@@ -130,7 +130,7 @@ export function resolveTemplate(template: string, metadata: PhotoMetadata) {
 }
 
 export function textColor(color: TextElement['color'], style: FrameSettings['style']) {
-  return color === 'auto' ? (style === 'white' ? '#161616' : '#ffffff') : color
+  return color === 'auto' ? (style === 'white' || style === 'softWhite' ? '#161616' : '#ffffff') : color
 }
 
 export function getCanvasFontFamily(fontFamily: string) {

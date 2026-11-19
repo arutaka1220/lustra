@@ -122,12 +122,17 @@ enum FrameStyle {
     Black,
     White,
     Blurred,
+    #[serde(alias = "softWhite")]
+    SoftWhite,
+    Custom,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Frame {
     style: FrameStyle,
+    #[serde(default)]
+    custom_color: Option<String>,
     top: f64,
     bottom: f64,
     left: f64,
@@ -784,6 +789,7 @@ mod tests {
     fn frame() -> Frame {
         Frame {
             style: FrameStyle::Blurred,
+            custom_color: None,
             top: 0.0,
             bottom: 0.0,
             left: 0.0,
@@ -883,10 +889,13 @@ mod tests {
                 .unwrap();
         fs::write(&path, &source).unwrap();
 
+        let mut custom_frame = frame();
+        custom_frame.style = FrameStyle::Custom;
+        custom_frame.custom_color = Some("#123ABC".to_owned());
         let job = ExportJob {
             path: path.clone(),
             id: "test".to_owned(),
-            frame: frame(),
+            frame: custom_frame,
             text: vec![TextItem {
                 text: "Lustra".to_owned(),
                 anchor: "bottom-center".to_owned(),

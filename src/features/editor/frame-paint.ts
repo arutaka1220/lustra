@@ -107,7 +107,7 @@ export class FrameBackdrop {
   update(scene: FrameScene): boolean {
     const { size, raster, frame, layout, dpr } = scene
     const { visible } = layout
-    const key = [size.width, size.height, dpr, frame.style, frame.blurStrength, frame.backgroundBrightness,
+    const key = [size.width, size.height, dpr, frame.style, frame.customColor, frame.blurStrength, frame.backgroundBrightness,
       frame.backgroundOpacity, frame.showShadow, visible.x, visible.y, visible.width, visible.height].join(':')
     if (this.raster === raster && this.key === key) return false
 
@@ -120,7 +120,7 @@ export class FrameBackdrop {
     this.key = key
 
     context.setTransform(canvas.width / size.width, 0, 0, canvas.height / size.height, 0, 0)
-    context.fillStyle = FRAME_COLORS[frame.style]
+    context.fillStyle = frame.style === 'custom' ? (frame.customColor ?? '#000000') : FRAME_COLORS[frame.style]
     context.fillRect(0, 0, size.width, size.height)
     if (frame.style === 'blurred' && (frame.backgroundOpacity ?? 100) > 0) paintBlurredBackground(context, scene)
     if (frame.showShadow) {
@@ -151,7 +151,7 @@ export function getInsetStroke(scene: FrameScene) {
     width: Math.max(0, visible.width - 2 * offset),
     height: Math.max(0, visible.height - 2 * offset),
   }
-  return frame.style === 'white'
+  return frame.style === 'white' || frame.style === 'softWhite'
     ? { rect, weight, color: 0x181916, alpha: 0.38, cssColor: 'rgba(24, 25, 22, .38)' }
     : { rect, weight, color: 0xffffff, alpha: 0.6, cssColor: 'rgba(255, 255, 255, .60)' }
 }

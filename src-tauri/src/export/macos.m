@@ -19,6 +19,7 @@ typedef struct {
     uint32_t quality;
     uint32_t preserve_color_space;
     uint32_t style;
+    uint32_t custom_color;
     uint32_t inset;
     uint32_t shadow;
     LustraRect image;
@@ -207,7 +208,7 @@ static bool draw_background(
     const double width = settings->width;
     const double height = settings->height;
     CGRect full = CGRectMake(0, 0, width, height);
-    uint32_t matte = settings->style == 0 ? 0x191a18ff : settings->style == 1 ? 0xfafaf8ff : 0x454842ff;
+    uint32_t matte = settings->style == 0 ? 0x000000ff : settings->style == 1 ? 0xffffffff : settings->style == 3 ? 0xfafaf8ff : settings->style == 4 ? (settings->custom_color << 8) | 0xff : 0x454842ff;
     CGColorRef color = make_color(srgb, matte);
     CGContextSetFillColorWithColor(context, color);
     CGContextFillRect(context, full);
@@ -294,7 +295,7 @@ static void draw_inset(CGContextRef context, CGColorSpaceRef srgb, CGRect visibl
     if (CGRectIsEmpty(inset)) {
         return;
     }
-    CGColorRef color = make_color(srgb, style == 1 ? 0x18191661 : 0xffffff99);
+    CGColorRef color = make_color(srgb, style == 1 || style == 3 ? 0x18191661 : 0xffffff99);
     CGContextSetStrokeColorWithColor(context, color);
     CGContextSetLineWidth(context, unit);
     CGContextStrokeRect(context, inset);

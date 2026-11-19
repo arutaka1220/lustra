@@ -483,3 +483,6 @@ RAW現像や明るさ調整・色調整などの編集機能は搭載しない�
 - キャンバス比率・Fit / Fill・クロップを廃止し、元画像全体に4辺の余白を加える仕様へ統一。既存の余白単位（完成キャンバスに対する割合）を維持。
 - 旧セッション／プリセットの比率・クロップ情報は無視し、余白・テキスト・有効な編集履歴を維持する。
 - JPEG / PNG / WebPのEXIF / XMP読み取り、項目単位のEXIF優先とXMP補完、タイムゾーン付き日時、読み取り状態と診断ログを追加。
+# 変更追補（2026-11-20）
+
+この追補は本文中の旧仕様より優先する。フレーム色はBlack `#000000`、White `#FFFFFF`、Soft White `#fafaf8`、Blurred、Customを提供する。Preset機能は廃止し、セッション単位の編集設定とUndo/Redoは維持する。PaddingはVertical（Top/Bottom）とHorizontal（Left/Right）に分け、各グループ内で連動を操作する。Custom色のMy Paletteはアプリ共通で最大16色とする。

@@ -18,10 +18,11 @@ export type PhotoSource =
   | { kind: 'path'; path: string; url: string; missing?: boolean }
   | { kind: 'file'; file: File; url: string }
 
-export type FrameStyle = 'black' | 'white' | 'blurred'
+export type FrameStyle = 'black' | 'white' | 'softWhite' | 'blurred' | 'custom'
 
 export type FrameSettings = {
   style: FrameStyle
+  customColor?: string
   top: number
   bottom: number
   left: number

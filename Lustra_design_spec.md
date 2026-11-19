@@ -570,3 +570,6 @@ v0.3時点での仕様を記録した説明。最新の確定内容は本文と�
 - Canvasの比率／Fit／Fill／Crop操作を削除し、元画像全体と四辺の余白で完成比率を決める。
 - 余白の単位は従来セッションとの互換性を保つため、完成キャンバス辺に対する割合を維持。
 - JPEG / PNG / WebPのEXIF / XMP値を表示へ統合し、XMPのURI名前空間識別、項目単位の補完、日時の小数秒・タイムゾーン保持を仕様化。
+# 変更追補（2026-11-20）
+
+この追補は本文中の旧Preset/色/Padding記述より優先する。InspectorにPresetセクションを表示しない。FrameにはBlack、White、Soft White、Blurred、Customを並べ、Custom色とアプリ共通My Palette（最大16色）を扱う。PaddingはVerticalとHorizontalの各グループにLink操作を置く。

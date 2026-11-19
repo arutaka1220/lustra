@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
 import { ArrowLeft, ArrowRight, Check, FileSearch } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -9,7 +9,7 @@ import { TextInspector } from '../text/TextInspector'
 import { Filmstrip } from './Filmstrip'
 import { FramePreview } from './FramePreview'
 import { FrameControls } from './FrameControls'
-import { PresetControls } from './PresetControls'
+import { prefetchEditPreview, previewNeighborIndices } from './preview-cache'
 
 type EditorScreenProps = {
   inspectorOpen: boolean
@@ -48,6 +48,16 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
   const frame = useMemo(() => getEffectiveFrame(activePhoto, commonFrame), [activePhoto, commonFrame])
   const controlsFrame = editMode === 'all' ? commonFrame : frame
   const index = Math.max(0, photos.findIndex((photo) => photo.id === activePhoto?.id))
+  const prefetchKey = previewNeighborIndices(photos.length, index).map(i => `${photos[i].id}\t${photos[i].source.url}`).join('\n')
+  useEffect(() => {
+    if (!prefetchKey) return
+    const controller = new AbortController()
+    for (const entry of prefetchKey.split('\n')) {
+      const [id, url] = entry.split('\t')
+      if (id && url) void prefetchEditPreview(url, controller.signal, id === activePhoto?.id ? 90 : 10).catch(() => {})
+    }
+    return () => controller.abort()
+  }, [activePhoto?.id, prefetchKey])
   const completed = photos.filter((photo) => photo.completed).length
   const layoutStyle = { '--inspector-width': `${inspectorWidth}px` } as CSSProperties
 
@@ -102,7 +112,6 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
           </div>
           <FrameControls frame={controlsFrame} onChange={updateFrame}
             onPatch={patchFrame} onFrameEditStart={beginFrameEdit} onFrameEditEnd={endFrameEdit}
-            preset={<PresetControls frame={controlsFrame} onApply={patchFrame} />}
           >
             <TextInspector photo={photo} frame={controlsFrame} />
           </FrameControls>

@@ -17,6 +17,7 @@ struct NativeRenderSettings {
     quality: u32,
     preserve_color_space: u32,
     style: u32,
+    custom_color: u32,
     inset: u32,
     shadow: u32,
     image: Rect,
@@ -146,7 +147,10 @@ pub fn render(path: &Path, job: &ExportJob, settings: &ExportSettings) -> Result
             FrameStyle::Black => 0,
             FrameStyle::White => 1,
             FrameStyle::Blurred => 2,
+            FrameStyle::SoftWhite => 3,
+            FrameStyle::Custom => 4,
         },
+        custom_color: parse_hex_color(job.frame.custom_color.as_deref().unwrap_or("#000000")),
         inset: u32::from(job.frame.show_inset),
         shadow: u32::from(job.frame.show_shadow),
         image: layout.image,
@@ -182,6 +186,15 @@ pub fn render(path: &Path, job: &ExportJob, settings: &ExportSettings) -> Result
         metadata::webp_with_profile(bytes, layout.width, layout.height, output.icc())
     } else {
         Ok(bytes)
+    }
+}
+
+fn parse_hex_color(value: &str) -> u32 {
+    let value = value.strip_prefix('#').unwrap_or(value);
+    if value.len() == 6 && value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        u32::from_str_radix(value, 16).unwrap_or(0)
+    } else {
+        0
     }
 }
 

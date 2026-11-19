@@ -100,7 +100,7 @@ export function ReviewThumbnail({ photo, frame }: Props) {
   }, [currentRendered])
 
   return <div className="review-thumbnail" ref={viewport}>
-    {currentRendered && thumbnail?.raster ? <div className={`preview-board preview-board--${frame.style} review-thumbnail__board`} style={board}>
+    {currentRendered && thumbnail?.raster ? <div className={`preview-board preview-board--${frame.style} review-thumbnail__board`} style={{ ...board, '--custom-frame-color': frame.customColor ?? '#000000' } as React.CSSProperties}>
       <canvas className="review-thumbnail__canvas" ref={displayCanvas} aria-hidden="true" />
       <TextOverlay photo={photo} frame={frame} canvasSize={board} />
     </div> : thumbnail?.error

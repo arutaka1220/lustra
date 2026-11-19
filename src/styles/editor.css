@@ -40,6 +40,23 @@
 .style-preview > span { display: block; width: 42%; height: 78%; border: 3px solid #f6f6f6; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
 .style-preview--black { background: #242426; }
 .style-preview--white { background: #e7e7e9; }
+.style-preview--softWhite { background: #fafaf8; }
+.style-preview--custom { background: linear-gradient(135deg, #ef5454, #4d61ef, #f4cd42); }
+.custom-color { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px; font-size: 12px; }
+.custom-color__swatch { width: 24px; height: 24px; border: 1px solid #aaa; border-radius: 50%; }
+.custom-color__popover { position: absolute; z-index: 5; top: 100%; left: 8px; display: grid; min-width: 220px; gap: 10px; padding: 12px; background: white; border: 1px solid #ddd; border-radius: 10px; box-shadow: 0 8px 24px #0002; }
+.custom-color__backdrop { position: fixed; z-index: 4; inset: 0; width: 100vw; height: 100vh; padding: 0; background: transparent; border: 0; }
+.custom-color__current { height: 24px; border: 1px solid #bbb; border-radius: 5px; }
+.custom-color__field { height: 112px; border: 1px solid #ddd; border-radius: 5px; touch-action: none; cursor: crosshair; }
+.custom-color__popover input[type=range] { width: 100%; }
+.custom-color__popover input[type=text], .custom-color__popover input[type=number] { min-width: 0; width: 100%; }
+.custom-color__rgb { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.custom-color__popover label { display: grid; gap: 3px; font-size: 11px; }
+.custom-color__palette { display: grid; grid-template-columns: repeat(8, 20px); gap: 6px; }
+.custom-color__palette button { width: 20px; height: 20px; border: 1px solid #bbb; border-radius: 50%; }
+.custom-color__palette span { grid-column: 1 / -1; }
+.padding-group { margin-top: 10px; }
+.padding-group > header { display: flex; align-items: center; justify-content: space-between; }
 .style-preview--white > span { border-color: #fff; }
 .style-preview--blur { background: linear-gradient(125deg, #768072, #999085 48%, #5c5b59); }
 .slider-field { min-width: 0; margin: 12px 0 14px; }

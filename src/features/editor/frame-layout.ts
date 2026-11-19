@@ -4,9 +4,11 @@ export type Size = { width: number; height: number }
 export type FrameRect = Size & { x: number; y: number }
 
 export const FRAME_COLORS = {
-  black: '#191a18',
-  white: '#fafaf8',
+  black: '#000000',
+  white: '#FFFFFF',
+  softWhite: '#fafaf8',
   blurred: '#454842',
+  custom: '#000000',
 } satisfies Record<FrameSettings['style'], string>
 
 function paddingFraction(value: number): number {

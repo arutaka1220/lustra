@@ -24,11 +24,37 @@ export type SessionWorkspace = Workspace<SessionPhoto, PhotoSource>
 type StoredWorkspace = Workspace<StoredPhoto, StoredSource>
 
 export type SessionSnapshot = {
-  version: 1
+  version: 1 | 2
   active: StoredWorkspace
   parked: StoredWorkspace | null
   recent: StoredWorkspace[]
   activeRecentId: string | null
+}
+
+function migrateLegacyWhite(workspace: StoredWorkspace): StoredWorkspace {
+  const frame = (value: any) => value && value.style === 'white' ? { ...value, style: 'softWhite' } : value
+  const photo = (value: any) => value && ({ ...value, overrides: frame(value.overrides) })
+  const series = (value: any, kind: 'common' | 'photo') => value && Object.fromEntries(['undo', 'redo'].map(direction => [direction, (value[direction] ?? []).map((entry: any) => {
+    const change = entry.change
+    if (change?.kind === kind) {
+      if (kind === 'common') return { ...entry, change: { ...change, values: { ...change.values, before: frame(change.values.before), after: frame(change.values.after) } } }
+      const edit = (v: any) => v?.overrides ? { ...v, overrides: frame(v.overrides) } : v
+      return { ...entry, change: { ...change, values: { ...change.values, before: edit(change.values.before), after: edit(change.values.after) } } }
+    }
+    return entry
+  })]))
+  return {
+    ...workspace,
+    commonFrame: frame(workspace.commonFrame),
+    photos: workspace.photos.map(photo),
+    removedPhotos: workspace.removedPhotos.map((v: any) => ({ ...v, photo: photo(v.photo) })),
+    history: {
+      ...workspace.history,
+      detachedPhotos: Object.fromEntries(Object.entries(workspace.history.detachedPhotos).map(([id, v]) => [id, photo(v)])),
+      common: series(workspace.history.common, 'common'),
+      photos: Object.fromEntries(Object.entries(workspace.history.photos).map(([id, v]) => [id, series(v, 'photo')])),
+    },
+  }
 }
 
 function serializePhoto(photo: SessionPhoto): StoredPhoto | undefined {
@@ -165,3 +191,5 @@ export function deserializeWorkspace(workspace: StoredWorkspace, initialFrame: F
     },
   }
 }
+
+export { migrateLegacyWhite }

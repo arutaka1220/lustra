@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react'
 import { readAppPreference, writeAppPreference } from '../../store/session-persistence'
 
-export type InspectorSectionId = 'preset' | 'frame' | 'padding' | 'effects' | 'text' | 'typography' | 'guides'
+export type InspectorSectionId = 'frame' | 'padding' | 'effects' | 'text' | 'typography' | 'guides'
 
 type SectionState = Record<InspectorSectionId, boolean>
 
 const STORAGE_KEY = 'lustra.inspector-sections'
 const PREF_KEY = 'editor.inspector-sections'
 const DEFAULT_SECTIONS: SectionState = {
-  preset: false,
   frame: true,
   padding: true,
   effects: false,

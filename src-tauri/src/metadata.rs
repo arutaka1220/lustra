@@ -1265,6 +1265,24 @@ mod tests {
     }
 
     #[test]
+    fn reads_the_repository_png_and_jpeg_metadata_samples() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../test-data");
+        let jpeg = read_photo_metadata_file(&root.join("DSC_8575.jpg"));
+        let png = read_photo_metadata_file(&root.join("DSC_8575.png"));
+        for result in [jpeg, png] {
+            assert_eq!(
+                result.metadata.camera.as_deref(),
+                Some("NIKON CORPORATION NIKON Z 6_2")
+            );
+            assert_eq!(
+                result.metadata.lens.as_deref(),
+                Some("NIKKOR Z 24-70mm f/4 S")
+            );
+            assert_eq!(result.metadata.iso.as_deref(), Some("51200"));
+        }
+    }
+
+    #[test]
     fn reads_png_exif_chunk() {
         let fields = [
             ascii_field(Tag::Make, "NIKON CORPORATION"),

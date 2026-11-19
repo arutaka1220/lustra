@@ -7,6 +7,9 @@ import { canvasAspectRatio, fitCanvasToBounds, getPhotoLayout } from './frame-la
 import type { Size } from './frame-layout'
 import { createCanvasRenderer, createFrameScene } from './frame-paint'
 import type { PhotoRaster, PreviewRenderer } from './frame-paint'
+import { useEditPreview } from './preview-cache'
+import { usePhotoThumbnail } from '../import/photo-thumbnail-cache'
+import { PhotoThumbnailCanvas } from '../import/PhotoThumbnailCanvas'
 import './frame-i18n'
 import '../../styles/frame-preview.css'
 
@@ -49,8 +52,10 @@ export function FramePreview({ photo, frame, compact = false, readOnly = false, 
   const [loaded, setLoaded] = useState<LoadedPhoto>()
   const sourceUrl = photo.source.url
   const status = loaded?.url === sourceUrl ? loaded : undefined
-  const raster = status?.raster
   const sourceMissing = photo.source.kind === 'path' && photo.source.missing === true
+  const highResolution = useEditPreview(compact ? undefined : sourceUrl, seen && !sourceMissing)
+  const smallPreview = usePhotoThumbnail(!compact && sourceUrl && !sourceMissing ? sourceUrl : undefined, 100)
+  const raster = compact ? status?.raster : highResolution?.raster
   const size = fitCanvasToBounds(available, canvasAspectRatio(frame, raster))
   const photoLayout = raster && getPhotoLayout(size, raster, frame)
   const paintRef = useRef<() => void>(() => {})
@@ -88,7 +93,7 @@ export function FramePreview({ photo, frame, compact = false, readOnly = false, 
   useLayoutEffect(() => { imageErrorRef.current = onImageError }, [onImageError])
 
   useEffect(() => {
-    if (!seen || sourceMissing || !sourceUrl) return
+    if (compact || !seen || sourceMissing || !sourceUrl) return
     let active = true
     const image = new Image()
     image.crossOrigin = 'anonymous'
@@ -109,6 +114,10 @@ export function FramePreview({ photo, frame, compact = false, readOnly = false, 
       if (compact) setLoaded(undefined)
     }
   }, [compact, seen, sourceMissing, sourceUrl])
+
+  useEffect(() => {
+    if (highResolution?.error) imageErrorRef.current?.()
+  }, [highResolution?.error])
 
   useEffect(() => {
     const mount = surface.current
@@ -169,13 +178,14 @@ export function FramePreview({ photo, frame, compact = false, readOnly = false, 
 
   const visible = photoLayout?.visible
   const interactive = !compact && !readOnly
-  const missing = sourceMissing || status?.error
+  const missing = sourceMissing || status?.error || highResolution?.error
 
   return (
     <div className={`framed-preview-viewport${compact ? ' framed-preview-viewport--compact' : ''}`} ref={viewport}>
-      <div className={`preview-board preview-board--${frame.style}`} style={size}>
+      <div className={`preview-board preview-board--${frame.style}`} style={{ ...size, '--custom-frame-color': frame.customColor ?? '#000000' } as React.CSSProperties}>
         <div className="framed-preview-surface" ref={surface} hidden={!raster || !seen || sourceMissing} role="img" aria-label={compact ? undefined : photo.name} aria-hidden={compact || undefined} />
-        {missing ? <span className="framed-preview-message"><ImageOff size={18} />{t('framePreview.unavailable')}</span> : !raster && !compact && <span className="framed-preview-message" role="status">{t('framePreview.loading')}</span>}
+        {!raster && smallPreview?.raster && !missing && <div className="preview-loading-thumb" aria-hidden="true"><PhotoThumbnailCanvas url={sourceUrl} fit="contain" /></div>}
+        {missing ? <span className="framed-preview-message"><ImageOff size={18} />{t('framePreview.unavailable')}</span> : !raster && !smallPreview?.raster && !compact && <span className="framed-preview-message" role="status">{t('framePreview.loading')}</span>}
         {raster && !sourceMissing && seen && <TextOverlay photo={photo} frame={frame} interactive={interactive} imageBounds={visible} canvasSize={size} onRevealInspector={onRevealInspector} />}
       </div>
     </div>

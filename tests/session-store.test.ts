@@ -85,6 +85,63 @@ describe('session history and recovery', () => {
     expect(session().commonFrame.bottom).toBe(15)
   })
 
+  test('migrates version 1 White values in the session and history to Soft White', () => {
+    session().addToSession([photo('old')])
+    session().updateFrame('style', 'white')
+    session().setEditMode('this')
+    session().updateFrame('style', 'white')
+    const old = JSON.parse(JSON.stringify(getSessionSnapshot())) as any
+    old.version = 1
+    useSessionStore.setState(useSessionStore.getInitialState(), true)
+    restoreSessionSnapshot(old)
+    expect(session().commonFrame.style).toBe('softWhite')
+    expect(session().photos[0].overrides.style).toBe('softWhite')
+    expect(session().history.common.undo.at(-1)?.change).toMatchObject({ kind: 'common', values: { before: { style: 'black' }, after: { style: 'softWhite' } } })
+    session().undo()
+    expect(session().photos[0].overrides.style).toBeUndefined()
+  })
+
+  test('links and unlinks both padding axes with one undoable change and restores link state', () => {
+    session().addToSession([photo('padding')])
+    session().updateFrame('left', 11)
+    expect(session().commonFrame).toMatchObject({ left: 11, right: 11 })
+    session().updateFrame('linkSides', false)
+    session().updateFrame('right', 20)
+    session().updateFrame('left', 7)
+    expect(session().commonFrame).toMatchObject({ left: 7, right: 20, linkSides: false })
+    session().patchFrame({ linkSides: true, right: session().commonFrame.left })
+    expect(session().commonFrame).toMatchObject({ left: 7, right: 7, linkSides: true })
+    session().undo()
+    expect(session().commonFrame).toMatchObject({ left: 7, right: 20, linkSides: false })
+    session().patchFrame({ linkVertical: true, bottom: session().commonFrame.top })
+    session().updateFrame('top', 9)
+    expect(session().commonFrame).toMatchObject({ top: 9, bottom: 9 })
+    const snapshot = JSON.parse(JSON.stringify(getSessionSnapshot()))
+    useSessionStore.setState(useSessionStore.getInitialState(), true)
+    restoreSessionSnapshot(snapshot)
+    expect(session().commonFrame).toMatchObject({ linkSides: false, linkVertical: true, top: 9, bottom: 9 })
+  })
+
+  test('reimporting the same original in a new session does not carry Completed state', () => {
+    session().addToSession([photo('same')])
+    session().setCompleted('same', true)
+    session().finishSession()
+    const repeatedOriginal = { ...photo('same-again'), name: 'same.jpg', source: { kind: 'path' as const, path: '/photos/same.jpg', url: '/photos/same.jpg' } }
+    session().addToSession([repeatedOriginal])
+    expect(session().photos).toHaveLength(1)
+    expect(session().photos[0].source.path).toBe('/photos/same.jpg')
+    expect(session().photos[0].completed).toBe(false)
+  })
+
+  test('restores Custom frame values independently of any palette entries', () => {
+    session().addToSession([photo('color')])
+    session().patchFrame({ style: 'custom', customColor: '#123ABC' })
+    const snapshot = JSON.parse(JSON.stringify(getSessionSnapshot()))
+    useSessionStore.setState(useSessionStore.getInitialState(), true)
+    restoreSessionSnapshot(snapshot)
+    expect(session().commonFrame).toMatchObject({ style: 'custom', customColor: '#123ABC' })
+  })
+
   test('finishing a reopened session updates its history item and brings back the parked work', () => {
     session().addToSession([photo('a'), photo('b')])
     const firstId = session().sessionId
