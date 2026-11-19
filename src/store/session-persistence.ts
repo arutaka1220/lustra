@@ -64,6 +64,7 @@ let closing = false
 const windowCloseGuards = new Set<() => boolean>()
 let pendingPerformance: PerformancePreferences | null = null
 let performanceReadFailed = false
+let recoveryOnly = false
 
 function subscribeStatus(listener: () => void): () => void {
   listeners.add(listener)
@@ -146,6 +147,7 @@ function sessionChanged(state: SessionState, previous: SessionState): boolean {
 }
 
 function onStoreChanged(state: SessionState, previous: SessionState) {
+  if (recoveryOnly) return
   const performanceChanged = state.recentLimit !== previous.recentLimit || state.undoLimit !== previous.undoLimit
   if (performanceChanged) {
     pendingPerformance = { recentLimit: state.recentLimit, undoLimit: state.undoLimit }
@@ -201,13 +203,13 @@ function startRestore(): void {
     const archive = restored.value
     let recentSessionsTrimmed = false
     if (archive?.snapshot) {
-      if (archive.snapshot.version !== 1) throw new Error('This session archive requires a newer version of Lustra.')
       restoreSessionSnapshot(archive.snapshot, archive.missingPaths)
       const { recentSessions } = useSessionStore.getState()
       recentSessionsTrimmed = recentSessions.length < archive.snapshot.recent.length
       scheduleRecentThumbnails(recentSessions, true)
     }
     if (isTauri()) await attachCloseHandler()
+    recoveryOnly = false
     useSessionStore.subscribe(onStoreChanged)
     performanceReadFailed = performance.status === 'rejected'
     reportStatus({ ready: true, error: performance.status === 'rejected' ? explain(performance.reason) : null })
@@ -219,7 +221,11 @@ function startRestore(): void {
 }
 
 function retry() {
-  if (!status.ready) startRestore()
+  if (recoveryOnly) {
+    recoveryOnly = false
+    reportStatus({ ready: false, error: null })
+    startRestore()
+  } else if (!status.ready) startRestore()
   else if (performanceReadFailed) void loadPerformance().then(saveNow, reportPersistenceError)
   else saveNow()
 }
@@ -227,7 +233,13 @@ function retry() {
 export function useSessionPersistence() {
   const current = useSyncExternalStore(subscribeStatus, () => status)
   useEffect(startRestore, [])
-  return { ...current, retry }
+  const goHome = () => {
+    if (current.ready || !current.error) return
+    recoveryOnly = true
+    useSessionStore.getState().setScreen('welcome')
+    reportStatus({ ready: true, error: current.error })
+  }
+  return { ...current, retry, goHome, protectedArchive: recoveryOnly }
 }
 
 const thumbnailObservers = new Set<(id?: string) => void>()

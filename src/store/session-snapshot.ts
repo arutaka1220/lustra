@@ -23,12 +23,26 @@ type Workspace<P, Source> = {
 export type SessionWorkspace = Workspace<SessionPhoto, PhotoSource>
 type StoredWorkspace = Workspace<StoredPhoto, StoredSource>
 
+export const SESSION_SNAPSHOT_VERSION = 2 as const
+
 export type SessionSnapshot = {
-  version: 1 | 2
+  version: number
   active: StoredWorkspace
   parked: StoredWorkspace | null
   recent: StoredWorkspace[]
   activeRecentId: string | null
+}
+
+export function assertSupportedSessionSnapshot(snapshot: SessionSnapshot): void {
+  if (!snapshot || typeof snapshot !== 'object' || !Number.isInteger(snapshot.version)) {
+    throw new Error('This session archive is invalid or damaged.')
+  }
+  if (snapshot.version > SESSION_SNAPSHOT_VERSION) {
+    throw new Error('This session archive requires a newer version of Lustra.')
+  }
+  if (snapshot.version < 1) {
+    throw new Error('This session archive is invalid or damaged.')
+  }
 }
 
 function migrateLegacyWhite(workspace: StoredWorkspace): StoredWorkspace {

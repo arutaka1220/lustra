@@ -94,11 +94,45 @@ describe('session history and recovery', () => {
     old.version = 1
     useSessionStore.setState(useSessionStore.getInitialState(), true)
     restoreSessionSnapshot(old)
+    expect(getSessionSnapshot().version).toBe(2)
     expect(session().commonFrame.style).toBe('softWhite')
     expect(session().photos[0].overrides.style).toBe('softWhite')
     expect(session().history.common.undo.at(-1)?.change).toMatchObject({ kind: 'common', values: { before: { style: 'black' }, after: { style: 'softWhite' } } })
     session().undo()
     expect(session().photos[0].overrides.style).toBeUndefined()
+  })
+
+  test('writes the current archive version and rejects unsupported versions without changing the store', () => {
+    session().addToSession([photo('versioned')])
+    const current = getSessionSnapshot()
+    expect(current.version).toBe(2)
+
+    const before = session().photos
+    expect(() => restoreSessionSnapshot({ ...current, version: 3 })).toThrow('This session archive requires a newer version of Lustra.')
+    expect(session().photos).toBe(before)
+    expect(() => restoreSessionSnapshot({ ...current, version: 0 })).toThrow('This session archive is invalid or damaged.')
+  })
+
+  test('survives three serialized restart cycles with photo, frame, text, padding, color, and completion intact', () => {
+    session().addToSession([photo('restart')])
+    session().setScreen('edit')
+    session().patchFrame({
+      style: 'custom', customColor: '#123ABC', top: 12, bottom: 24, left: 9, right: 9,
+      textElements: [{ id: 'title', template: 'Lustra test', anchor: 'bottom-left', x: 34, y: -18, size: 20, fontFamily: 'Arial', weight: 400, color: '#123ABC', visible: true }],
+    })
+    session().setCompleted('restart', true)
+
+    for (let restart = 0; restart < 3; restart += 1) {
+      const archived = JSON.parse(JSON.stringify(getSessionSnapshot()))
+      useSessionStore.setState(useSessionStore.getInitialState(), true)
+      restoreSessionSnapshot(archived)
+      expect(getSessionSnapshot().version).toBe(2)
+      expect(session().screen).toBe('edit')
+      expect(session().photos).toHaveLength(1)
+      expect(session().photos[0].completed).toBe(true)
+      expect(session().commonFrame).toMatchObject({ style: 'custom', customColor: '#123ABC', top: 12, bottom: 24, left: 9, right: 9 })
+      expect(session().commonFrame.textElements?.[0]).toMatchObject({ template: 'Lustra test', color: '#123ABC' })
+    }
   })
 
   test('links and unlinks both padding axes with one undoable change and restores link state', () => {

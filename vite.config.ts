@@ -4,6 +4,7 @@ import { defineConfig } from 'vite'
 
 // Tauri expects a stable localhost port and does not want Vite to silently move.
 export default defineConfig({
+  base: process.env.LUSTRA_E2E_FILE_MODE === '1' ? './' : '/',
   plugins: [react(), tailwindcss()],
   clearScreen: false,
   server: {

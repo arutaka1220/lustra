@@ -17,6 +17,7 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_fs::FsExt;
 
 const SESSIONS: &str = "sessions";
+const LEGACY_SESSION_BACKUP: &str = "sessions.migration-backup.v1";
 const METADATA_CORRECTIONS: &str = "metadata_corrections";
 const MAX_THUMBNAIL_BYTES: usize = 256 * 1024;
 
@@ -57,6 +58,24 @@ fn read_record(database: &Database, key: &str) -> Result<Option<Value>, String> 
         .read(key)?
         .map(|text| serde_json::from_str(&text).map_err(|error| error.to_string()))
         .transpose()
+}
+
+fn preserve_v1_session_before_upgrade(
+    database: &Database,
+    previous: Option<&Value>,
+    next: &Value,
+) -> Result<(), String> {
+    let is_v1_to_v2 = previous
+        .and_then(|snapshot| snapshot.get("version"))
+        .and_then(Value::as_u64)
+        == Some(1)
+        && next.get("version").and_then(Value::as_u64) == Some(2);
+    if is_v1_to_v2 && read_record(database, LEGACY_SESSION_BACKUP)?.is_none() {
+        let previous = previous.expect("checked above");
+        let serialized = serde_json::to_string(previous).map_err(|error| error.to_string())?;
+        database.write(LEGACY_SESSION_BACKUP, &serialized)?;
+    }
+    Ok(())
 }
 
 fn image_path(path: &Path) -> bool {
@@ -154,12 +173,51 @@ pub(crate) async fn save_sessions(app: AppHandle, snapshot: Value) -> Result<(),
             }
         }
         let serialized = serde_json::to_string(&snapshot).map_err(|error| error.to_string())?;
+        preserve_v1_session_before_upgrade(&database, previous.as_ref(), &snapshot)?;
         database.write(SESSIONS, &serialized)?;
         // Cache eviction is advisory once the edit transaction has committed.
         let _ = prune_thumbnails(data_dir, &snapshot);
         Ok(())
     })
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{
+        fs, process,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    #[test]
+    fn backs_up_v1_archive_before_first_v2_overwrite() {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let folder =
+            std::env::temp_dir().join(format!("lustra-session-migration-{}-{now}", process::id()));
+        fs::create_dir(&folder).unwrap();
+        let database = Database::open(&folder.join("sessions.sqlite3")).unwrap();
+        let v1: Value = serde_json::from_str(r#"{"version":1,"active":{"id":"kept"}}"#).unwrap();
+        let v2: Value = serde_json::from_str(r#"{"version":2,"active":{"id":"new"}}"#).unwrap();
+        database
+            .write(SESSIONS, &serde_json::to_string(&v1).unwrap())
+            .unwrap();
+
+        preserve_v1_session_before_upgrade(&database, Some(&v1), &v2).unwrap();
+        database
+            .write(SESSIONS, &serde_json::to_string(&v2).unwrap())
+            .unwrap();
+
+        assert_eq!(read_record(&database, SESSIONS).unwrap(), Some(v2));
+        assert_eq!(
+            read_record(&database, LEGACY_SESSION_BACKUP).unwrap(),
+            Some(v1)
+        );
+        let _ = fs::remove_dir_all(folder);
+    }
 }
 
 #[tauri::command]

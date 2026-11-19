@@ -88,8 +88,11 @@ export function App() {
       />
 
       {persistence.error && <div className="persistence-notice" role="alert">
-        <div><strong>{t(persistence.ready ? 'session.saveError' : 'session.loadError')}</strong><small>{persistence.error}</small></div>
+        <div><strong>{t(persistence.protectedArchive || !persistence.ready ? 'session.loadError' : 'session.saveError')}</strong><small>{persistence.error}</small>
+          {persistence.protectedArchive && <small>{t('session.recoveryNoOverwrite')}</small>}
+        </div>
         <button className="button button--secondary button--small" onClick={persistence.retry}>{t('common.retry')}</button>
+        {!persistence.ready && <button className="button button--secondary button--small" onClick={persistence.goHome}>{t('common.home')}</button>}
       </div>}
       {!persistence.ready && !persistence.error && <main className="session-loading" role="status">{t('session.loading')}</main>}
       {persistence.ready && screen === 'welcome' && <WelcomeScreen onImportPhotos={photoImport.openFiles} onImportFolder={photoImport.openFolder} />}

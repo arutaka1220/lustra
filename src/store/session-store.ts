@@ -6,7 +6,7 @@ import {
   mergeChanges, moveHistoryEntry, pruneHistory, selectRedoSeries, selectUndoSeries, sessionLayout,
 } from './session-history'
 import type { PhotoEdit, RemovedPhoto, SessionChange, SessionHistory, SessionLayout } from './session-history'
-import { deserializeWorkspace, migrateLegacyWhite, serializeWorkspace } from './session-snapshot'
+import { assertSupportedSessionSnapshot, deserializeWorkspace, migrateLegacyWhite, serializeWorkspace, SESSION_SNAPSHOT_VERSION } from './session-snapshot'
 import type { SessionSnapshot, SessionWorkspace } from './session-snapshot'
 
 export type { SessionSnapshot, SessionWorkspace } from './session-snapshot'
@@ -550,7 +550,7 @@ export function canRedo(state: SessionState) {
 
 export function getSessionSnapshot(state = useSessionStore.getState()): SessionSnapshot {
   return {
-    version: 2,
+    version: SESSION_SNAPSHOT_VERSION,
     active: serializeWorkspace(currentWorkspace(state)),
     parked: state.parkedSession && serializeWorkspace(state.parkedSession),
     recent: state.recentSessions.map(serializeWorkspace).filter((workspace) => (
@@ -561,7 +561,7 @@ export function getSessionSnapshot(state = useSessionStore.getState()): SessionS
 }
 
 export function restoreSessionSnapshot(snapshot: SessionSnapshot, missingPaths: string[] = []) {
-  if (snapshot.version !== 1 && snapshot.version !== 2) return
+  assertSupportedSessionSnapshot(snapshot)
   const missing = new Set(missingPaths)
   const { undoLimit, recentLimit } = useSessionStore.getState()
   const restore = (workspace: SessionSnapshot['active']) => limitWorkspaceHistory(deserializeWorkspace(snapshot.version === 1 ? migrateLegacyWhite(workspace) : workspace, initialFrame, missing), undoLimit)
