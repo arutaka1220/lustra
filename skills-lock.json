@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "skills": {
+    "intelirelease": {
+      "source": "tukuyomil032/intelirelease-skill",
+      "commit": "4c490fd547773c9e1d26a51d7f9eab9b91b1eb75",
+      "sourceType": "github",
+      "skillPath": "skills/intelirelease/SKILL.md",
+      "computedHash": "c6ffb7943c86d246b60d48eb8287d1cfb71421c498ad93fc7643aa0eb66017cc"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+@media (max-width: 1100px) {
+  .app-header { padding-right: 12px; padding-left: 12px; }
+  .preview-nav--left { left: 8px; }
+  .preview-nav--right { right: 8px; }
+  .preview-stage-content { padding-right: 44px; padding-left: 44px; }
+  .editor-footer { gap: 10px; padding-right: 10px; padding-left: 10px; }
+  .editor-footer__left small { display: none; }
+}
+
+@media (max-width: 980px) {
+  .import-view, .review-view { padding-right: 20px; padding-left: 20px; }
+  .candidate-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; padding: 12px; }
+  .review-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+  .editor-footer__right .button { padding-right: 7px; padding-left: 7px; }
+  .editor-footer__right { gap: 4px; }
+}
+
+@media (max-height: 760px) {
+  .filmstrip { height: 118px; padding-top: 6px; padding-bottom: 6px; }
+  .filmstrip-thumb { height: 57px; }
+  .preview-stage-wrap { min-height: 230px; }
+}
+
+@media (max-height: 620px) {
+  .filmstrip { height: 98px; }
+  .filmstrip-heading { height: 22px; }
+  .filmstrip-thumb { height: 44px; }
+  .preview-stage-wrap { min-height: 190px; }
+  .preview-stage-label { top: 7px; }
+}

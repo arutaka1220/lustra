@@ -1,0 +1,14 @@
+.photo-virtual-grid {
+  box-sizing: border-box;
+  min-height: 0;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
+.photo-virtual-grid__row,
+.photo-virtual-grid__cell {
+  min-width: 0;
+  min-height: 0;
+}
+
+.photo-virtual-grid__cell > * { width: 100%; height: 100%; }

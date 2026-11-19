@@ -1,0 +1,17 @@
+.ui-combobox-popup {
+  position: fixed;
+  z-index: 50;
+  padding: 5px;
+  overflow: hidden;
+  color: var(--text-primary);
+  background: var(--panel-bg);
+  border: 1px solid var(--stroke-color);
+  border-radius: 10px;
+  box-shadow: var(--shadow-menu);
+}
+.ui-combobox-list { max-height: min(280px, 40vh); overflow-y: auto; overscroll-behavior: contain; }
+.ui-combobox-option { min-height: 32px; padding: 7px 9px; overflow: hidden; border-radius: 6px; color: var(--text-secondary); cursor: pointer; text-overflow: ellipsis; white-space: nowrap; }
+.ui-combobox-option:hover, .ui-combobox-option[data-highlighted="true"] { color: var(--text-primary); background: var(--surface-hover); }
+.text-fields .ui-combobox-field { display: grid; min-width: 0; gap: 4px; color: var(--text-secondary); font-size: 12px; }
+.ui-combobox-input { width: 100%; min-height: 36px; padding: 0 10px; color: var(--text-primary); background: var(--panel-bg); border: 1px solid var(--stroke-color); border-radius: 8px; font: inherit; }
+.ui-combobox-input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }

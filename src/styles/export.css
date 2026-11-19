@@ -1,0 +1,288 @@
+.export-view {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  align-items: flex-start;
+  justify-content: center;
+  padding: clamp(var(--space-6), 5vh, 48px) var(--space-6);
+  overflow-y: auto;
+}
+
+.export-card {
+  display: grid;
+  width: min(100%, 640px);
+  gap: var(--space-6);
+  padding: var(--space-6);
+  background: var(--panel-bg);
+  border: var(--stroke-width) solid var(--stroke-color);
+  border-radius: var(--radius-md);
+}
+
+.export-card h1 {
+  margin: 0;
+  outline: none;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -.025em;
+}
+
+.export-form,
+.export-preferences-panel,
+.export-result,
+.export-progress,
+.export-advanced__content {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.export-preferences-panel h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.export-preferences-panel .export-destination {
+  flex-wrap: wrap;
+}
+
+.export-preferences-panel .export-destination > span {
+  flex-basis: 45%;
+}
+
+.export-form__basics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.export-field {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.export-field > span:first-child,
+.export-metadata legend {
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.export-field .ui-select-trigger { min-height: 36px; }
+
+.export-field small,
+.export-metadata small {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.export-destination {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.export-destination > span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.export-destination__path {
+  color: var(--text-secondary);
+}
+
+.export-advanced {
+  border-block: var(--stroke-width) solid var(--stroke-color);
+}
+
+.export-advanced summary {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  font-weight: 550;
+  list-style: none;
+}
+
+.export-advanced summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.export-advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+.export-advanced:not([open]) summary svg {
+  transform: rotate(-90deg);
+}
+
+.export-advanced__content {
+  padding: var(--space-2) 0 var(--space-4);
+}
+
+.export-metadata {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.export-metadata legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+}
+
+.export-metadata__options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-4);
+}
+
+.export-checkbox {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.export-checkbox input {
+  accent-color: var(--accent);
+}
+
+.export-checkbox:has(input:disabled) {
+  color: var(--text-muted);
+}
+
+.export-actions,
+.export-result__actions > div,
+.export-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.export-actions {
+  justify-content: space-between;
+}
+
+.export-actions--end,
+.export-result__actions > div {
+  justify-content: flex-end;
+}
+
+.export-progress__label,
+.export-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.export-progress__label {
+  justify-content: space-between;
+  color: var(--text-secondary);
+}
+
+.export-progress__label strong {
+  color: var(--text-primary);
+}
+
+.export-progress progress {
+  width: 100%;
+  height: 8px;
+  appearance: none;
+  color: var(--accent);
+  background: var(--surface-hover);
+  border: 0;
+  border-radius: 4px;
+}
+
+.export-progress progress::-webkit-progress-bar {
+  background: var(--surface-hover);
+  border-radius: 4px;
+}
+
+.export-progress progress::-webkit-progress-value {
+  background: var(--accent);
+  border-radius: 4px;
+}
+
+.export-progress progress::-moz-progress-bar {
+  background: var(--accent);
+  border-radius: 4px;
+}
+
+.export-summary > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.export-summary__saved {
+  color: var(--status-success);
+}
+
+.export-summary__failed,
+.export-delete-button {
+  color: var(--status-danger);
+}
+
+.export-message,
+.export-result__destination {
+  margin: 0;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.export-failed h2 {
+  margin: 0 0 var(--space-2);
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.export-failed ul,
+.export-error ul {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: var(--space-4);
+  list-style: disc;
+}
+
+.export-failed li,
+.export-error li {
+  overflow-wrap: anywhere;
+}
+
+.export-failed li span {
+  display: block;
+  color: var(--text-secondary);
+}
+
+.export-error {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  padding: var(--space-3);
+  color: var(--status-danger);
+  border: var(--stroke-width) solid currentColor;
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
+.export-dialog {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.export-dialog .dialog-title {
+  margin-top: 0;
+}

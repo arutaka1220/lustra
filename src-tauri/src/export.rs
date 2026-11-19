@@ -1,0 +1,990 @@
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::HashSet,
+    fs::{self, Metadata, OpenOptions},
+    io::{self, Write},
+    path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicU64, AtomicU8, AtomicUsize, Ordering},
+        mpsc, Arc, Mutex,
+    },
+};
+use tauri::{ipc::Channel, AppHandle, Manager};
+use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_fs::FsExt;
+
+#[cfg(target_os = "macos")]
+mod macos;
+mod metadata;
+#[cfg(target_os = "macos")]
+use macos as platform;
+
+#[cfg(not(target_os = "macos"))]
+mod platform {
+    use super::{ExportFormat, ExportJob, ExportSettings, Path};
+
+    pub fn available(_: ExportFormat) -> bool {
+        false
+    }
+
+    pub fn memory_bytes() -> u64 {
+        0
+    }
+
+    pub fn render(_: &Path, _: &ExportJob, _: &ExportSettings) -> Result<Vec<u8>, String> {
+        Err("Native image export is unavailable on this platform.".to_owned())
+    }
+}
+
+static DESTINATION: Mutex<Option<DestinationGrant>> = Mutex::new(None);
+static ACTIVE: Mutex<Option<ActiveRun>> = Mutex::new(None);
+static RUN_SEQUENCE: AtomicU64 = AtomicU64::new(1);
+const RUNNING: u8 = 0;
+const KEEP_OUTPUTS: u8 = 1;
+const DELETE_OUTPUTS: u8 = 2;
+const FINISHED: u8 = 3;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ExportFormat {
+    Jpeg,
+    Png,
+    Webp,
+}
+
+impl ExportFormat {
+    fn extension(self) -> &'static str {
+        match self {
+            Self::Jpeg => "jpg",
+            Self::Png => "png",
+            Self::Webp => "webp",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum OriginalSize {
+    Original,
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(untagged)]
+enum ExportSize {
+    Original(OriginalSize),
+    ShortEdge(u32),
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum ColorSpace {
+    Srgb,
+    Original,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportSettings {
+    format: ExportFormat,
+    size: ExportSize,
+    quality: u8,
+    keep_camera: bool,
+    keep_lens: bool,
+    keep_exposure: bool,
+    keep_date: bool,
+    keep_gps: bool,
+    keep_serial: bool,
+    apply_metadata_corrections: bool,
+    color_space: ColorSpace,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportJob {
+    id: String,
+    path: PathBuf,
+    frame: Frame,
+    #[serde(default)]
+    crop: Crop,
+    #[serde(default)]
+    text: Vec<TextItem>,
+    #[serde(default)]
+    metadata: MetadataCorrections,
+}
+
+#[derive(Default, Deserialize)]
+pub struct MetadataCorrections {
+    camera: Option<String>,
+    lens: Option<String>,
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum FrameStyle {
+    Black,
+    White,
+    Blurred,
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum FitMode {
+    Fit,
+    Fill,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Frame {
+    style: FrameStyle,
+    top: f64,
+    bottom: f64,
+    left: f64,
+    right: f64,
+    blur_strength: f64,
+    background_brightness: f64,
+    #[serde(default = "full_opacity")]
+    background_opacity: f64,
+    ratio: String,
+    #[serde(default = "one")]
+    ratio_width: f64,
+    #[serde(default = "one")]
+    ratio_height: f64,
+    fit: FitMode,
+    show_inset: bool,
+    show_shadow: bool,
+}
+
+fn full_opacity() -> f64 {
+    100.0
+}
+
+fn one() -> f64 {
+    1.0
+}
+
+#[derive(Deserialize)]
+struct Crop {
+    x: f64,
+    y: f64,
+    zoom: f64,
+}
+
+impl Default for Crop {
+    fn default() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.0,
+            zoom: 1.0,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TextItem {
+    text: String,
+    #[serde(default = "bottom_left")]
+    anchor: String,
+    x: f64,
+    y: f64,
+    size: f64,
+    font_family: String,
+    weight: u32,
+    color: String,
+}
+
+fn bottom_left() -> String {
+    "bottom-left".to_owned()
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+#[repr(C)]
+struct Rect {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
+
+struct Layout {
+    width: u32,
+    height: u32,
+    image: Rect,
+    visible_image: Rect,
+}
+
+fn layout(
+    frame: &Frame,
+    crop: &Crop,
+    source_width: u32,
+    source_height: u32,
+    size: ExportSize,
+) -> Result<Layout, String> {
+    let source_width = f64::from(source_width);
+    let source_height = f64::from(source_height);
+    let ratio = match frame.ratio.as_str() {
+        "1:1" => 1.0,
+        "4:5" => 4.0 / 5.0,
+        "3:4" => 3.0 / 4.0,
+        "9:16" => 9.0 / 16.0,
+        "3:2" => 3.0 / 2.0,
+        "16:9" => 16.0 / 9.0,
+        "auto" => source_width / source_height,
+        "custom" => frame.ratio_width / frame.ratio_height,
+        _ => return Err("Invalid canvas ratio.".to_owned()),
+    };
+    if !(0.001..=1000.0).contains(&ratio) || source_width < 1.0 || source_height < 1.0 {
+        return Err("Invalid image or canvas dimensions.".to_owned());
+    }
+
+    let left = frame.left.clamp(0.0, 49.0) / 100.0;
+    let right = frame.right.clamp(0.0, 49.0) / 100.0;
+    let top = frame.top.clamp(0.0, 49.0) / 100.0;
+    let bottom = frame.bottom.clamp(0.0, 49.0) / 100.0;
+    let inner_width = 1.0 - left - right;
+    let inner_height = 1.0 - top - bottom;
+    let zoom = crop.zoom.clamp(1.0, 3.0);
+    let width_baseline = source_width / (ratio * inner_width);
+    let height_baseline = source_height / inner_height;
+    let canvas_height = match size {
+        ExportSize::Original(_) => match frame.fit {
+            FitMode::Fit => width_baseline.max(height_baseline),
+            FitMode::Fill => width_baseline.min(height_baseline) / zoom,
+        },
+        ExportSize::ShortEdge(edge) => f64::from(edge) / ratio.min(1.0),
+    };
+
+    let width = (canvas_height * ratio).round().max(1.0) as u32;
+    let height = canvas_height.round().max(1.0) as u32;
+    if u64::from(width) * u64::from(height) > 90_000_000 || width > 32_768 || height > 32_768 {
+        return Err(
+            "The output dimensions are too large. Choose a smaller export size.".to_owned(),
+        );
+    }
+
+    let inner = Rect {
+        x: f64::from(width) * left,
+        y: f64::from(height) * top,
+        width: f64::from(width) * inner_width,
+        height: f64::from(height) * inner_height,
+    };
+    let scale_width = inner.width / source_width;
+    let scale_height = inner.height / source_height;
+    let scale = match frame.fit {
+        FitMode::Fit => scale_width.min(scale_height),
+        FitMode::Fill => scale_width.max(scale_height) * zoom,
+    };
+    let image_width = source_width * scale;
+    let image_height = source_height * scale;
+    let x_offset = match frame.fit {
+        FitMode::Fit => 0.0,
+        FitMode::Fill => crop.x.clamp(-1.0, 1.0),
+    };
+    let y_offset = match frame.fit {
+        FitMode::Fit => 0.0,
+        FitMode::Fill => crop.y.clamp(-1.0, 1.0),
+    };
+    let image = Rect {
+        x: inner.x + (inner.width - image_width) * (1.0 + x_offset) * 0.5,
+        y: inner.y + (inner.height - image_height) * (1.0 + y_offset) * 0.5,
+        width: image_width,
+        height: image_height,
+    };
+    let visible_image = match frame.fit {
+        FitMode::Fit => image,
+        FitMode::Fill => inner,
+    };
+
+    Ok(Layout {
+        width,
+        height,
+        image,
+        visible_image,
+    })
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportCapabilities {
+    formats: Vec<ExportFormat>,
+    metadata_formats: Vec<ExportFormat>,
+    icc_formats: Vec<ExportFormat>,
+}
+
+#[tauri::command]
+pub fn get_export_capabilities() -> ExportCapabilities {
+    let formats = [ExportFormat::Jpeg, ExportFormat::Png, ExportFormat::Webp]
+        .into_iter()
+        .filter(|format| platform::available(*format))
+        .collect::<Vec<_>>();
+    ExportCapabilities {
+        metadata_formats: formats.clone(),
+        icc_formats: formats.clone(),
+        formats,
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+struct DestinationGrant {
+    path: PathBuf,
+    identity: (u64, u64),
+}
+
+fn grant_path(app: &AppHandle) -> Option<PathBuf> {
+    app.path()
+        .app_data_dir()
+        .ok()
+        .map(|directory| directory.join("export-destination.json"))
+}
+
+fn save_grant(app: &AppHandle, grant: &DestinationGrant) -> io::Result<()> {
+    let path = grant_path(app)
+        .ok_or_else(|| io::Error::other("Application data directory unavailable"))?;
+    let directory = path
+        .parent()
+        .ok_or_else(|| io::Error::other("Invalid application data directory"))?;
+    fs::create_dir_all(directory)?;
+    let nonce = RUN_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let temporary = directory.join(format!(
+        "export-destination-{}-{nonce}.tmp",
+        std::process::id()
+    ));
+    let metadata = write_new(&temporary, &serde_json::to_vec(grant)?)?;
+    let temporary = TemporaryOutput::new(temporary, &metadata);
+    fs::rename(&temporary.path, path)
+}
+
+#[tauri::command]
+pub async fn choose_export_destination(
+    app: AppHandle,
+    default_path: Option<PathBuf>,
+    title: Option<String>,
+) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut dialog = app
+            .dialog()
+            .file()
+            .set_title(title.as_deref().unwrap_or("Choose export folder"));
+        if let Some(path) = default_path.filter(|path| path.is_dir()) {
+            dialog = dialog.set_directory(path);
+        }
+        let Some(selected) = dialog.blocking_pick_folder() else {
+            return Ok(None);
+        };
+        let path = selected.into_path().map_err(|error| error.to_string())?;
+        let path = path.canonicalize().map_err(|error| error.to_string())?;
+        let displayed_path = path
+            .to_str()
+            .ok_or("The destination path is not valid UTF-8.")?
+            .to_owned();
+        let metadata = path.metadata().map_err(|error| error.to_string())?;
+        let grant = DestinationGrant {
+            path,
+            identity: file_identity(&metadata),
+        };
+        let mut destination = DESTINATION.lock().map_err(|error| error.to_string())?;
+        let _ = save_grant(&app, &grant);
+        *destination = Some(grant);
+        Ok(Some(displayed_path))
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+fn authorized_destination(app: &AppHandle, path: &Path) -> Option<PathBuf> {
+    let resolved = path.canonicalize().ok()?;
+    let metadata = resolved.metadata().ok()?;
+    let mut stored = DESTINATION.lock().ok()?;
+    if stored.is_none() {
+        let path = grant_path(app)?;
+        let bytes = fs::read(path).ok()?;
+        *stored = serde_json::from_slice(&bytes).ok();
+    }
+    let grant = stored.as_ref()?;
+    (metadata.is_dir() && grant.path == resolved && grant.identity == file_identity(&metadata))
+        .then_some(resolved)
+}
+
+#[tauri::command]
+pub fn check_export_destination(app: AppHandle, destination: PathBuf) -> bool {
+    authorized_destination(&app, &destination).is_some()
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CancelPolicy {
+    Keep,
+    Delete,
+}
+
+struct ActiveRun {
+    id: String,
+    status: Arc<AtomicU8>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum ExportEvent {
+    Photo {
+        id: String,
+        outcome: ExportOutcome,
+        processed: usize,
+        total: usize,
+    },
+    Finished {
+        cancelled: bool,
+        cleanup_errors: Vec<String>,
+        deleted_ids: Vec<String>,
+    },
+}
+
+#[derive(Clone, Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum ExportOutcome {
+    Success { path: String },
+    Failed { message: String },
+}
+
+#[tauri::command]
+pub fn begin_export(
+    app: AppHandle,
+    destination: PathBuf,
+    jobs: Vec<ExportJob>,
+    settings: ExportSettings,
+    on_event: Channel<ExportEvent>,
+) -> Result<String, String> {
+    let destination = authorized_destination(&app, &destination)
+        .ok_or("Select the destination folder in Lustra before exporting.")?;
+    if jobs.is_empty() {
+        return Err("There are no photos to export.".to_owned());
+    }
+    if jobs.iter().any(|job| !job.path.is_absolute()) {
+        return Err("Every export job needs an absolute source path.".to_owned());
+    }
+    let unique_ids: HashSet<_> = jobs.iter().map(|job| &job.id).collect();
+    if unique_ids.len() != jobs.len() {
+        return Err("The export batch contains duplicate job IDs.".to_owned());
+    }
+    if !platform::available(settings.format) {
+        return Err("This output format is unavailable on this computer.".to_owned());
+    }
+    if matches!(settings.size, ExportSize::ShortEdge(edge) if ![720, 1080, 1440, 2160].contains(&edge))
+    {
+        return Err("The short edge needs to be 720, 1080, 1440, or 2160 pixels.".to_owned());
+    }
+    if !(1..=100).contains(&settings.quality) {
+        return Err("Quality must be between 1 and 100.".to_owned());
+    }
+
+    let mut active = ACTIVE.lock().map_err(|error| error.to_string())?;
+    if active.is_some() {
+        return Err("An export is already running.".to_owned());
+    }
+    let id = format!(
+        "{}-{}",
+        std::process::id(),
+        RUN_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+    );
+    let status = Arc::new(AtomicU8::new(RUNNING));
+    *active = Some(ActiveRun {
+        id: id.clone(),
+        status: status.clone(),
+    });
+    let worker_id = id.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        run_export(
+            app,
+            destination,
+            &jobs,
+            &settings,
+            on_event,
+            status,
+            &worker_id,
+        )
+    });
+    Ok(id)
+}
+
+#[tauri::command]
+pub fn cancel_export(run_id: String, policy: CancelPolicy) -> Result<(), String> {
+    let active = ACTIVE.lock().map_err(|error| error.to_string())?;
+    let Some(run) = active.as_ref().filter(|run| run.id == run_id) else {
+        return Ok(());
+    };
+    let status = match policy {
+        CancelPolicy::Keep => KEEP_OUTPUTS,
+        CancelPolicy::Delete => DELETE_OUTPUTS,
+    };
+    let _ = run
+        .status
+        .compare_exchange(RUNNING, status, Ordering::AcqRel, Ordering::Acquire);
+    Ok(())
+}
+
+struct OutputFile {
+    path: PathBuf,
+    metadata: Metadata,
+}
+
+fn render_one(
+    app: &AppHandle,
+    destination: &Path,
+    job: &ExportJob,
+    settings: &ExportSettings,
+    status: &AtomicU8,
+    run_id: &str,
+    index: usize,
+) -> Result<Option<OutputFile>, String> {
+    let source = job
+        .path
+        .canonicalize()
+        .map_err(|error| format!("Cannot access the source photo: {error}"))?;
+    if !source.is_file()
+        || !(app.fs_scope().is_allowed(&source) || app.asset_protocol_scope().is_allowed(&source))
+    {
+        return Err("The source photo needs to be selected or relinked in Lustra.".to_owned());
+    }
+    let is_photo = source.extension().is_some_and(|extension| {
+        ["jpg", "jpeg", "png", "webp"]
+            .iter()
+            .any(|supported| extension.eq_ignore_ascii_case(supported))
+    });
+    if !is_photo {
+        return Err("The source is not a supported image file.".to_owned());
+    }
+
+    let bytes = platform::render(&source, job, settings)?;
+    if status.load(Ordering::Acquire) != RUNNING {
+        return Ok(None);
+    }
+
+    let metadata = metadata::filtered_exif(&source, settings, &job.metadata)?;
+    let bytes = match metadata {
+        Some(metadata) => metadata::attach_exif(bytes, metadata, settings.format)?,
+        None => bytes,
+    };
+    if status.load(Ordering::Acquire) != RUNNING {
+        return Ok(None);
+    }
+
+    let stem = job
+        .path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .ok_or("Invalid photo filename.")?;
+    write_output(destination, stem, settings.format, &bytes, run_id, index)
+        .map(Some)
+        .map_err(|error| format!("Cannot write the output file: {error}"))
+}
+
+fn run_export(
+    app: AppHandle,
+    destination: PathBuf,
+    jobs: &[ExportJob],
+    settings: &ExportSettings,
+    events: Channel<ExportEvent>,
+    status: Arc<AtomicU8>,
+    run_id: &str,
+) {
+    let cpu_count = std::thread::available_parallelism().map_or(1, usize::from);
+    let worker_count = if matches!(settings.size, ExportSize::Original(_))
+        || cpu_count < 6
+        || platform::memory_bytes() < 12 * 1024 * 1024 * 1024
+    {
+        1
+    } else {
+        jobs.len().min(2)
+    };
+    let next_job = AtomicUsize::new(0);
+    let (sent, received) = mpsc::channel();
+    let mut written = Vec::new();
+    let mut processed = 0;
+
+    std::thread::scope(|scope| {
+        for _ in 0..worker_count {
+            let sent = sent.clone();
+            let next_job = &next_job;
+            let status = &status;
+            let app = &app;
+            let destination = &destination;
+            scope.spawn(move || {
+                while status.load(Ordering::Acquire) == RUNNING {
+                    let index = next_job.fetch_add(1, Ordering::Relaxed);
+                    let Some(job) = jobs.get(index) else { break };
+                    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        render_one(app, destination, job, settings, status, run_id, index)
+                    }))
+                    .unwrap_or_else(|_| Err("The image renderer stopped unexpectedly.".to_owned()));
+                    if sent.send((job, outcome)).is_err() {
+                        break;
+                    }
+                }
+            });
+        }
+        drop(sent);
+        for (job, result) in received {
+            let outcome = match result {
+                Ok(Some(output)) => {
+                    let path = output.path.to_string_lossy().into_owned();
+                    written.push((job.id.clone(), output));
+                    ExportOutcome::Success { path }
+                }
+                Ok(None) => continue,
+                Err(message) => ExportOutcome::Failed { message },
+            };
+            processed += 1;
+            if events
+                .send(ExportEvent::Photo {
+                    id: job.id.clone(),
+                    outcome,
+                    processed,
+                    total: jobs.len(),
+                })
+                .is_err()
+            {
+                let _ = status.compare_exchange(
+                    RUNNING,
+                    KEEP_OUTPUTS,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                );
+            }
+        }
+    });
+
+    let final_status = status.swap(FINISHED, Ordering::AcqRel);
+    let mut cleanup_errors = Vec::new();
+    let mut deleted_ids = Vec::new();
+    if final_status == DELETE_OUTPUTS {
+        for (id, output) in written {
+            match remove_output(&output) {
+                Ok(()) => deleted_ids.push(id),
+                Err(error) => cleanup_errors.push(format!("{}: {error}", output.path.display())),
+            }
+        }
+    }
+    if let Ok(mut active) = ACTIVE.lock() {
+        *active = None;
+    }
+    let _ = events.send(ExportEvent::Finished {
+        cancelled: final_status != RUNNING,
+        cleanup_errors,
+        deleted_ids,
+    });
+}
+
+struct TemporaryOutput {
+    path: PathBuf,
+    identity: (u64, u64),
+}
+
+impl TemporaryOutput {
+    fn new(path: PathBuf, metadata: &Metadata) -> Self {
+        Self {
+            path,
+            identity: file_identity(metadata),
+        }
+    }
+}
+
+impl Drop for TemporaryOutput {
+    fn drop(&mut self) {
+        remove_if_owned(&self.path, self.identity);
+    }
+}
+
+fn remove_if_owned(path: &Path, identity: (u64, u64)) {
+    if fs::symlink_metadata(path)
+        .is_ok_and(|file| file.is_file() && file_identity(&file) == identity)
+    {
+        let _ = fs::remove_file(path);
+    }
+}
+
+fn write_new(path: &Path, bytes: &[u8]) -> io::Result<Metadata> {
+    let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
+    let result = (|| {
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        file.metadata()
+    })();
+    if result.is_err() {
+        let identity = file.metadata().ok().as_ref().map(file_identity);
+        drop(file);
+        if let Some(identity) = identity {
+            remove_if_owned(path, identity);
+        }
+    }
+    result
+}
+
+fn write_output(
+    directory: &Path,
+    stem: &str,
+    format: ExportFormat,
+    bytes: &[u8],
+    run_id: &str,
+    index: usize,
+) -> io::Result<OutputFile> {
+    let temporary_path = directory.join(format!(".lustra-export-{run_id}-{index}.tmp"));
+    let metadata = write_new(&temporary_path, bytes)?;
+    let temporary = TemporaryOutput::new(temporary_path, &metadata);
+    let mut can_link = true;
+    for number in 1..=10_000 {
+        let extra = if number == 1 {
+            String::new()
+        } else {
+            format!("_{number}")
+        };
+        let path = directory.join(format!("{stem}_framed{extra}.{}", format.extension()));
+        if can_link {
+            match fs::hard_link(&temporary.path, &path) {
+                Ok(()) => return Ok(OutputFile { path, metadata }),
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(error)
+                    if [
+                        io::ErrorKind::Unsupported,
+                        io::ErrorKind::PermissionDenied,
+                        io::ErrorKind::CrossesDevices,
+                    ]
+                    .contains(&error.kind()) =>
+                {
+                    can_link = false
+                }
+                Err(error) => return Err(error),
+            }
+        }
+
+        // Some removable and network volumes cannot create hard links. Use a
+        // no-replace create there and remove an incomplete file on write failure.
+        match write_new(&path, bytes) {
+            Ok(metadata) => return Ok(OutputFile { path, metadata }),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(io::Error::new(
+        io::ErrorKind::AlreadyExists,
+        "All numbered output names already exist.",
+    ))
+}
+
+fn remove_output(output: &OutputFile) -> io::Result<()> {
+    let current = match fs::symlink_metadata(&output.path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    if !current.is_file()
+        || current.len() != output.metadata.len()
+        || current.modified().ok() != output.metadata.modified().ok()
+        || file_identity(&current) != file_identity(&output.metadata)
+    {
+        return Err(io::Error::other(
+            "The file changed after export and was left in place.",
+        ));
+    }
+    fs::remove_file(&output.path)
+}
+
+#[cfg(unix)]
+fn file_identity(metadata: &Metadata) -> (u64, u64) {
+    use std::os::unix::fs::MetadataExt;
+    (metadata.dev(), metadata.ino())
+}
+
+#[cfg(not(unix))]
+fn file_identity(metadata: &Metadata) -> (u64, u64) {
+    let created = metadata
+        .created()
+        .ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok());
+    created.map_or((0, 0), |time| {
+        (time.as_secs(), u64::from(time.subsec_nanos()))
+    })
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::*;
+    use exif::{experimental::Writer, Field, In, Reader, Tag, Value};
+    use std::io::Cursor;
+
+    // A 3×2 RGB image with red and green rows, independent of any system photos.
+    const SOURCE_PNG: &[u8] = &[
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x02, 0x08, 0x02, 0x00, 0x00, 0x00, 0x12,
+        0x16, 0xf1, 0x4d, 0x00, 0x00, 0x00, 0x11, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0xf8,
+        0xcf, 0xc0, 0x00, 0x41, 0x30, 0xfa, 0x3f, 0x03, 0x00, 0x3e, 0xd5, 0x05, 0xfb, 0xa8, 0x2e,
+        0x2f, 0x4d, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+    ];
+
+    struct ScratchDirectory(PathBuf);
+
+    impl ScratchDirectory {
+        fn new() -> Self {
+            let nonce = RUN_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+            let path = std::env::temp_dir()
+                .join(format!("lustra-export-test-{}-{nonce}", std::process::id()));
+            fs::create_dir(&path).unwrap();
+            Self(path)
+        }
+    }
+
+    impl Drop for ScratchDirectory {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn frame() -> Frame {
+        Frame {
+            style: FrameStyle::Blurred,
+            top: 0.0,
+            bottom: 0.0,
+            left: 0.0,
+            right: 0.0,
+            blur_strength: 30.0,
+            background_brightness: 80.0,
+            background_opacity: 70.0,
+            ratio: "4:5".to_owned(),
+            ratio_width: 1.0,
+            ratio_height: 1.0,
+            fit: FitMode::Fill,
+            show_inset: true,
+            show_shadow: true,
+        }
+    }
+
+    #[test]
+    fn original_fill_maintains_source_crop_pixel_density() {
+        let mut frame = frame();
+        let mut crop = Crop::default();
+        let size = ExportSize::Original(OriginalSize::Original);
+        let output = layout(&frame, &crop, 6000, 4000, size).unwrap();
+        assert_eq!((output.width, output.height), (3200, 4000));
+        assert_eq!(output.image.width, 6000.0);
+        crop.zoom = 2.0;
+        crop.x = 1.0;
+        let output = layout(&frame, &crop, 6000, 4000, size).unwrap();
+        assert_eq!((output.width, output.height), (1600, 2000));
+        assert_eq!(output.image.x, -4400.0);
+        frame.fit = FitMode::Fit;
+        let output = layout(&frame, &crop, 6000, 4000, size).unwrap();
+        assert_eq!((output.width, output.height), (6000, 7500));
+    }
+
+    #[test]
+    fn cancellation_cleanup_skips_files_replaced_after_export() {
+        let directory = ScratchDirectory::new();
+        let existing = directory.0.join("photo_framed.jpg");
+        fs::write(&existing, b"existing").unwrap();
+        let output = write_output(
+            &directory.0,
+            "photo",
+            ExportFormat::Jpeg,
+            b"export",
+            "test",
+            0,
+        )
+        .unwrap();
+        assert_eq!(output.path.file_name().unwrap(), "photo_framed_2.jpg");
+        assert_eq!(fs::read(&existing).unwrap(), b"existing");
+        let replacement = directory.0.join("other.jpg");
+        fs::write(&replacement, b"export").unwrap();
+        fs::rename(replacement, &output.path).unwrap();
+        assert!(remove_output(&output).is_err());
+        assert_eq!(fs::read(&output.path).unwrap(), b"export");
+    }
+
+    #[test]
+    fn native_formats_embed_allowed_exif_without_sensitive_fields() {
+        let directory = ScratchDirectory::new();
+        let path = directory.0.join("source.png");
+        let fields = [
+            (Tag::Make, Value::Ascii(vec![b"NIKON".to_vec()])),
+            (Tag::Model, Value::Ascii(vec![b"Old Camera".to_vec()])),
+            (Tag::LensModel, Value::Ascii(vec![b"Old Lens".to_vec()])),
+            (
+                Tag::BodySerialNumber,
+                Value::Ascii(vec![b"private".to_vec()]),
+            ),
+            (Tag::GPSLatitudeRef, Value::Ascii(vec![b"N".to_vec()])),
+        ]
+        .map(|(tag, value)| Field {
+            tag,
+            value,
+            ifd_num: In::PRIMARY,
+        });
+        let mut writer = Writer::new();
+        for field in &fields {
+            writer.push_field(field);
+        }
+        let mut payload = Cursor::new(Vec::new());
+        writer.write(&mut payload, false).unwrap();
+        let source =
+            metadata::attach_exif(SOURCE_PNG.to_vec(), payload.into_inner(), ExportFormat::Png)
+                .unwrap();
+        fs::write(&path, &source).unwrap();
+
+        let job = ExportJob {
+            path: path.clone(),
+            id: "test".to_owned(),
+            frame: frame(),
+            crop: Crop::default(),
+            text: vec![TextItem {
+                text: "Lustra".to_owned(),
+                anchor: "bottom-center".to_owned(),
+                x: 0.0,
+                y: -34.0,
+                size: 36.0,
+                font_family: "Arial".to_owned(),
+                weight: 700,
+                color: "#ffffff".to_owned(),
+            }],
+            metadata: MetadataCorrections {
+                camera: Some("NIKON New Camera".to_owned()),
+                lens: None,
+            },
+        };
+        for format in get_export_capabilities().formats {
+            let settings = ExportSettings {
+                format,
+                size: ExportSize::ShortEdge(720),
+                quality: 90,
+                keep_camera: true,
+                keep_lens: false,
+                keep_exposure: false,
+                keep_date: false,
+                keep_gps: false,
+                keep_serial: false,
+                apply_metadata_corrections: true,
+                color_space: ColorSpace::Srgb,
+            };
+            let pixels = platform::render(&path, &job, &settings).unwrap();
+            let exif = metadata::filtered_exif(&path, &settings, &job.metadata)
+                .unwrap()
+                .unwrap();
+            let framed = metadata::attach_exif(pixels, exif, format).unwrap();
+            let name = directory.0.join(format!("framed.{}", format.extension()));
+            fs::write(&name, &framed).unwrap();
+            let parsed = Reader::new()
+                .read_from_container(&mut Cursor::new(framed))
+                .unwrap();
+            let camera = parsed.get_field(Tag::Model, In::PRIMARY).unwrap();
+            assert!(matches!(&camera.value, Value::Ascii(values) if values[0] == b"New Camera"));
+            for tag in [Tag::LensModel, Tag::BodySerialNumber, Tag::GPSLatitudeRef] {
+                assert!(parsed.get_field(tag, In::PRIMARY).is_none());
+            }
+
+            // A native decoder must still accept the file after metadata insertion.
+            assert!(platform::render(&name, &job, &settings).is_ok());
+        }
+        assert_eq!(fs::read(path).unwrap(), source);
+    }
+}
