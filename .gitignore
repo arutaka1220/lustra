@@ -3,6 +3,7 @@ node_modules/
 dist/
 .vite/
 .bun-cache/
+test-results/
 
 # Tauri build artifacts
 src-tauri/target/
@@ -11,4 +12,3 @@ src-tauri/gen/schemas/
 # Local OS files
 .DS_Store
 Thumbs.db
-
