@@ -13,6 +13,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 cc = "1"
 tauri-build = { version = "2", features = [] }
 
+[dev-dependencies]
+png = "0.18.1"
+
 [dependencies]
 crc32fast = "1"
 exif = { package = "kamadak-exif", version = "0.6" }

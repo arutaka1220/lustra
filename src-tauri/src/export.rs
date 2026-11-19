@@ -837,6 +837,56 @@ mod tests {
     }
 
     #[test]
+    fn frame_style_colors_are_written_to_png_pixels_without_changing_the_source() {
+        let directory = ScratchDirectory::new();
+        let path = directory.0.join("source.png");
+        fs::write(&path, SOURCE_PNG).unwrap();
+        let settings = ExportSettings {
+            format: ExportFormat::Png,
+            size: ExportSize::Original(OriginalSize::Original),
+            quality: 90,
+            keep_camera: false,
+            keep_lens: false,
+            keep_exposure: false,
+            keep_date: false,
+            keep_gps: false,
+            keep_serial: false,
+            apply_metadata_corrections: false,
+            color_space: ColorSpace::Srgb,
+        };
+        for (style, custom_color, expected) in [
+            (FrameStyle::Black, None, [0x00, 0x00, 0x00]),
+            (FrameStyle::White, None, [0xFF, 0xFF, 0xFF]),
+            (FrameStyle::SoftWhite, None, [0xFA, 0xFA, 0xF8]),
+            (FrameStyle::Custom, Some("#123ABC"), [0x12, 0x3A, 0xBC]),
+        ] {
+            let mut export_frame = frame();
+            export_frame.style = style;
+            export_frame.custom_color = custom_color.map(str::to_owned);
+            export_frame.left = 50.0;
+            let job = ExportJob {
+                path: path.clone(),
+                id: "frame-color-pixel".to_owned(),
+                frame: export_frame,
+                text: vec![],
+                metadata: MetadataCorrections { camera: None, lens: None },
+            };
+            let bytes = platform::render(&path, &job, &settings).unwrap();
+            let mut decoder = png::Decoder::new(Cursor::new(bytes));
+            decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
+            let mut reader = decoder.read_info().unwrap();
+            let mut pixels = vec![0; reader.output_buffer_size().unwrap()];
+            let info = reader.next_frame(&mut pixels).unwrap();
+            let pixel = match info.color_type {
+                png::ColorType::Rgb | png::ColorType::Rgba => &pixels[0..3],
+                other => panic!("Unexpected PNG color type: {other:?}"),
+            };
+            assert_eq!(pixel, expected);
+        }
+        assert_eq!(fs::read(path).unwrap(), SOURCE_PNG);
+    }
+
+    #[test]
     fn cancellation_cleanup_skips_files_replaced_after_export() {
         let directory = ScratchDirectory::new();
         let existing = directory.0.join("photo_framed.jpg");

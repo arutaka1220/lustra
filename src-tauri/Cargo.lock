@@ -1825,6 +1825,7 @@ dependencies = [
  "crc32fast",
  "flate2",
  "kamadak-exif",
+ "png",
  "quick-xml",
  "serde",
  "serde_json",

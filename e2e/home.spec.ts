@@ -1,13 +1,19 @@
 import { expect, test } from '@playwright/test'
 import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+
+const appUrl = process.env.LUSTRA_E2E_FILE_MODE === '1'
+  ? pathToFileURL(resolve('dist/index.html')).href
+  : '/'
+
 test('home screen loads and offers photo import', async ({ page }) => {
-  await page.goto('/')
+  await page.goto(appUrl)
   await expect(page.getByRole('heading').first()).toBeVisible()
   await expect(page.getByRole('button', { name: /import photos/i })).toBeVisible()
 })
 
 test('Home import creates a fresh photo import session', async ({ page }) => {
-  await page.goto('/')
+  await page.goto(appUrl)
   await page.getByRole('button', { name: /import photos/i }).click()
   await page.locator('input[type=file]').first().setInputFiles([resolve('test-data/DSC_8575.jpg'), resolve('test-data/DSC_8575.png')])
   await page.getByRole('button', { name: /got it/i }).click()
@@ -20,10 +26,11 @@ test('Home import creates a fresh photo import session', async ({ page }) => {
   await expect(page.getByRole('img', { name: 'DSC_8575.jpg' })).toBeVisible()
   await page.getByRole('button', { name: /custom/i }).click()
   await page.getByRole('button', { name: /choose custom frame color/i }).click()
-  await page.getByRole('textbox', { name: 'HEX' }).fill('#123ABC')
-  await expect(page.getByLabel('Current color #123ABC')).toBeVisible()
-  await page.getByRole('button', { name: /add color to my palette/i }).click()
-  await expect(page.getByLabel('My Palette 1 / 16')).toBeVisible()
+  const picker = page.getByRole('dialog', { name: 'Frame Color' })
+  await picker.getByRole('textbox', { name: 'HEX' }).fill('#123ABC')
+  await expect(page.getByRole('button', { name: /choose custom frame color/i })).toContainText('#123ABC')
+  await page.getByRole('button', { name: /save current color/i }).click()
+  await expect(page.getByRole('region', { name: 'My Palette 1 / 16' })).toBeVisible()
   await page.locator('.custom-color__popover button[aria-label="Close color picker"]').click()
   await page.getByRole('button', { name: /link left & right/i }).click()
   await expect(page.getByRole('button', { name: /link left & right/i })).toHaveAttribute('aria-pressed', 'false')
