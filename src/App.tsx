@@ -10,7 +10,6 @@ import { ImportScreen } from './features/import/ImportScreen'
 import { ReviewScreen } from './features/review/ReviewScreen'
 import { useEditorShortcuts } from './hooks/useEditorShortcuts'
 import { useInspectorLayout } from './hooks/useInspectorLayout'
-import { useSystemTheme } from './hooks/useSystemTheme'
 import { usePhotoImport } from './features/import/usePhotoImport'
 import { useSessionStore } from './store/session-store'
 import { readAppPreference, useSessionPersistence } from './store/session-persistence'
@@ -29,7 +28,6 @@ export function App() {
   const settingsOpen = useSessionStore((state) => state.settingsOpen)
   const toggleSettings = useSessionStore((state) => state.toggleSettings)
   const completedCount = photos.filter((photo) => photo.completed).length
-  const theme = useSystemTheme()
   const inspector = useInspectorLayout()
   const persistence = useSessionPersistence()
   const [exportBusy, setExportBusy] = useState(false)
@@ -37,7 +35,6 @@ export function App() {
   const loadMetadataCorrections = useMetadataCorrections((state) => state.load)
 
   useEditorShortcuts(persistence.ready && !settingsOpen ? screen : 'welcome')
-  useEffect(() => { document.documentElement.dataset.theme = theme }, [theme])
   useEffect(() => { void loadMetadataCorrections() }, [loadMetadataCorrections])
   useEffect(() => {
     let disposed = false
@@ -48,7 +45,7 @@ export function App() {
   }, [i18n])
 
   return (
-    <div className="app-shell" data-theme={theme} onDrop={photoImport.handleDrop} onDragOver={(event) => {
+    <div className="app-shell" onDrop={photoImport.handleDrop} onDragOver={(event) => {
       if (event.dataTransfer.types.includes('Files')) event.preventDefault()
     }}>
       <input

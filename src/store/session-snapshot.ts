@@ -1,6 +1,8 @@
 import { convertFileSrc, isTauri } from '@tauri-apps/api/core'
+import { PHOTO_METADATA_READER_VERSION } from '../types/photo'
 import type { FrameSettings, PhotoSource, SessionPhoto } from '../types/photo'
-import type { HistoryEntry, PhotoEdit, RemovedPhoto, SessionHistory, SessionLayout, ValueChange } from './session-history'
+import { withoutLegacyCanvasSettings, withoutLegacyCrop } from '../features/editor/frame-migration'
+import type { HistoryEntry, PhotoEdit, RemovedPhoto, SessionChange, SessionHistory, SessionLayout } from './session-history'
 
 type StoredSource = { kind: 'path'; path: string }
 type StoredPhoto = Omit<SessionPhoto, 'source'> & { source: StoredSource }
@@ -98,19 +100,61 @@ export function deserializeWorkspace(workspace: StoredWorkspace, initialFrame: F
     const missing = missingPaths.has(source.path)
     return { ...source, missing, url: missing ? '' : isTauri() ? convertFileSrc(source.path) : source.path }
   }
-  const restorePhoto = (photo: StoredPhoto): SessionPhoto => ({ ...photo, source: restoreSource(photo.source) })
-  const restoreChange = ({ keys, before, after }: ValueChange<PhotoEdit<StoredSource>>): ValueChange<PhotoEdit> => {
-    const format = ({ source, ...rest }: Partial<PhotoEdit<StoredSource>>): Partial<PhotoEdit> => source ? { ...rest, source: restoreSource(source) } : rest
-    return { keys, before: format(before), after: format(after) }
+  const normalizePhoto = (photo: StoredPhoto): StoredPhoto => {
+    const withoutCrop = withoutLegacyCrop(photo)
+    const canReadSource = !missingPaths.has(photo.source.path)
+    const metadataIsStale = canReadSource && photo.metadataReaderVersion !== PHOTO_METADATA_READER_VERSION
+    return {
+      ...withoutCrop,
+      metadataState: metadataIsStale ? 'loading' : photo.metadataState,
+      overrides: withoutLegacyCanvasSettings(photo.overrides),
+    } as StoredPhoto
   }
-  const restoreEntry = (entry: HistoryEntry<StoredSource>): HistoryEntry => {
+  const restorePhoto = (photo: StoredPhoto): SessionPhoto => ({ ...normalizePhoto(photo), source: restoreSource(photo.source) })
+  const restorePhotoEdit = (value: Partial<PhotoEdit<StoredSource>>): Partial<PhotoEdit> => {
+    const withoutCrop = withoutLegacyCrop(value) as Partial<PhotoEdit<StoredSource>> & { overrides?: Record<string, unknown> }
+    const normalized = withoutCrop.overrides
+      ? { ...withoutCrop, overrides: withoutLegacyCanvasSettings(withoutCrop.overrides) as Partial<FrameSettings> }
+      : withoutCrop
+    const { source, ...rest } = normalized
+    return source ? { ...rest, source: restoreSource(source) } : rest
+  }
+  const restorePhotoChange = (change: Extract<SessionChange<StoredSource>, { kind: 'photo' }>) => {
+    const keys = change.values.keys.filter((key) => String(key) !== 'crop')
+    if (!keys.length) return null
+    const before = restorePhotoEdit(change.values.before)
+    const after = restorePhotoEdit(change.values.after)
+    if (JSON.stringify(before) === JSON.stringify(after)) return null
+    return { ...change, values: { keys, before, after } }
+  }
+  const restoreCommonChange = (change: Extract<SessionChange<StoredSource>, { kind: 'common' }>) => {
+    const removedKeys = new Set(['ratio', 'ratioWidth', 'ratioHeight', 'fit'])
+    const keys = change.values.keys.filter((key) => !removedKeys.has(String(key)))
+    if (!keys.length) return null
+    const before = withoutLegacyCanvasSettings(change.values.before)
+    const after = withoutLegacyCanvasSettings(change.values.after)
+    return { ...change, values: { keys, before, after } }
+  }
+  const restoreEntry = (entry: HistoryEntry<StoredSource>): HistoryEntry | null => {
     const change = entry.change
-    return change.kind === 'photo' ? { ...entry, change: { ...change, values: restoreChange(change.values) } } : { ...entry, change }
+    if (change.kind === 'photo') {
+      const normalized = restorePhotoChange(change)
+      return normalized ? { ...entry, change: normalized } : null
+    }
+    if (change.kind === 'common') {
+      const normalized = restoreCommonChange(change)
+      return normalized ? { ...entry, change: normalized } : null
+    }
+    return { ...entry, change }
   }
-  const restoreSeries = ({ undo, redo }: StoredWorkspace['history']['common']) => ({ undo: undo.map(restoreEntry), redo: redo.map(restoreEntry) })
+  const restoreSeries = ({ undo, redo }: StoredWorkspace['history']['common']) => ({
+    undo: undo.flatMap((entry) => { const restored = restoreEntry(entry); return restored ? [restored] : [] }),
+    redo: redo.flatMap((entry) => { const restored = restoreEntry(entry); return restored ? [restored] : [] }),
+  })
+  const normalizedFrame = withoutLegacyCanvasSettings(workspace.commonFrame)
   return {
     ...workspace,
-    commonFrame: { ...initialFrame, ...workspace.commonFrame },
+    commonFrame: { ...initialFrame, ...normalizedFrame },
     photos: workspace.photos.map(restorePhoto),
     removedPhotos: workspace.removedPhotos.map((removed) => ({ ...removed, photo: restorePhoto(removed.photo) })),
     history: {

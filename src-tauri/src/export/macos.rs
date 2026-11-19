@@ -126,13 +126,7 @@ pub fn render(path: &Path, job: &ExportJob, settings: &ExportSettings) -> Result
         )
     };
     let photo = NativeImage(NonNull::new(photo).ok_or_else(|| error_message(error))?);
-    let layout = layout(
-        &job.frame,
-        &job.crop,
-        source_width,
-        source_height,
-        settings.size,
-    )?;
+    let layout = layout(&job.frame, source_width, source_height, settings.size)?;
     if settings.format == ExportFormat::Webp && (layout.width > 16_383 || layout.height > 16_383) {
         return Err(
             "WebP is limited to 16,383 pixels on each side. Choose a smaller size.".to_owned(),

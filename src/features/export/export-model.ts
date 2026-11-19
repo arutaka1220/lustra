@@ -1,5 +1,5 @@
 import { Channel, invoke } from '@tauri-apps/api/core'
-import type { FrameSettings, PhotoCrop } from '../../types/photo'
+import type { FrameSettings } from '../../types/photo'
 import type { TextDrawRecipe } from '../text/text-model'
 
 export const exportFormats = ['jpeg', 'png', 'webp'] as const
@@ -28,7 +28,6 @@ export type ExportJob = {
   id: string
   path: string
   frame: FrameSettings
-  crop?: PhotoCrop
   text: TextDrawRecipe[]
   metadata?: { camera?: string; lens?: string }
 }

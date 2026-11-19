@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import type { CanvasRatio, FrameSettings, ImportCandidate, PhotoCrop, PhotoMetadata, PhotoSource, SessionPhoto } from '../types/photo'
+import { PHOTO_METADATA_READER_VERSION } from '../types/photo'
+import type { FrameSettings, ImportCandidate, PhotoMetadata, PhotoSource, SessionPhoto } from '../types/photo'
 import {
   appendChange, applyValues, changedValues, clearRemovedHistory, emptyHistory, getSeries, limitHistory,
   mergeChanges, moveHistoryEntry, pruneHistory, selectRedoSeries, selectUndoSeries, sessionLayout,
@@ -45,10 +46,8 @@ export type SessionState = {
   setEditMode: (mode: EditMode) => void
   updateFrame: <K extends keyof FrameSettings>(key: K, value: FrameSettings[K]) => void
   patchFrame: (changes: Partial<FrameSettings>) => void
-  setRatio: (ratio: CanvasRatio) => void
   resetPhotoOverride: (id: string, key: keyof FrameSettings) => void
   resetPhotoOverrides: (id: string) => void
-  setCrop: (id: string, crop: PhotoCrop) => void
   setPhotoMetadataOverrides: (id: string, patch: Partial<PhotoMetadata>) => void
   setCompleted: (id: string, completed: boolean) => void
   doneNext: () => void
@@ -84,10 +83,6 @@ export const initialFrame: FrameSettings = {
   blurStrength: 18,
   backgroundBrightness: 100,
   backgroundOpacity: 100,
-  ratio: '4:5',
-  ratioWidth: 1,
-  ratioHeight: 1,
-  fit: 'fit',
   showInset: false,
   showShadow: false,
 }
@@ -168,8 +163,8 @@ function changePhoto(state: SessionState, id: string, update: (photo: SessionPho
   if (index === -1) return state
   const before = state.photos[index]
   const after = update(before)
-  const photoEdit = ({ overrides, completed, crop, metadataOverrides, source }: SessionPhoto): PhotoEdit => (
-    { overrides, completed, crop, metadataOverrides, source }
+  const photoEdit = ({ overrides, completed, metadataOverrides, source }: SessionPhoto): PhotoEdit => (
+    { overrides, completed, metadataOverrides, source }
   )
   const values = changedValues(photoEdit(before), photoEdit(after))
   if (!values.keys.length) return state
@@ -352,10 +347,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
   setCandidateMetadata: (id, metadata, metadataState, expectedSource) => set((state) => {
     const matches = (candidate: ImportCandidate) => expectedSource ? candidate.source === expectedSource : candidate.id === id
+    const metadataReaderVersion = metadataState === 'fileError' ? 0 : PHOTO_METADATA_READER_VERSION
     const candidates = state.candidates.some(matches)
-      ? state.candidates.map((candidate) => matches(candidate) ? { ...candidate, metadata, metadataState } : candidate)
+      ? state.candidates.map((candidate) => matches(candidate) ? { ...candidate, metadata, metadataState, metadataReaderVersion } : candidate)
       : state.candidates
-    const update = (photo: SessionPhoto) => matches(photo) ? { ...photo, metadata, metadataState } : photo
+    const update = (photo: SessionPhoto) => matches(photo) ? { ...photo, metadata, metadataState, metadataReaderVersion } : photo
     const updateWorkspace = <T extends Pick<SessionWorkspace, 'photos' | 'removedPhotos' | 'history'>>(workspace: T): T => {
       const matchingPhoto = workspace.photos.some(matches)
       const matchingRemoval = workspace.removedPhotos.some(({ photo }) => matches(photo))
@@ -391,7 +387,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const values = changedValues(state.commonFrame, commonFrame)
     return values.keys.length ? { commonFrame, ...recordChange(state, { kind: 'common', values }) } : state
   }),
-  setRatio: (ratio) => get().patchFrame({ ratio }),
   resetPhotoOverride: (id, key) => set((state) => changePhoto(state, id, (photo) => {
     if (!Object.hasOwn(photo.overrides, key)) return photo
     const overrides = { ...photo.overrides }
@@ -399,7 +394,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     return { ...photo, overrides }
   })),
   resetPhotoOverrides: (id) => set((state) => changePhoto(state, id, (photo) => ({ ...photo, overrides: {} }))),
-  setCrop: (id, crop) => set((state) => changePhoto(state, id, (photo) => ({ ...photo, crop }))),
   setPhotoMetadataOverrides: (id, patch) => set((state) => changePhoto(state, id, (photo) => {
     const metadataOverrides = { ...photo.metadataOverrides, ...patch }
     for (const key of Object.keys(metadataOverrides) as (keyof PhotoMetadata)[]) {

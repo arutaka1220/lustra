@@ -47,8 +47,8 @@ export function Filmstrip({ photos, activePhotoId, completed, expanded, onToggle
 
   function requestRemove() {
     if (!optionsPhoto) return
-    const { overrides, completed: isComplete, crop, metadataOverrides } = optionsPhoto
-    if (isComplete || crop || Object.keys(overrides).length || Object.keys(metadataOverrides ?? {}).length) setConfirmRemove(true)
+    const { overrides, completed: isComplete, metadataOverrides } = optionsPhoto
+    if (isComplete || Object.keys(overrides).length || Object.keys(metadataOverrides ?? {}).length) setConfirmRemove(true)
     else removeSelected()
   }
 

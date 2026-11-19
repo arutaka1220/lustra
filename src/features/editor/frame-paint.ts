@@ -1,4 +1,4 @@
-import type { FrameSettings, PhotoCrop } from '../../types/photo'
+import type { FrameSettings } from '../../types/photo'
 import { canvasUnit, FRAME_COLORS, getBackgroundRect, getPhotoLayout } from './frame-layout'
 import type { FrameRect, Size } from './frame-layout'
 
@@ -18,9 +18,9 @@ export interface PreviewRenderer {
   dispose(): void
 }
 
-export function createFrameScene(size: Size, raster: PhotoRaster, frame: FrameSettings, crop: PhotoCrop): FrameScene {
+export function createFrameScene(size: Size, raster: PhotoRaster, frame: FrameSettings): FrameScene {
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
-  return { size, raster, frame, layout: getPhotoLayout(size, raster, frame, crop), dpr }
+  return { size, raster, frame, layout: getPhotoLayout(size, raster, frame), dpr }
 }
 
 /** Blur in bounded working space so the Canvas 2D path also works on WebKit without ctx.filter. */
@@ -98,7 +98,7 @@ function paintBlurredBackground(context: CanvasRenderingContext2D, scene: FrameS
   context.restore()
 }
 
-/** Shared backdrop keeps both preview paths identical without rerendering blur on crop movement. */
+/** Shared backdrop keeps both preview paths identical without rerendering blur on image movement. */
 export class FrameBackdrop {
   readonly canvas = document.createElement('canvas')
   private key = ''

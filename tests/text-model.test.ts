@@ -8,7 +8,7 @@ import type { MetadataCorrectionRule } from '../src/features/text/text-model'
 import type { FrameSettings, SessionPhoto } from '../src/types/photo'
 
 const frame: FrameSettings = {
-  style: 'white', ratio: '4:5', fit: 'fit', top: 4, bottom: 10, left: 4, right: 4,
+  style: 'white', top: 4, bottom: 10, left: 4, right: 4,
   linkSides: true, linkVertical: false, blurStrength: 16, backgroundBrightness: 100,
   showInset: false, showShadow: false,
 }

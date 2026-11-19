@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react'
 import { readAppPreference, writeAppPreference } from '../../store/session-persistence'
 
-export type InspectorSectionId = 'preset' | 'frame' | 'canvas' | 'padding' | 'effects' | 'text' | 'typography' | 'guides'
+export type InspectorSectionId = 'preset' | 'frame' | 'padding' | 'effects' | 'text' | 'typography' | 'guides'
 
 type SectionState = Record<InspectorSectionId, boolean>
 
@@ -10,7 +10,6 @@ const PREF_KEY = 'editor.inspector-sections'
 const DEFAULT_SECTIONS: SectionState = {
   preset: false,
   frame: true,
-  canvas: true,
   padding: true,
   effects: false,
   text: false,

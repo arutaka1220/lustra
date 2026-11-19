@@ -105,8 +105,6 @@ pub struct ExportJob {
     path: PathBuf,
     frame: Frame,
     #[serde(default)]
-    crop: Crop,
-    #[serde(default)]
     text: Vec<TextItem>,
     #[serde(default)]
     metadata: MetadataCorrections,
@@ -126,13 +124,6 @@ enum FrameStyle {
     Blurred,
 }
 
-#[derive(Clone, Copy, Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum FitMode {
-    Fit,
-    Fill,
-}
-
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Frame {
@@ -145,39 +136,12 @@ struct Frame {
     background_brightness: f64,
     #[serde(default = "full_opacity")]
     background_opacity: f64,
-    ratio: String,
-    #[serde(default = "one")]
-    ratio_width: f64,
-    #[serde(default = "one")]
-    ratio_height: f64,
-    fit: FitMode,
     show_inset: bool,
     show_shadow: bool,
 }
 
 fn full_opacity() -> f64 {
     100.0
-}
-
-fn one() -> f64 {
-    1.0
-}
-
-#[derive(Deserialize)]
-struct Crop {
-    x: f64,
-    y: f64,
-    zoom: f64,
-}
-
-impl Default for Crop {
-    fn default() -> Self {
-        Self {
-            x: 0.0,
-            y: 0.0,
-            zoom: 1.0,
-        }
-    }
 }
 
 #[derive(Deserialize)]
@@ -216,91 +180,66 @@ struct Layout {
 
 fn layout(
     frame: &Frame,
-    crop: &Crop,
     source_width: u32,
     source_height: u32,
     size: ExportSize,
 ) -> Result<Layout, String> {
-    let source_width = f64::from(source_width);
-    let source_height = f64::from(source_height);
-    let ratio = match frame.ratio.as_str() {
-        "1:1" => 1.0,
-        "4:5" => 4.0 / 5.0,
-        "3:4" => 3.0 / 4.0,
-        "9:16" => 9.0 / 16.0,
-        "3:2" => 3.0 / 2.0,
-        "16:9" => 16.0 / 9.0,
-        "auto" => source_width / source_height,
-        "custom" => frame.ratio_width / frame.ratio_height,
-        _ => return Err("Invalid canvas ratio.".to_owned()),
-    };
-    if !(0.001..=1000.0).contains(&ratio) || source_width < 1.0 || source_height < 1.0 {
+    if source_width == 0 || source_height == 0 {
         return Err("Invalid image or canvas dimensions.".to_owned());
     }
 
-    let left = frame.left.clamp(0.0, 49.0) / 100.0;
-    let right = frame.right.clamp(0.0, 49.0) / 100.0;
-    let top = frame.top.clamp(0.0, 49.0) / 100.0;
-    let bottom = frame.bottom.clamp(0.0, 49.0) / 100.0;
+    // Padding values remain percentages of the completed canvas, matching the
+    // editor and existing presets. Solve that relationship algebraically so
+    // that the full source image always fits inside the padded canvas.
+    let fraction = |value: f64| {
+        if value.is_finite() {
+            value.clamp(0.0, 49.0) / 100.0
+        } else {
+            0.0
+        }
+    };
+    let left = fraction(frame.left);
+    let right = fraction(frame.right);
+    let top = fraction(frame.top);
+    let bottom = fraction(frame.bottom);
     let inner_width = 1.0 - left - right;
     let inner_height = 1.0 - top - bottom;
-    let zoom = crop.zoom.clamp(1.0, 3.0);
-    let width_baseline = source_width / (ratio * inner_width);
-    let height_baseline = source_height / inner_height;
-    let canvas_height = match size {
-        ExportSize::Original(_) => match frame.fit {
-            FitMode::Fit => width_baseline.max(height_baseline),
-            FitMode::Fill => width_baseline.min(height_baseline) / zoom,
-        },
-        ExportSize::ShortEdge(edge) => f64::from(edge) / ratio.min(1.0),
+    let source_width = f64::from(source_width);
+    let source_height = f64::from(source_height);
+    let canvas_width_exact = source_width / inner_width;
+    let canvas_height_exact = source_height / inner_height;
+    let scale = match size {
+        ExportSize::Original(OriginalSize::Original) => 1.0,
+        ExportSize::ShortEdge(edge) if edge > 0 => {
+            f64::from(edge) / canvas_width_exact.min(canvas_height_exact)
+        }
+        ExportSize::ShortEdge(_) => return Err("Invalid export size.".to_owned()),
     };
-
-    let width = (canvas_height * ratio).round().max(1.0) as u32;
-    let height = canvas_height.round().max(1.0) as u32;
+    // Round canvas dimensions up after applying one uniform image scale. The
+    // fractional remainder becomes at most one extra pixel of outer padding,
+    // preventing the canvas edge from clipping any part of the source image.
+    let width = (canvas_width_exact * scale).ceil().max(1.0) as u32;
+    let height = (canvas_height_exact * scale).ceil().max(1.0) as u32;
     if u64::from(width) * u64::from(height) > 90_000_000 || width > 32_768 || height > 32_768 {
         return Err(
             "The output dimensions are too large. Choose a smaller export size.".to_owned(),
         );
     }
 
-    let inner = Rect {
-        x: f64::from(width) * left,
-        y: f64::from(height) * top,
-        width: f64::from(width) * inner_width,
-        height: f64::from(height) * inner_height,
-    };
-    let scale_width = inner.width / source_width;
-    let scale_height = inner.height / source_height;
-    let scale = match frame.fit {
-        FitMode::Fit => scale_width.min(scale_height),
-        FitMode::Fill => scale_width.max(scale_height) * zoom,
-    };
     let image_width = source_width * scale;
     let image_height = source_height * scale;
-    let x_offset = match frame.fit {
-        FitMode::Fit => 0.0,
-        FitMode::Fill => crop.x.clamp(-1.0, 1.0),
-    };
-    let y_offset = match frame.fit {
-        FitMode::Fit => 0.0,
-        FitMode::Fill => crop.y.clamp(-1.0, 1.0),
-    };
     let image = Rect {
-        x: inner.x + (inner.width - image_width) * (1.0 + x_offset) * 0.5,
-        y: inner.y + (inner.height - image_height) * (1.0 + y_offset) * 0.5,
+        x: f64::from(width) * left,
+        y: f64::from(height) * top,
         width: image_width,
         height: image_height,
-    };
-    let visible_image = match frame.fit {
-        FitMode::Fit => image,
-        FitMode::Fill => inner,
     };
 
     Ok(Layout {
         width,
         height,
         image,
-        visible_image,
+        visible_image: image,
     })
 }
 
@@ -852,31 +791,43 @@ mod tests {
             blur_strength: 30.0,
             background_brightness: 80.0,
             background_opacity: 70.0,
-            ratio: "4:5".to_owned(),
-            ratio_width: 1.0,
-            ratio_height: 1.0,
-            fit: FitMode::Fill,
             show_inset: true,
             show_shadow: true,
         }
     }
 
     #[test]
-    fn original_fill_maintains_source_crop_pixel_density() {
+    fn original_size_adds_padding_without_resizing_or_cropping_source() {
         let mut frame = frame();
-        let mut crop = Crop::default();
-        let size = ExportSize::Original(OriginalSize::Original);
-        let output = layout(&frame, &crop, 6000, 4000, size).unwrap();
-        assert_eq!((output.width, output.height), (3200, 4000));
-        assert_eq!(output.image.width, 6000.0);
-        crop.zoom = 2.0;
-        crop.x = 1.0;
-        let output = layout(&frame, &crop, 6000, 4000, size).unwrap();
-        assert_eq!((output.width, output.height), (1600, 2000));
-        assert_eq!(output.image.x, -4400.0);
-        frame.fit = FitMode::Fit;
-        let output = layout(&frame, &crop, 6000, 4000, size).unwrap();
-        assert_eq!((output.width, output.height), (6000, 7500));
+        frame.left = 10.0;
+        frame.bottom = 20.0;
+        let output = layout(
+            &frame,
+            600,
+            400,
+            ExportSize::Original(OriginalSize::Original),
+        )
+        .unwrap();
+        assert_eq!((output.width, output.height), (667, 500));
+        assert_eq!(output.image.width, 600.0);
+        assert_eq!(output.image.height, 400.0);
+        assert_eq!(output.image.x, f64::from(output.width) * 0.1);
+        assert_eq!(output.image.y, f64::from(output.height) * 0.0);
+        assert_eq!(output.visible_image.width, output.image.width);
+        assert_eq!(output.visible_image.height, output.image.height);
+    }
+
+    #[test]
+    fn short_edge_scales_complete_canvas_and_keeps_source_aspect_ratio() {
+        let mut frame = frame();
+        frame.left = 10.0;
+        frame.bottom = 20.0;
+        let output = layout(&frame, 600, 400, ExportSize::ShortEdge(720)).unwrap();
+        assert_eq!((output.width, output.height), (960, 720));
+        assert!((output.image.width / output.image.height - 1.5).abs() < f64::EPSILON);
+        assert_eq!(output.image.x, 96.0);
+        assert_eq!(output.visible_image.width, output.image.width);
+        assert_eq!(output.visible_image.height, output.image.height);
     }
 
     #[test]
@@ -936,7 +887,6 @@ mod tests {
             path: path.clone(),
             id: "test".to_owned(),
             frame: frame(),
-            crop: Crop::default(),
             text: vec![TextItem {
                 text: "Lustra".to_owned(),
                 anchor: "bottom-center".to_owned(),

@@ -55,6 +55,36 @@ describe('session history and recovery', () => {
     expect(session().photos[0].overrides).toMatchObject({ left: 18, right: 18 })
   })
 
+  test('migrates legacy ratio and crop fields while preserving padding edits and history', () => {
+    session().addToSession([photo('legacy')])
+    session().updateFrame('bottom', 24)
+    const legacy = JSON.parse(JSON.stringify(getSessionSnapshot())) as any
+    legacy.active.commonFrame.ratio = '4:5'
+    legacy.active.commonFrame.fit = 'fill'
+    legacy.active.photos[0].crop = { x: 0.4, y: -0.2, zoom: 1.5 }
+    legacy.active.photos[0].overrides = { left: 12, right: 12, ratio: '1:1', fit: 'fill' }
+    const oldCommonEdit = legacy.active.history.common.undo.at(-1)
+    oldCommonEdit.change.values.keys.push('ratio')
+    oldCommonEdit.change.values.before.ratio = '4:5'
+    oldCommonEdit.change.values.after.ratio = '1:1'
+
+    useSessionStore.setState(useSessionStore.getInitialState(), true)
+    restoreSessionSnapshot(legacy, [])
+
+    expect(session().commonFrame).toMatchObject({ bottom: 24 })
+    expect(session().photos[0].metadataState).toBe('loading')
+    expect(session().commonFrame).not.toHaveProperty('ratio')
+    expect(session().commonFrame).not.toHaveProperty('fit')
+    expect(session().photos[0]).not.toHaveProperty('crop')
+    expect(session().photos[0].overrides).toEqual({ left: 12, right: 12 })
+    expect(session().history.common.undo.at(-1)?.change).toMatchObject({
+      kind: 'common', values: { keys: ['bottom'] },
+    })
+
+    session().undo()
+    expect(session().commonFrame.bottom).toBe(15)
+  })
+
   test('finishing a reopened session updates its history item and brings back the parked work', () => {
     session().addToSession([photo('a'), photo('b')])
     const firstId = session().sessionId

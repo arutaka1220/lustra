@@ -28,10 +28,15 @@ export function usePhotoImport(ready: boolean, allowImport: boolean) {
       const candidate = pending.current.shift()
       if (!candidate) break
       running.current += 1
-      void readPhotoMetadata(candidate).then((metadata) => {
-        setCandidateMetadata(candidate.id, metadata, Object.values(metadata).some(Boolean) ? 'ready' : 'missing', candidate.source)
-      }).catch(() => {
-        setCandidateMetadata(candidate.id, {}, 'missing', candidate.source)
+      void readPhotoMetadata(candidate).then((result) => {
+        if (result.diagnostics?.length) {
+          console.debug('[Lustra metadata]', result.status, result.diagnostics)
+        }
+        const state = result.status === 'complete' ? 'ready' : result.status
+        setCandidateMetadata(candidate.id, result.metadata, state, candidate.source)
+      }).catch((error) => {
+        console.warn('[Lustra metadata] Could not read source file', error)
+        setCandidateMetadata(candidate.id, {}, 'fileError', candidate.source)
       }).finally(() => {
         running.current -= 1
         readNext()

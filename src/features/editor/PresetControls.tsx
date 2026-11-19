@@ -8,13 +8,15 @@ import { getTextElements } from '../text/text-model'
 import { InspectorSection } from './InspectorSection'
 import { useInspectorSections } from './useInspectorSections'
 import { SelectField } from '../../components/ui/SelectField'
+import { hasLegacyCanvasSettings, withoutLegacyCanvasSettings } from './frame-migration'
 
 type Preset = { id: string; name: string; frame: FrameSettings }
 type PresetAction = 'new' | 'delete' | null
 const preferenceKey = 'frame.presets'
 
 function presetFrame(frame: FrameSettings): FrameSettings {
-  return { ...initialFrame, ...frame, textElements: getTextElements(frame) }
+  const compatible = withoutLegacyCanvasSettings(frame)
+  return { ...initialFrame, ...compatible, textElements: getTextElements(frame) }
 }
 
 export function PresetControls({ frame, onApply }: { frame: FrameSettings; onApply: (frame: FrameSettings) => void }) {
@@ -36,9 +38,14 @@ export function PresetControls({ frame, onApply }: { frame: FrameSettings; onApp
     let disposed = false
     void readAppPreference<Preset[]>(preferenceKey).then((saved) => {
       if (disposed) return
-      setPresets(Array.isArray(saved) ? saved : [])
+      const loaded = Array.isArray(saved) ? saved : []
+      const normalized = loaded.map((preset) => ({ ...preset, frame: presetFrame(preset.frame) }))
+      setPresets(normalized)
       setLoadFailed(false)
       setReady(true)
+      if (loaded.some((preset) => hasLegacyCanvasSettings(preset.frame))) {
+        void writeAppPreference(preferenceKey, normalized).catch((error) => console.warn('Could not migrate frame presets', error))
+      }
     }).catch(() => {
       if (!disposed) setLoadFailed(true)
     })

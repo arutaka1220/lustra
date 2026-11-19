@@ -8,7 +8,7 @@ type RemovedPosition = {
 
 export type RemovedPhoto<P = SessionPhoto> = RemovedPosition & { photo: P }
 
-export type PhotoEdit<Source = SessionPhoto['source']> = Pick<SessionPhoto, 'overrides' | 'completed' | 'crop' | 'metadataOverrides'> & {
+export type PhotoEdit<Source = SessionPhoto['source']> = Pick<SessionPhoto, 'overrides' | 'completed' | 'metadataOverrides'> & {
   source: Source
 }
 

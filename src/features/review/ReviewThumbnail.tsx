@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { FrameSettings, SessionPhoto } from '../../types/photo'
-import { DEFAULT_CROP, fitCanvasSize, getCanvasRatio } from '../editor/frame-layout'
+import { canvasAspectRatio, fitCanvasToBounds } from '../editor/frame-layout'
 import { createCanvasRenderer, createFrameScene } from '../editor/frame-paint'
 import { TextOverlay } from '../text/TextOverlay'
 import { usePhotoThumbnail } from '../import/photo-thumbnail-cache'
@@ -41,8 +41,7 @@ export function ReviewThumbnail({ photo, frame }: Props) {
   const [rendered, setRendered] = useState<RenderedThumbnail>()
   const sourceUrl = photo.source.url
   const thumbnail = usePhotoThumbnail(visibility.visible ? sourceUrl : undefined, visibility.priority)
-  const crop = photo.crop ?? DEFAULT_CROP
-  const renderKey = useMemo(() => `${photo.id}:${sourceUrl}:${JSON.stringify({ ...frame, textElements: undefined })}:${JSON.stringify(crop)}`, [crop, frame, photo.id, sourceUrl])
+  const renderKey = useMemo(() => `${photo.id}:${sourceUrl}:${JSON.stringify({ ...frame, textElements: undefined })}`, [frame, photo.id, sourceUrl])
 
   useEffect(() => {
     const element = viewport.current
@@ -75,19 +74,18 @@ export function ReviewThumbnail({ photo, frame }: Props) {
       return
     }
 
-    const ratio = getCanvasRatio(frame, raster)
-    const size = fitCanvasSize({ width: OUTPUT_EDGE, height: OUTPUT_EDGE }, ratio)
+    const size = fitCanvasToBounds({ width: OUTPUT_EDGE, height: OUTPUT_EDGE }, canvasAspectRatio(frame, raster))
     const renderer = createCanvasRenderer()
-    renderer.render(createFrameScene(size, raster, frame, crop))
+    renderer.render(createFrameScene(size, raster, frame))
     const canvas = renderer.canvas
     const entry = { key: renderKey, canvas, size, bytes: canvas.width * canvas.height * 4 }
     rememberRendered(entry)
     setRendered(entry)
-  }, [crop, frame, renderKey, sourceUrl, thumbnail, visibility.visible])
+  }, [frame, renderKey, sourceUrl, thumbnail, visibility.visible])
 
   const currentRendered = rendered?.key === renderKey ? rendered : undefined
-  const ratio = thumbnail?.raster ? getCanvasRatio(frame, thumbnail.raster) : 1
-  const board = fitCanvasSize({
+  const ratio = canvasAspectRatio(frame, thumbnail?.raster)
+  const board = fitCanvasToBounds({
     width: Math.max(1, available.width - 2),
     height: Math.max(1, available.height - 2),
   }, ratio)

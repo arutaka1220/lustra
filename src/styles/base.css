@@ -29,9 +29,7 @@
   --toolbar-height: 52px;
   --filmstrip-height: 140px;
   --filmstrip-collapsed-height: 28px;
-  --preview-bg-for-white-frame: #333333;
-  --preview-bg-for-black-frame: #edeef0;
-  --preview-bg-for-blur-frame: #808080;
+  --workspace-background: #FFFFFF;
 }
 
 * { box-sizing: border-box; }
@@ -74,27 +72,6 @@ button:disabled { cursor: not-allowed; opacity: .5; }
   overflow: hidden;
   color: var(--text-primary);
   background: var(--app-bg);
-}
-
-:root[data-theme="dark"] {
-  --app-bg: #1b1b1d;
-  --panel-bg: #252528;
-  --surface-hover: #303034;
-  --surface-active: #3a3a40;
-  --stroke-color: #414147;
-  --text-primary: #f4f4f5;
-  --text-secondary: #b9b9c0;
-  --text-muted: #a0a0a9;
-  --text-disabled: #85858f;
-  --accent: #e7e7ea;
-  --accent-contrast: #1a1a1c;
-  --status-success: #6bbf98;
-  --status-warning: #d9b76a;
-  --status-danger: #e38c90;
-  --smart-guide: #b38bff;
-  --focus-ring: #dedee3;
-  --shadow-menu: 0 12px 34px rgba(0, 0, 0, .4);
-  color-scheme: dark;
 }
 
 .visually-hidden {

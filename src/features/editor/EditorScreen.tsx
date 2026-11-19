@@ -33,8 +33,6 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
   const patchFrame = useSessionStore((state) => state.patchFrame)
   const beginFrameEdit = useSessionStore((state) => state.beginFrameEdit)
   const endFrameEdit = useSessionStore((state) => state.endFrameEdit)
-  const setRatio = useSessionStore((state) => state.setRatio)
-  const setCrop = useSessionStore((state) => state.setCrop)
   const setCompleted = useSessionStore((state) => state.setCompleted)
   const doneNext = useSessionStore((state) => state.doneNext)
   const nextPhoto = useSessionStore((state) => state.nextPhoto)
@@ -102,8 +100,7 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
               <button className="text-button" onClick={() => resetAllOverrides(photo.id)}>{t('edit.resetOverrides')}</button>
             </details>}
           </div>
-          <FrameControls frame={controlsFrame} onChange={updateFrame} onRatioChange={setRatio}
-            crop={photo.crop} effectiveFit={frame.fit} onCropChange={(crop) => setCrop(photo.id, crop)}
+          <FrameControls frame={controlsFrame} onChange={updateFrame}
             onPatch={patchFrame} onFrameEditStart={beginFrameEdit} onFrameEditEnd={endFrameEdit}
             preset={<PresetControls frame={controlsFrame} onApply={patchFrame} />}
           >
@@ -126,7 +123,7 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
         />
       </>}
 
-      <section className="preview-area" data-frame-style={frame.style}>
+      <section className="preview-area">
         <div className="preview-toolbar">
           <div className="preview-breadcrumb">
             <strong title={photo.name}>{photo.name}</strong>
@@ -148,7 +145,7 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
         <div className="preview-stage-wrap">
           <div className="preview-stage-content">
             {photo.source.url
-              ? <FramePreview photo={photo} frame={frame} onCropChange={(crop) => setCrop(photo.id, crop)} onImageError={() => markMissing(photo.id, photo.source)} onRevealInspector={onRevealInspector} />
+              ? <FramePreview photo={photo} frame={frame} onImageError={() => markMissing(photo.id, photo.source)} onRevealInspector={onRevealInspector} />
               : <div className="relink-card">
                 <FileSearch size={26} />
                 <strong>{t('session.sourceMissing')}</strong>

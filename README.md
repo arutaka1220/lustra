@@ -30,7 +30,7 @@ The configured packages are DMG for macOS 13 and later and NSIS for Windows. Nat
 ## Current workflow
 
 - Import JPEG, PNG and WebP files or the direct contents of a folder. Review the selection, reorder photos and add more while editing.
-- Apply common or per-photo frames, adjust ratios, padding and Fill cropping, and save presets. Place EXIF-linked text on the canvas, correct camera or lens names across sessions, or fill missing values for an individual photo.
+- Apply common or per-photo Black, White or Blurred frames, add independent padding on all four sides without cropping or stretching the source photo, and save presets. The editor uses a fixed light UI with a white workspace. Place EXIF-linked text on the canvas, read EXIF and XMP metadata from JPEG, PNG and WebP, correct camera or lens names across sessions, or fill missing values for an individual photo.
 - Review every photo at the end of the session. On macOS, export JPEG, PNG or WebP with Original or fixed short-edge sizes, metadata category controls and ICC settings. A batch can be canceled or retried for failed photos.
 - Resume the current session along with its Undo/Redo history after restarting. Finish moves it into Recent Sessions. Move a missing original back into the session with Locate File or a matching filename in a selected folder.
 - Switch between English and Japanese in Preferences. Session edits are stored in SQLite WAL, preferences in JSON, and recent-session thumbnails in a separate cache. The source photo stays at its original path.

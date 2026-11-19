@@ -1823,7 +1823,9 @@ version = "0.1.0"
 dependencies = [
  "cc",
  "crc32fast",
+ "flate2",
  "kamadak-exif",
+ "quick-xml",
  "serde",
  "serde_json",
  "tauri",

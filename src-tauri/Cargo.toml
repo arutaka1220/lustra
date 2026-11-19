@@ -16,6 +16,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 crc32fast = "1"
 exif = { package = "kamadak-exif", version = "0.6" }
+flate2 = "1.1"
+quick-xml = "0.42"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = ["protocol-asset"] }
