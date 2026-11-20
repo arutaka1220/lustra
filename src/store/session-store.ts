@@ -245,6 +245,37 @@ function effectiveChanges(changes: Partial<FrameSettings>, frame: FrameSettings)
   return adjusted
 }
 
+function restoreAwareChanges(changes: Partial<FrameSettings>, frame: FrameSettings): Partial<FrameSettings> {
+  const adjusted = { ...changes }
+  const restore = { ...frame.linkedPaddingRestore }
+  if (changes.linkSides !== undefined && changes.linkSides !== frame.linkSides) {
+    if (changes.linkSides) {
+      restore.horizontal = { left: frame.left, right: frame.right }
+      adjusted.left = frame.left
+      adjusted.right = frame.left
+    } else {
+      adjusted.left = restore.horizontal?.left ?? frame.left
+      adjusted.right = restore.horizontal?.right ?? frame.right
+      delete restore.horizontal
+    }
+  }
+  if (changes.linkVertical !== undefined && changes.linkVertical !== frame.linkVertical) {
+    if (changes.linkVertical) {
+      restore.vertical = { top: frame.top, bottom: frame.bottom }
+      adjusted.top = frame.top
+      adjusted.bottom = frame.top
+    } else {
+      adjusted.top = restore.vertical?.top ?? frame.top
+      adjusted.bottom = restore.vertical?.bottom ?? frame.bottom
+      delete restore.vertical
+    }
+  }
+  if (changes.linkSides !== undefined || changes.linkVertical !== undefined) {
+    adjusted.linkedPaddingRestore = restore.horizontal || restore.vertical ? restore : undefined
+  }
+  return adjusted
+}
+
 function currentWorkspace(state: SessionState, updatedAt = Date.now()): SessionWorkspace {
   return {
     id: state.sessionId,
@@ -380,10 +411,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   patchFrame: (changes) => set((state) => {
     const photo = state.photos.find(({ id }) => id === state.activePhotoId)
     if (state.editMode === 'this' && photo) {
-      const adjusted = effectiveChanges(changes, getEffectiveFrame(photo, state.commonFrame))
+      const currentFrame = getEffectiveFrame(photo, state.commonFrame)
+      const adjusted = effectiveChanges(restoreAwareChanges(changes, currentFrame), currentFrame)
       return changePhoto(state, photo.id, (current) => ({ ...current, overrides: { ...current.overrides, ...adjusted } }))
     }
-    const commonFrame = { ...state.commonFrame, ...effectiveChanges(changes, state.commonFrame) }
+    const commonFrame = { ...state.commonFrame, ...effectiveChanges(restoreAwareChanges(changes, state.commonFrame), state.commonFrame) }
     const values = changedValues(state.commonFrame, commonFrame)
     return values.keys.length ? { commonFrame, ...recordChange(state, { kind: 'common', values }) } : state
   }),

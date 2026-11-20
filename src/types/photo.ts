@@ -18,7 +18,12 @@ export type PhotoSource =
   | { kind: 'path'; path: string; url: string; missing?: boolean }
   | { kind: 'file'; file: File; url: string }
 
-export type FrameStyle = 'black' | 'white' | 'softWhite' | 'blurred' | 'custom'
+export type FrameStyle = 'black' | 'white' | 'softBlack' | 'softWhite' | 'blurred' | 'custom'
+
+export type LinkedPaddingRestore = {
+  vertical?: { top: number; bottom: number }
+  horizontal?: { left: number; right: number }
+}
 
 export type FrameSettings = {
   style: FrameStyle
@@ -29,6 +34,8 @@ export type FrameSettings = {
   right: number
   linkSides: boolean
   linkVertical: boolean
+  /** Values to restore when a linked padding axis is unlinked. Omitted for legacy linked sessions. */
+  linkedPaddingRestore?: LinkedPaddingRestore
   blurStrength: number
   backgroundBrightness: number
   backgroundOpacity?: number
