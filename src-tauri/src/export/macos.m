@@ -208,7 +208,7 @@ static bool draw_background(
     const double width = settings->width;
     const double height = settings->height;
     CGRect full = CGRectMake(0, 0, width, height);
-    uint32_t matte = settings->style == 0 ? 0x000000ff : settings->style == 1 ? 0xffffffff : settings->style == 3 ? 0xfafaf8ff : settings->style == 4 ? (settings->custom_color << 8) | 0xff : 0x454842ff;
+    uint32_t matte = settings->style == 0 ? 0x000000ff : settings->style == 1 ? 0xffffffff : settings->style == 3 ? 0xfafaf8ff : settings->style == 4 ? (settings->custom_color << 8) | 0xff : settings->style == 5 ? 0x242424ff : 0x454842ff;
     CGColorRef color = make_color(srgb, matte);
     CGContextSetFillColorWithColor(context, color);
     CGContextFillRect(context, full);

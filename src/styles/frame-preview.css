@@ -19,6 +19,7 @@
 }
 
 .preview-board--black { color: #f3f3f0; background: #000000; }
+.preview-board--softBlack { color: #fff; background: #242424; }
 .preview-board--white { color: #252629; background: #FFFFFF; outline-color: rgba(0, 0, 0, .18); box-shadow: 0 1px 3px rgba(0, 0, 0, .06); }
 .preview-board--softWhite { color: #252629; background: #fafaf8; outline-color: rgba(0, 0, 0, .18); }
 .preview-board--custom { background: var(--custom-frame-color, #000000); }

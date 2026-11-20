@@ -124,6 +124,8 @@ enum FrameStyle {
     Blurred,
     #[serde(alias = "softWhite")]
     SoftWhite,
+    #[serde(alias = "softBlack")]
+    SoftBlack,
     Custom,
 }
 
@@ -856,6 +858,7 @@ mod tests {
         };
         for (style, custom_color, expected) in [
             (FrameStyle::Black, None, [0x00, 0x00, 0x00]),
+            (FrameStyle::SoftBlack, None, [0x24, 0x24, 0x24]),
             (FrameStyle::White, None, [0xFF, 0xFF, 0xFF]),
             (FrameStyle::SoftWhite, None, [0xFA, 0xFA, 0xF8]),
             (FrameStyle::Custom, Some("#123ABC"), [0x12, 0x3A, 0xBC]),
@@ -869,11 +872,15 @@ mod tests {
                 id: "frame-color-pixel".to_owned(),
                 frame: export_frame,
                 text: vec![],
-                metadata: MetadataCorrections { camera: None, lens: None },
+                metadata: MetadataCorrections {
+                    camera: None,
+                    lens: None,
+                },
             };
             let bytes = platform::render(&path, &job, &settings).unwrap();
             let mut decoder = png::Decoder::new(Cursor::new(bytes));
-            decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
+            decoder
+                .set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
             let mut reader = decoder.read_info().unwrap();
             let mut pixels = vec![0; reader.output_buffer_size().unwrap()];
             let info = reader.next_frame(&mut pixels).unwrap();
@@ -884,6 +891,14 @@ mod tests {
             assert_eq!(pixel, expected);
         }
         assert_eq!(fs::read(path).unwrap(), SOURCE_PNG);
+    }
+
+    #[test]
+    fn soft_black_style_name_deserializes_from_existing_camel_case_ui_value() {
+        assert!(matches!(
+            serde_json::from_str::<FrameStyle>("\"softBlack\""),
+            Ok(FrameStyle::SoftBlack)
+        ));
     }
 
     #[test]

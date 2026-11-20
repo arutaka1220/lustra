@@ -149,6 +149,7 @@ pub fn render(path: &Path, job: &ExportJob, settings: &ExportSettings) -> Result
             FrameStyle::Blurred => 2,
             FrameStyle::SoftWhite => 3,
             FrameStyle::Custom => 4,
+            FrameStyle::SoftBlack => 5,
         },
         custom_color: parse_hex_color(job.frame.custom_color.as_deref().unwrap_or("#000000")),
         inset: u32::from(job.frame.show_inset),

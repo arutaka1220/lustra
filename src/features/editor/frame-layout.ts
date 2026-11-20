@@ -6,6 +6,7 @@ export type FrameRect = Size & { x: number; y: number }
 export const FRAME_COLORS = {
   black: '#000000',
   white: '#FFFFFF',
+  softBlack: '#242424',
   softWhite: '#fafaf8',
   blurred: '#454842',
   custom: '#000000',
