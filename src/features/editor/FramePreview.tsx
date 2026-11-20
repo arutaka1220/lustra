@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { ImageOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { FrameSettings, SessionPhoto } from '../../types/photo'
@@ -20,6 +21,7 @@ type FramePreviewProps = {
   readOnly?: boolean
   onImageError?: () => void
   onRevealInspector?: () => void
+  fallbackPreview?: ReactNode
 }
 
 type LoadedPhoto = { url: string; raster?: PhotoRaster; error?: boolean }
@@ -40,7 +42,7 @@ function rasterizeImage(image: HTMLImageElement, maxEdge: number): PhotoRaster {
   return { image: canvas, width: canvas.width, height: canvas.height }
 }
 
-export function FramePreview({ photo, frame, compact = false, readOnly = false, onImageError, onRevealInspector }: FramePreviewProps) {
+export function FramePreview({ photo, frame, compact = false, readOnly = false, onImageError, onRevealInspector, fallbackPreview }: FramePreviewProps) {
   const { t } = useTranslation()
   const viewport = useRef<HTMLDivElement>(null)
   const surface = useRef<HTMLDivElement>(null)
@@ -50,10 +52,11 @@ export function FramePreview({ photo, frame, compact = false, readOnly = false, 
   const [seen, setSeen] = useState(!compact)
   const [available, setAvailable] = useState<Size>({ width: 1, height: 1 })
   const [loaded, setLoaded] = useState<LoadedPhoto>()
+  const [retryKey, setRetryKey] = useState(0)
   const sourceUrl = photo.source.url
   const status = loaded?.url === sourceUrl ? loaded : undefined
   const sourceMissing = photo.source.kind === 'path' && photo.source.missing === true
-  const highResolution = useEditPreview(compact ? undefined : sourceUrl, seen && !sourceMissing)
+  const highResolution = useEditPreview(compact ? undefined : sourceUrl, seen && !sourceMissing, retryKey)
   const smallPreview = usePhotoThumbnail(!compact && sourceUrl && !sourceMissing ? sourceUrl : undefined, 100)
   const raster = compact ? status?.raster : highResolution?.raster
   const size = fitCanvasToBounds(available, canvasAspectRatio(frame, raster))
@@ -93,12 +96,12 @@ export function FramePreview({ photo, frame, compact = false, readOnly = false, 
   useLayoutEffect(() => { imageErrorRef.current = onImageError }, [onImageError])
 
   useEffect(() => {
-    if (compact || !seen || sourceMissing || !sourceUrl) return
+    if (!compact || !seen || sourceMissing || !sourceUrl) return
     let active = true
     const image = new Image()
     image.crossOrigin = 'anonymous'
     image.onload = () => {
-      if (active) setLoaded({ url: sourceUrl, raster: rasterizeImage(image, compact ? 480 : 2048) })
+      if (active) setLoaded({ url: sourceUrl, raster: rasterizeImage(image, 480) })
     }
     image.onerror = () => {
       if (!active) return
@@ -184,8 +187,9 @@ export function FramePreview({ photo, frame, compact = false, readOnly = false, 
     <div className={`framed-preview-viewport${compact ? ' framed-preview-viewport--compact' : ''}`} ref={viewport}>
       <div className={`preview-board preview-board--${frame.style}`} style={{ ...size, '--custom-frame-color': frame.customColor ?? '#000000' } as React.CSSProperties}>
         <div className="framed-preview-surface" ref={surface} hidden={!raster || !seen || sourceMissing} role="img" aria-label={compact ? undefined : photo.name} aria-hidden={compact || undefined} />
-        {!raster && smallPreview?.raster && !missing && <div className="preview-loading-thumb" aria-hidden="true"><PhotoThumbnailCanvas url={sourceUrl} fit="contain" /></div>}
-        {missing ? <span className="framed-preview-message"><ImageOff size={18} />{t('framePreview.unavailable')}</span> : !raster && !smallPreview?.raster && !compact && <span className="framed-preview-message" role="status">{t('framePreview.loading')}</span>}
+        {!raster && fallbackPreview}
+        {!raster && !fallbackPreview && smallPreview?.raster && !missing && <div className="preview-loading-thumb" aria-hidden="true"><PhotoThumbnailCanvas url={sourceUrl} fit="contain" /></div>}
+        {sourceMissing || status?.error ? <span className="framed-preview-message"><ImageOff size={18} />{t('framePreview.unavailable')}</span> : highResolution?.error ? <span className="framed-preview-message preview-error" role="alert">{t('framePreview.previewError')}<button type="button" onClick={() => { setLoaded(undefined); setRetryKey(value => value + 1) }}>{t('framePreview.retry')}</button></span> : !raster && !smallPreview?.raster && !fallbackPreview && !compact && <span className="framed-preview-message" role="status">{t('framePreview.loading')}</span>}
         {raster && !sourceMissing && seen && <TextOverlay photo={photo} frame={frame} interactive={interactive} imageBounds={visible} canvasSize={size} onRevealInspector={onRevealInspector} />}
       </div>
     </div>

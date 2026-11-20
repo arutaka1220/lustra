@@ -5,6 +5,7 @@ const THUMBNAIL_EDGE = 384
 const CACHE_LIMIT_BYTES = 24 * 1024 * 1024
 const MAX_CONCURRENT_DECODES = 2
 const MAX_PENDING_THUMBNAILS = 48
+const DECODE_TIMEOUT_MS = 20_000
 
 type CacheEntry = { raster: PhotoRaster; bytes: number }
 type QueueEntry = {
@@ -54,16 +55,33 @@ async function decodeThumbnail(url: string, signal: AbortSignal): Promise<PhotoR
   const image = new Image()
   image.crossOrigin = 'anonymous'
   const abortImageLoad = () => image.removeAttribute('src')
-  signal.addEventListener('abort', abortImageLoad, { once: true })
+  let rejectAbort!: (error: unknown) => void
+  const aborted = new Promise<never>((_, reject) => { rejectAbort = reject })
+  let timeoutId: ReturnType<typeof setTimeout>
+  const timedOut = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('Thumbnail image decoding timed out.')), DECODE_TIMEOUT_MS)
+  })
+  const abortDecode = () => { abortImageLoad(); rejectAbort(abortError()) }
+  signal.addEventListener('abort', abortDecode, { once: true })
   image.src = url
   let bitmap: ImageBitmap | undefined
   try {
-    await image.decode()
+    await Promise.race([image.decode(), aborted, timedOut])
     if (signal.aborted) throw abortError()
     const scale = Math.min(1, THUMBNAIL_EDGE / Math.max(image.naturalWidth, image.naturalHeight))
     const width = Math.max(1, Math.round(image.naturalWidth * scale))
     const height = Math.max(1, Math.round(image.naturalHeight * scale))
-    bitmap = await createImageBitmap(image, { resizeWidth: width, resizeHeight: height, resizeQuality: 'high' })
+    let keepBitmap = false
+    const pendingBitmap = createImageBitmap(image, { resizeWidth: width, resizeHeight: height, resizeQuality: 'high' }).then((result) => {
+      if (!keepBitmap) result.close()
+      return result
+    })
+    bitmap = await Promise.race([
+      pendingBitmap,
+      aborted,
+      timedOut,
+    ])
+    keepBitmap = true
     if (signal.aborted) throw abortError()
     const canvas = document.createElement('canvas')
     canvas.width = width
@@ -73,7 +91,8 @@ async function decodeThumbnail(url: string, signal: AbortSignal): Promise<PhotoR
     context.drawImage(bitmap, 0, 0, width, height)
     return { image: canvas, width, height }
   } finally {
-    signal.removeEventListener('abort', abortImageLoad)
+    signal.removeEventListener('abort', abortDecode)
+    clearTimeout(timeoutId!)
     image.removeAttribute('src')
     bitmap?.close()
   }

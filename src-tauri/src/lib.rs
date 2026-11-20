@@ -7,6 +7,50 @@ use std::path::Path;
 use tauri::Manager;
 use tauri_plugin_fs::FsExt;
 
+fn is_supported_photo_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| {
+            matches!(
+                extension.to_ascii_lowercase().as_str(),
+                "jpg" | "jpeg" | "png" | "webp"
+            )
+        })
+        .unwrap_or(false)
+}
+
+#[tauri::command]
+fn allow_photo_paths(app: tauri::AppHandle, paths: Vec<String>) -> Result<(), String> {
+    for path in paths {
+        let image_path = Path::new(&path);
+        if !is_supported_photo_path(image_path) || !image_path.is_file() {
+            continue;
+        }
+        app.asset_protocol_scope()
+            .allow_file(image_path)
+            .map_err(|error| error.to_string())?;
+        app.fs_scope()
+            .allow_file(image_path)
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn allow_photo_directory(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    let directory = Path::new(&path);
+    if !directory.is_dir() {
+        return Err("The selected photo folder is unavailable.".to_owned());
+    }
+    app.asset_protocol_scope()
+        .allow_directory(directory, false)
+        .map_err(|error| error.to_string())?;
+    app.fs_scope()
+        .allow_directory(directory, false)
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
 #[tauri::command]
 async fn read_photo_metadata(
     app: tauri::AppHandle,
@@ -36,6 +80,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            allow_photo_paths,
+            allow_photo_directory,
             read_photo_metadata,
             fonts::list_font_families,
             persistence::load_sessions,

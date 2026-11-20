@@ -203,6 +203,13 @@ function startRestore(): void {
     const archive = restored.value
     let recentSessionsTrimmed = false
     if (archive?.snapshot) {
+      if (isTauri()) {
+        const workspaces = [archive.snapshot.active, ...(archive.snapshot.parked ? [archive.snapshot.parked] : []), ...archive.snapshot.recent]
+        const paths = workspaces.flatMap((workspace) => workspace.photos
+          .filter((photo) => photo.source.kind === 'path' && !archive.missingPaths.includes(photo.source.path))
+          .map((photo) => photo.source.path))
+        await invoke('allow_photo_paths', { paths })
+      }
       restoreSessionSnapshot(archive.snapshot, archive.missingPaths)
       const { recentSessions } = useSessionStore.getState()
       recentSessionsTrimmed = recentSessions.length < archive.snapshot.recent.length

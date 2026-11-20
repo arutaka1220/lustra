@@ -3,8 +3,11 @@ import i18n from '../../i18n'
 i18n.addResources('en', 'translation', {
   'framePreview.unavailable': 'Photo unavailable',
   'framePreview.loading': 'Loading preview…',
+  'framePreview.previewError': 'The full preview could not be loaded.',
+  'framePreview.retry': 'Retry',
   'framePreview.black': 'Black',
   'framePreview.white': 'White',
+  'framePreview.softBlack': 'Soft Black',
   'framePreview.softWhite': 'Soft White',
   'framePreview.custom': 'Custom',
   'framePreview.vertical': 'Vertical',
@@ -29,8 +32,11 @@ i18n.addResources('en', 'translation', {
 i18n.addResources('ja', 'translation', {
   'framePreview.unavailable': '写真を表示できません',
   'framePreview.loading': 'プレビューを読み込み中…',
+  'framePreview.previewError': '高解像度プレビューを読み込めませんでした。',
+  'framePreview.retry': '再試行',
   'framePreview.black': '黒',
   'framePreview.white': '白',
+  'framePreview.softBlack': 'ソフトブラック',
   'framePreview.softWhite': 'ソフトホワイト',
   'framePreview.custom': 'カスタム',
   'framePreview.vertical': '垂直',

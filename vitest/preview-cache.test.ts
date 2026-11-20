@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { editPreviewCacheStats, loadEditPreview, previewNeighborIndices, PREVIEW_CACHE_LIMIT } from '../src/features/editor/preview-cache'
 
 describe('edit preview prefetch policy', () => {
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
   it('chooses the two nearest photos on both sides and respects boundaries', () => {
     expect(previewNeighborIndices(8, 3)).toEqual([2, 4, 1, 5])
     expect(previewNeighborIndices(8, 0)).toEqual([1, 2])
@@ -76,5 +77,23 @@ describe('edit preview prefetch policy', () => {
     const pending = loadEditPreview(`preview-abort-${crypto.randomUUID()}`, 512, controller.signal)
     controller.abort()
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+  })
+  it('fails a stuck image decode instead of keeping a worker slot indefinitely', async () => {
+    vi.useFakeTimers()
+    class MockImage {
+      naturalWidth = 1000
+      naturalHeight = 500
+      crossOrigin = ''
+      set src(_value: string) {}
+      removeAttribute(_value: string) {}
+      decode() { return new Promise<void>(() => {}) }
+    }
+    vi.stubGlobal('Image', MockImage)
+    const request = loadEditPreview(`preview-timeout-${crypto.randomUUID()}`)
+    const rejection = expect(request).rejects.toThrow(/timed out/i)
+    await vi.advanceTimersByTimeAsync(20_000)
+    await rejection
+    await Promise.resolve()
+    expect(editPreviewCacheStats().running).toBe(0)
   })
 })
