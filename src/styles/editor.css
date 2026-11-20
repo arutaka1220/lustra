@@ -2,7 +2,7 @@
   display: grid;
   height: calc(100vh - var(--toolbar-height));
   min-height: 0;
-  flex: 1;
+  flex: 0 0 auto;
   grid-template-columns: var(--inspector-width) 6px minmax(0, 1fr);
 }
 .editor-layout--inspector-collapsed { grid-template-columns: minmax(0, 1fr); }
