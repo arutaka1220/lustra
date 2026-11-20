@@ -6,7 +6,6 @@ import { InspectorSection } from './InspectorSection'
 import { useInspectorSections } from './useInspectorSections'
 import type { FrameSettings } from '../../types/photo'
 import './frame-i18n'
-import { parseHex } from './color-utils'
 import { CustomColorPicker } from './CustomColorPicker'
 
 type FrameControlsProps = {
@@ -18,7 +17,7 @@ type FrameControlsProps = {
   children?: ReactNode
 }
 
-const frameStyles = ['black', 'white', 'softWhite', 'blurred', 'custom'] as const
+export const FRAME_STYLE_ORDER = ['black', 'white', 'blurred', 'softBlack', 'softWhite', 'custom'] as const
 const sides = ['top', 'bottom', 'left', 'right'] as const
 const oppositeSide = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' } as const
 
@@ -42,24 +41,20 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
   }
 
   const toggleLink = (key: 'linkSides' | 'linkVertical') => {
-    const next = !frame[key]
-    if (next) {
-      patch(key === 'linkSides' ? { linkSides: true, right: frame.left } : { linkVertical: true, bottom: frame.top })
-    } else {
-      onChange(key, false)
-    }
+    patch({ [key]: !frame[key] })
   }
   return (
     <div className="controls-scroll">
       <InspectorSection title={t('edit.frame')} open={isOpen('frame')} onToggle={() => toggle('frame')}>
         <div className="style-picker">
-          {frameStyles.map((style) => <button className={`style-option ${frame.style === style ? 'is-active' : ''}`} key={style}
-            onClick={() => onChange('style', style)} aria-pressed={frame.style === style}>
-            <span className={`style-preview style-preview--${style === 'blurred' ? 'blur' : style}`} style={style === 'custom' ? { '--custom-frame-color': parseHex(frame.customColor ?? '') ?? '#000000' } as React.CSSProperties : undefined}><span /></span>
-            <span>{t(`framePreview.${style}`)}</span>{frame.style === style && <Check size={14} aria-hidden="true" />}
-          </button>)}
+          {FRAME_STYLE_ORDER.map((style) => style === 'custom'
+            ? <CustomColorPicker key={style} tile selected={frame.style === 'custom'} label={t('framePreview.custom')} color={frame.customColor ?? '#000000'} onOpen={() => onChange('style', 'custom')} onChange={color => onChange('customColor', color)} onEditStart={onFrameEditStart} onEditEnd={onFrameEditEnd} />
+            : <button className={`style-option ${frame.style === style ? 'is-active' : ''}`} key={style}
+              onClick={() => onChange('style', style)} aria-pressed={frame.style === style}>
+              <span className={`style-preview style-preview--${style === 'blurred' ? 'blur' : style}`}><span /></span>
+              <span>{t(`framePreview.${style}`)}</span>{frame.style === style && <Check size={14} aria-hidden="true" />}
+            </button>)}
         </div>
-        {frame.style === 'custom' && <CustomColorPicker color={frame.customColor ?? '#000000'} onChange={color => onChange('customColor', color)} onEditStart={onFrameEditStart} onEditEnd={onFrameEditEnd} />}
       </InspectorSection>
 
       <InspectorSection title={t('edit.padding')} open={isOpen('padding')} onToggle={() => toggle('padding')}>

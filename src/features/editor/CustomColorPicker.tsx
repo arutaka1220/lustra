@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Clipboard, Plus, X } from 'lucide-react'
+import { Check, Clipboard, Plus, X } from 'lucide-react'
 import { hexToRgb, hsvToHex, parseHex, rgbToHex, rgbToHsv } from './color-utils'
 import { useMyPalette } from './MyPalette'
 import './custom-color-picker.css'
@@ -8,13 +8,17 @@ import './custom-color-picker.css'
 type Props = {
   color: string
   onChange: (color: string) => void
+  onOpen?: () => void
+  tile?: boolean
+  selected?: boolean
+  label?: string
   onEditStart?: () => void
   onEditEnd?: () => void
 }
 
 type Point = { top: number; left: number; placement: 'right' | 'left' }
 
-export function CustomColorPicker({ color: rawColor, onChange, onEditStart, onEditEnd }: Props) {
+export function CustomColorPicker({ color: rawColor, onChange, onOpen, tile = false, selected = false, label = 'Custom', onEditStart, onEditEnd }: Props) {
   const color = parseHex(rawColor) ?? '#000000'
   const trigger = useRef<HTMLButtonElement>(null)
   const popover = useRef<HTMLDivElement>(null)
@@ -108,10 +112,9 @@ export function CustomColorPicker({ color: rawColor, onChange, onEditStart, onEd
   }
 
   return <>
-    <button ref={trigger} type="button" className="custom-color__trigger" aria-label="Choose custom frame color" aria-expanded={open} onClick={() => { if (open) end(); else { setHexDraft(color); position() } setOpen(!open) }}>
-      <span className="custom-color__trigger-swatch" style={{ backgroundColor: color }} />
-      <span className="custom-color__trigger-value">{color}</span>
-      <span className="custom-color__trigger-chevron" aria-hidden="true">⌄</span>
+    <button ref={trigger} type="button" className={tile ? `style-option custom-color__tile ${selected ? 'is-active' : ''}` : 'custom-color__trigger'} aria-label={tile ? `${label} frame color` : 'Choose custom frame color'} aria-expanded={open} aria-pressed={tile ? selected : undefined} onClick={() => { onOpen?.(); setHexDraft(color); position(); setOpen(true) }}>
+      {tile ? <><span className="style-preview style-preview--custom" style={{ '--custom-frame-color': color } as React.CSSProperties}><span /></span><span>{label}</span></> : <><span className="custom-color__trigger-swatch" style={{ backgroundColor: color }} /><span className="custom-color__trigger-value">{color}</span><span className="custom-color__trigger-chevron" aria-hidden="true">⌄</span></>}
+      {tile && selected && <Check className="custom-color__tile-check" size={14} aria-hidden="true" />}
     </button>
     {open && createPortal(<div ref={popover} className="custom-color__popover" role="dialog" aria-label="Frame Color" data-placement={point.placement} style={{ top: point.top, left: point.left }}>
       <header className="custom-color__header"><h2>Frame Color</h2><button type="button" className="custom-color__close" aria-label="Close color picker" onClick={() => { end(); setOpen(false); trigger.current?.focus() }}><X size={17}/></button></header>
