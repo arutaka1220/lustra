@@ -30,9 +30,9 @@ function rememberRendered(entry: RenderedThumbnail) {
   }
 }
 
-type Props = { photo: SessionPhoto; frame: FrameSettings }
+type Props = { photo: SessionPhoto; frame: FrameSettings; onAspectRatio?: (ratio: number) => void }
 
-export function ReviewThumbnail({ photo, frame }: Props) {
+export function ReviewThumbnail({ photo, frame, onAspectRatio }: Props) {
   const { t } = useTranslation()
   const viewport = useRef<HTMLDivElement>(null)
   const displayCanvas = useRef<HTMLCanvasElement>(null)
@@ -85,6 +85,9 @@ export function ReviewThumbnail({ photo, frame }: Props) {
 
   const currentRendered = rendered?.key === renderKey ? rendered : undefined
   const ratio = canvasAspectRatio(frame, thumbnail?.raster)
+  useEffect(() => {
+    if (thumbnail?.raster) onAspectRatio?.(ratio)
+  }, [onAspectRatio, ratio, thumbnail?.raster])
   const board = fitCanvasToBounds({
     width: Math.max(1, available.width - 2),
     height: Math.max(1, available.height - 2),
