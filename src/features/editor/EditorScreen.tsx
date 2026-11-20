@@ -48,7 +48,7 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
   const [relinkError, setRelinkError] = useState<{ id: string; key: string } | null>(null)
   const [locating, setLocating] = useState(false)
   const frame = useMemo(() => getEffectiveFrame(activePhoto, commonFrame), [activePhoto, commonFrame])
-  const controlsFrame = editMode === 'all' ? commonFrame : frame
+  const controlsFrame = editMode === 'all' ? getEffectiveFrame(activePhoto, commonFrame) : frame
   const index = Math.max(0, photos.findIndex((photo) => photo.id === activePhoto?.id))
   const prefetchKey = previewNeighborIndices(photos.length, index).map(i => `${photos[i].id}\t${photos[i].source.url}`).join('\n')
   useEffect(() => {

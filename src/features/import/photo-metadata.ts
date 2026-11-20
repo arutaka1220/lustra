@@ -6,6 +6,20 @@ export type PhotoMetadataReadResult = {
   metadata: PhotoMetadata
   status: MetadataReadStatus
   diagnostics?: string[]
+  imageWidth?: number
+  imageHeight?: number
+}
+
+async function readDisplayDimensions(url: string): Promise<{ imageWidth?: number; imageHeight?: number }> {
+  if (!url || typeof Image === 'undefined' || (typeof navigator !== 'undefined' && navigator.userAgent.includes('jsdom'))) return {}
+  return new Promise((resolve) => {
+    const image = new Image()
+    image.onload = () => resolve(image.naturalWidth > 0 && image.naturalHeight > 0
+      ? { imageWidth: image.naturalWidth, imageHeight: image.naturalHeight }
+      : {})
+    image.onerror = () => resolve({})
+    image.src = url
+  })
 }
 
 function captureDate(value: unknown, subsecond: unknown, offset: unknown): string | undefined {
@@ -23,10 +37,15 @@ function captureDate(value: unknown, subsecond: unknown, offset: unknown): strin
 
 export async function readPhotoMetadata(candidate: ImportCandidate): Promise<PhotoMetadataReadResult> {
   if (candidate.source.kind === 'path' && isTauri()) {
-    return invoke<PhotoMetadataReadResult>('read_photo_metadata', { path: candidate.source.path })
+    const [result, dimensions] = await Promise.all([
+      invoke<PhotoMetadataReadResult>('read_photo_metadata', { path: candidate.source.path }),
+      readDisplayDimensions(candidate.source.url),
+    ])
+    return { ...result, ...dimensions }
   }
   if (candidate.source.kind !== 'file') return { metadata: {}, status: 'fileError' }
 
+  const dimensionsPromise = readDisplayDimensions(candidate.source.url)
   try {
     const data = await exifr.parse(candidate.source.file, {
       pick: ['Make', 'Model', 'LensModel', 'FocalLength', 'DateTimeOriginal', 'DateCreated', 'CreateDate', 'SubSecTimeOriginal', 'OffsetTimeOriginal', 'FNumber', 'ExposureTime', 'ISO', 'PhotographicSensitivity'],
@@ -35,7 +54,7 @@ export async function readPhotoMetadata(candidate: ImportCandidate): Promise<Pho
       xmp: true,
       reviveValues: false,
     })
-    if (!data) return { metadata: {}, status: 'missing' }
+    if (!data) return { metadata: {}, status: 'missing', ...await dimensionsPromise }
 
     const make = typeof data.Make === 'string' ? data.Make.trim() : ''
     const model = typeof data.Model === 'string' ? data.Model.trim() : ''
@@ -58,12 +77,14 @@ export async function readPhotoMetadata(candidate: ImportCandidate): Promise<Pho
     }
     const presentCount = Object.values(metadata).filter(Boolean).length
     const complete = Boolean(metadata.camera && metadata.lens && metadata.focalLength && metadata.aperture && metadata.iso && metadata.date)
-    return { metadata, status: complete ? 'complete' : presentCount ? 'partial' : 'missing' }
+    const dimensions = await dimensionsPromise
+    return { metadata, status: complete ? 'complete' : presentCount ? 'partial' : 'missing', ...dimensions }
   } catch (error) {
     return {
       metadata: {},
       status: 'parseError',
       diagnostics: [error instanceof Error ? error.message : String(error)],
+      ...await dimensionsPromise,
     }
   }
 }

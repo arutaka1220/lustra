@@ -143,7 +143,7 @@ export function deserializeWorkspace(workspace: StoredWorkspace, initialFrame: F
   const normalizePhoto = (photo: StoredPhoto): StoredPhoto => {
     const withoutCrop = withoutLegacyCrop(photo)
     const canReadSource = !missingPaths.has(photo.source.path)
-    const metadataIsStale = canReadSource && photo.metadataReaderVersion !== PHOTO_METADATA_READER_VERSION
+    const metadataIsStale = canReadSource && (photo.metadataReaderVersion !== PHOTO_METADATA_READER_VERSION || !photo.imageWidth || !photo.imageHeight)
     return {
       ...withoutCrop,
       metadataState: metadataIsStale ? 'loading' : photo.metadataState,

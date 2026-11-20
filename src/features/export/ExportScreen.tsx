@@ -110,7 +110,7 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
         current.report.outcomes.set(photo.id, { type: 'failed', message: copy.missingSource })
         continue
       }
-      const frame = getEffectiveFrame(photo, commonFrame)
+      const { aspectPadding: _aspectPadding, ...frame } = getEffectiveFrame(photo, commonFrame)
       const { camera, lens } = getEffectiveMetadata(photo, corrections)
       jobs.push({
         id: photo.id,

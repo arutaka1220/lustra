@@ -33,7 +33,7 @@ export function usePhotoImport(ready: boolean, allowImport: boolean) {
           console.debug('[Lustra metadata]', result.status, result.diagnostics)
         }
         const state = result.status === 'complete' ? 'ready' : result.status
-        setCandidateMetadata(candidate.id, result.metadata, state, candidate.source)
+        setCandidateMetadata(candidate.id, result.metadata, state, candidate.source, { imageWidth: result.imageWidth, imageHeight: result.imageHeight })
       }).catch((error) => {
         console.warn('[Lustra metadata] Could not read source file', error)
         setCandidateMetadata(candidate.id, {}, 'fileError', candidate.source)

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { PHOTO_METADATA_READER_VERSION } from '../types/photo'
-import type { FrameSettings, ImportCandidate, PhotoMetadata, PhotoSource, SessionPhoto } from '../types/photo'
+import type { AspectPadding, FrameSettings, ImportCandidate, PhotoMetadata, PhotoSource, SessionPhoto } from '../types/photo'
+import { classifyPhotoAspect } from '../features/editor/photo-aspect-ratio'
 import {
   appendChange, applyValues, changedValues, clearRemovedHistory, emptyHistory, getSeries, limitHistory,
   mergeChanges, moveHistoryEntry, pruneHistory, selectRedoSeries, selectUndoSeries, sessionLayout,
@@ -41,7 +42,7 @@ export type SessionState = {
   reorderCandidates: (fromId: string, toId: string) => void
   clearImport: () => void
   importSelected: () => void
-  setCandidateMetadata: (id: string, metadata: PhotoMetadata, metadataState: ImportCandidate['metadataState'], expectedSource?: PhotoSource) => void
+  setCandidateMetadata: (id: string, metadata: PhotoMetadata, metadataState: ImportCandidate['metadataState'], expectedSource?: PhotoSource, dimensions?: { imageWidth?: number; imageHeight?: number }) => void
   setActivePhoto: (id: string) => void
   setEditMode: (mode: EditMode) => void
   updateFrame: <K extends keyof FrameSettings>(key: K, value: FrameSettings[K]) => void
@@ -87,13 +88,24 @@ export const initialFrame: FrameSettings = {
   showShadow: false,
 }
 
+let globalPaddingDefaults: FrameSettings['aspectPadding'] = {}
+export function setGlobalPaddingDefaults(value: FrameSettings['aspectPadding'] | null) {
+  globalPaddingDefaults = value && typeof value === 'object' ? value : {}
+}
+
+export function applyGlobalPaddingDefaultsToEmptyWorkspace() {
+  useSessionStore.setState((state) => state.photos.length || state.removedPhotos.length || state.history.sequence > 0
+    ? state
+    : { commonFrame: { ...state.commonFrame, aspectPadding: globalPaddingDefaults } })
+}
+
 function freshWorkspace() {
   return {
     sessionId: crypto.randomUUID(),
     photos: [],
     removedPhotos: [],
     activePhotoId: null,
-    commonFrame: initialFrame,
+    commonFrame: { ...initialFrame, aspectPadding: globalPaddingDefaults },
     editMode: 'all' as const,
     filmstripOpen: true,
     screen: 'welcome' as const,
@@ -376,13 +388,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     get().addToSession(selected)
     set((state) => ({ candidates: [], candidatesReordered: false, screen: state.photos.length ? 'edit' : 'welcome' }))
   },
-  setCandidateMetadata: (id, metadata, metadataState, expectedSource) => set((state) => {
+  setCandidateMetadata: (id, metadata, metadataState, expectedSource, dimensions) => set((state) => {
     const matches = (candidate: ImportCandidate) => expectedSource ? candidate.source === expectedSource : candidate.id === id
     const metadataReaderVersion = metadataState === 'fileError' ? 0 : PHOTO_METADATA_READER_VERSION
     const candidates = state.candidates.some(matches)
-      ? state.candidates.map((candidate) => matches(candidate) ? { ...candidate, metadata, metadataState, metadataReaderVersion } : candidate)
+      ? state.candidates.map((candidate) => matches(candidate) ? { ...candidate, metadata, metadataState, metadataReaderVersion, ...dimensions } : candidate)
       : state.candidates
-    const update = (photo: SessionPhoto) => matches(photo) ? { ...photo, metadata, metadataState, metadataReaderVersion } : photo
+    const update = (photo: SessionPhoto) => matches(photo) ? { ...photo, metadata, metadataState, metadataReaderVersion, ...dimensions } : photo
     const updateWorkspace = <T extends Pick<SessionWorkspace, 'photos' | 'removedPhotos' | 'history'>>(workspace: T): T => {
       const matchingPhoto = workspace.photos.some(matches)
       const matchingRemoval = workspace.removedPhotos.some(({ photo }) => matches(photo))
@@ -410,12 +422,27 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   updateFrame: (key, value) => get().patchFrame({ [key]: value }),
   patchFrame: (changes) => set((state) => {
     const photo = state.photos.find(({ id }) => id === state.activePhotoId)
+    const currentFrame = getEffectiveFrame(photo, state.commonFrame)
+    const adjusted = effectiveChanges(restoreAwareChanges(changes, currentFrame), currentFrame)
     if (state.editMode === 'this' && photo) {
-      const currentFrame = getEffectiveFrame(photo, state.commonFrame)
-      const adjusted = effectiveChanges(restoreAwareChanges(changes, currentFrame), currentFrame)
       return changePhoto(state, photo.id, (current) => ({ ...current, overrides: { ...current.overrides, ...adjusted } }))
     }
-    const commonFrame = { ...state.commonFrame, ...effectiveChanges(restoreAwareChanges(changes, state.commonFrame), state.commonFrame) }
+    const paddingKeys = ['top', 'bottom', 'left', 'right', 'linkSides', 'linkVertical', 'linkedPaddingRestore'] as const
+    const hasPaddingChange = paddingKeys.some((key) => Object.hasOwn(adjusted, key))
+    const nonPadding = { ...adjusted }
+    for (const key of paddingKeys) delete nonPadding[key]
+    let commonFrame: FrameSettings = { ...state.commonFrame, ...nonPadding }
+    if (hasPaddingChange && photo) {
+      const group = classifyPhotoAspect(photo.imageWidth ?? 0, photo.imageHeight ?? 0)
+      const defaults: AspectPadding = state.commonFrame.aspectPadding?.[group] ?? {
+        top: state.commonFrame.top, bottom: state.commonFrame.bottom, left: state.commonFrame.left, right: state.commonFrame.right,
+        linkSides: state.commonFrame.linkSides, linkVertical: state.commonFrame.linkVertical,
+        linkedPaddingRestore: state.commonFrame.linkedPaddingRestore,
+      }
+      commonFrame = { ...commonFrame, aspectPadding: { ...state.commonFrame.aspectPadding, [group]: { ...defaults, ...Object.fromEntries(paddingKeys.filter(key => Object.hasOwn(adjusted, key)).map(key => [key, adjusted[key]])) } } }
+    } else if (hasPaddingChange) {
+      commonFrame = { ...commonFrame, ...Object.fromEntries(paddingKeys.filter(key => Object.hasOwn(adjusted, key)).map(key => [key, adjusted[key]])) }
+    }
     const values = changedValues(state.commonFrame, commonFrame)
     return values.keys.length ? { commonFrame, ...recordChange(state, { kind: 'common', values }) } : state
   }),
@@ -567,10 +594,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   }),
 }))
 
-export const getEffectiveFrame = (photo: SessionPhoto | undefined, common: FrameSettings): FrameSettings => ({
-  ...common,
-  ...(photo?.overrides ?? {}),
-})
+export const getEffectiveFrame = (photo: SessionPhoto | undefined, common: FrameSettings): FrameSettings => {
+  const group = photo ? classifyPhotoAspect(photo.imageWidth ?? 0, photo.imageHeight ?? 0) : 'other:unknown'
+  const ratioPadding = common.aspectPadding?.[group]
+  const base = ratioPadding ? { ...common, ...ratioPadding } : common
+  return { ...base, ...(photo?.overrides ?? {}), aspectPadding: common.aspectPadding }
+}
 
 export function canUndo(state: SessionState) {
   return selectUndoSeries(getCommittedHistory(state), state.activePhotoId) !== undefined

@@ -1,7 +1,7 @@
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { getSessionSnapshot, restoreSessionSnapshot, useSessionStore } from './session-store'
+import { applyGlobalPaddingDefaultsToEmptyWorkspace, getSessionSnapshot, restoreSessionSnapshot, setGlobalPaddingDefaults, useSessionStore } from './session-store'
 import type { SessionSnapshot } from './session-store'
 
 const AUTOSAVE_DELAY = 1000
@@ -200,6 +200,8 @@ function startRestore(): void {
       loadPerformance(),
     ])
     if (restored.status === 'rejected') throw restored.reason
+    setGlobalPaddingDefaults(await readAppPreference('padding.aspect-defaults'))
+    applyGlobalPaddingDefaultsToEmptyWorkspace()
     const archive = restored.value
     let recentSessionsTrimmed = false
     if (archive?.snapshot) {

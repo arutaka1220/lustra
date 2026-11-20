@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
-import { getSessionSnapshot, restoreSessionSnapshot, useSessionStore } from '../src/store/session-store'
+import { getEffectiveFrame, getSessionSnapshot, restoreSessionSnapshot, useSessionStore } from '../src/store/session-store'
 import type { ImportCandidate } from '../src/types/photo'
 
 function photo(id: string): ImportCandidate {
@@ -9,6 +9,7 @@ function photo(id: string): ImportCandidate {
 }
 
 const session = useSessionStore.getState
+const activeFrame = () => getEffectiveFrame(session().photos.find(({ id }) => id === session().activePhotoId), session().commonFrame)
 
 beforeEach(() => useSessionStore.setState(useSessionStore.getInitialState(), true))
 
@@ -29,7 +30,7 @@ describe('session history and recovery', () => {
     session().updateFrame('top', 4)
     session().redo()
 
-    expect(session().commonFrame.top).toBe(4)
+    expect(activeFrame().top).toBe(4)
     expect(session().photos[0].overrides.style).toBe('white')
     expect(session().photos.map((item) => item.id)).toEqual(['a', 'b'])
   })
@@ -71,18 +72,18 @@ describe('session history and recovery', () => {
     useSessionStore.setState(useSessionStore.getInitialState(), true)
     restoreSessionSnapshot(legacy, [])
 
-    expect(session().commonFrame).toMatchObject({ bottom: 24 })
+    expect(activeFrame().bottom).toBe(24)
     expect(session().photos[0].metadataState).toBe('loading')
     expect(session().commonFrame).not.toHaveProperty('ratio')
     expect(session().commonFrame).not.toHaveProperty('fit')
     expect(session().photos[0]).not.toHaveProperty('crop')
     expect(session().photos[0].overrides).toEqual({ left: 12, right: 12 })
     expect(session().history.common.undo.at(-1)?.change).toMatchObject({
-      kind: 'common', values: { keys: ['bottom'] },
+      kind: 'common', values: { keys: ['aspectPadding'] },
     })
 
     session().undo()
-    expect(session().commonFrame.bottom).toBe(15)
+    expect(activeFrame().bottom).toBe(15)
   })
 
   test('migrates version 1 White values in the session and history to Soft White', () => {
@@ -130,7 +131,8 @@ describe('session history and recovery', () => {
       expect(session().screen).toBe('edit')
       expect(session().photos).toHaveLength(1)
       expect(session().photos[0].completed).toBe(true)
-      expect(session().commonFrame).toMatchObject({ style: 'custom', customColor: '#123ABC', top: 12, bottom: 24, left: 9, right: 9 })
+      expect(session().commonFrame).toMatchObject({ style: 'custom', customColor: '#123ABC' })
+      expect(activeFrame()).toMatchObject({ top: 12, bottom: 24, left: 9, right: 9 })
       expect(session().commonFrame.textElements?.[0]).toMatchObject({ template: 'Lustra test', color: '#123ABC' })
     }
   })
@@ -138,31 +140,31 @@ describe('session history and recovery', () => {
   test('links and unlinks both padding axes with one undoable change and restores link state', () => {
     session().addToSession([photo('padding')])
     session().updateFrame('left', 11)
-    expect(session().commonFrame).toMatchObject({ left: 11, right: 11 })
+    expect(activeFrame()).toMatchObject({ left: 11, right: 11 })
     session().updateFrame('linkSides', false)
     session().updateFrame('right', 20)
     session().updateFrame('left', 7)
-    expect(session().commonFrame).toMatchObject({ left: 7, right: 20, linkSides: false })
+    expect(activeFrame()).toMatchObject({ left: 7, right: 20, linkSides: false })
     session().patchFrame({ linkSides: true })
-    expect(session().commonFrame).toMatchObject({ left: 7, right: 7, linkSides: true })
+    expect(activeFrame()).toMatchObject({ left: 7, right: 7, linkSides: true })
     session().updateFrame('left', 10)
-    expect(session().commonFrame).toMatchObject({ left: 10, right: 10 })
+    expect(activeFrame()).toMatchObject({ left: 10, right: 10 })
     session().patchFrame({ linkSides: false })
-    expect(session().commonFrame).toMatchObject({ left: 7, right: 20, linkSides: false })
+    expect(activeFrame()).toMatchObject({ left: 7, right: 20, linkSides: false })
     session().undo()
-    expect(session().commonFrame).toMatchObject({ left: 10, right: 10, linkSides: true })
+    expect(activeFrame()).toMatchObject({ left: 10, right: 10, linkSides: true })
     session().undo()
     session().undo()
-    expect(session().commonFrame).toMatchObject({ left: 7, right: 20, linkSides: false })
+    expect(activeFrame()).toMatchObject({ left: 7, right: 20, linkSides: false })
     session().patchFrame({ linkVertical: true })
     session().updateFrame('top', 9)
-    expect(session().commonFrame).toMatchObject({ top: 9, bottom: 9 })
+    expect(activeFrame()).toMatchObject({ top: 9, bottom: 9 })
     const snapshot = JSON.parse(JSON.stringify(getSessionSnapshot()))
     useSessionStore.setState(useSessionStore.getInitialState(), true)
     restoreSessionSnapshot(snapshot)
-    expect(session().commonFrame).toMatchObject({ linkSides: false, linkVertical: true, top: 9, bottom: 9 })
+    expect(activeFrame()).toMatchObject({ linkSides: false, linkVertical: true, top: 9, bottom: 9 })
     session().patchFrame({ linkVertical: false })
-    expect(session().commonFrame).toMatchObject({ top: 8, bottom: 15, linkVertical: false })
+    expect(activeFrame()).toMatchObject({ top: 8, bottom: 15, linkVertical: false })
   })
 
   test('keeps linked padding restore values scoped to each photo and edit target', () => {

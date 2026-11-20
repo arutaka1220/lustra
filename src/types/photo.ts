@@ -25,6 +25,9 @@ export type LinkedPaddingRestore = {
   horizontal?: { left: number; right: number }
 }
 
+export type AspectPadding = Pick<FrameSettings, 'top' | 'bottom' | 'left' | 'right' | 'linkSides' | 'linkVertical' | 'linkedPaddingRestore'>
+export type AspectPaddingMap = Record<string, AspectPadding>
+
 export type FrameSettings = {
   style: FrameStyle
   customColor?: string
@@ -42,6 +45,8 @@ export type FrameSettings = {
   showInset: boolean
   showShadow: boolean
   textElements?: TextElement[]
+  /** Session-local shared padding presets, keyed by source photo aspect group. */
+  aspectPadding?: AspectPaddingMap
 }
 
 export type ImportCandidate = {
@@ -54,6 +59,9 @@ export type ImportCandidate = {
   metadataState: 'loading' | MetadataReadStatus | 'ready' | 'error'
   metadataReaderVersion?: number
   metadataDiagnostics?: string[]
+  /** Display dimensions; browser image decoding applies EXIF orientation. */
+  imageWidth?: number
+  imageHeight?: number
 }
 
 export type SessionPhoto = ImportCandidate & {
