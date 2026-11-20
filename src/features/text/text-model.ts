@@ -1,4 +1,5 @@
 import type { FrameSettings, PhotoMetadata, SessionPhoto } from '../../types/photo'
+import { formatCaptureDate } from './date-format'
 
 export const TEXT_REFERENCE_SIZE = 1080
 export const DEFAULT_TEXT_FONT = 'Arial'
@@ -116,13 +117,14 @@ export function getEffectiveMetadata(photo: SessionPhoto, corrections: MetadataC
   return metadata
 }
 
-export function resolveTemplate(template: string, metadata: PhotoMetadata) {
+export function resolveTemplate(template: string, metadata: PhotoMetadata, locale = 'en') {
   const missing = new Set<MetadataField>()
   const text = template.replace(/\{([a-z_]+)\}/gi, (token: string, variable: string) => {
     const key = variable.toLowerCase()
     if (!Object.hasOwn(METADATA_VARIABLES, key)) return token
     const field = METADATA_VARIABLES[key as keyof typeof METADATA_VARIABLES]
-    const value = metadata[field]?.trim()
+    const rawValue = metadata[field]?.trim()
+    const value = field === 'date' ? formatCaptureDate(rawValue, locale) : rawValue
     if (!value) missing.add(field)
     return value ?? ''
   })
@@ -139,11 +141,11 @@ export function getCanvasFontFamily(fontFamily: string) {
   return `"${namedFamily}", "${DEFAULT_TEXT_FONT}", "Noto Sans JP Variable", sans-serif`
 }
 
-export function resolveTextLayers(photo: SessionPhoto, frame: FrameSettings, corrections: MetadataCorrectionsState = EMPTY_METADATA_CORRECTIONS): TextDrawRecipe[] {
+export function resolveTextLayers(photo: SessionPhoto, frame: FrameSettings, corrections: MetadataCorrectionsState = EMPTY_METADATA_CORRECTIONS, locale = 'en'): TextDrawRecipe[] {
   const metadata = getEffectiveMetadata(photo, corrections)
   return getTextElements(frame).flatMap((element) => {
     if (!element.visible) return []
-    const resolved = resolveTemplate(element.template, metadata)
+    const resolved = resolveTemplate(element.template, metadata, locale)
     if (resolved.missing.length || !resolved.text.trim()) return []
     const { anchor, x, y, size, fontFamily, weight, color } = element
     return [{ text: resolved.text, anchor, x, y, size, fontFamily, weight, color: textColor(color, frame.style) }]

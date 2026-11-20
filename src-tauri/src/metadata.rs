@@ -1279,6 +1279,10 @@ mod tests {
                 Some("NIKKOR Z 24-70mm f/4 S")
             );
             assert_eq!(result.metadata.iso.as_deref(), Some("51200"));
+            assert_eq!(
+                result.metadata.date.as_deref(),
+                Some("2026:11:07 14:19:45.90+09:00")
+            );
         }
     }
 

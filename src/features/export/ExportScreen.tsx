@@ -116,7 +116,7 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
         id: photo.id,
         path: photo.source.path,
         frame,
-        text: resolveTextLayers(photo, frame, corrections),
+        text: resolveTextLayers(photo, frame, corrections, language),
         metadata: { camera, lens },
       })
     }

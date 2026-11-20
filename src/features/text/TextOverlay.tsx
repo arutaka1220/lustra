@@ -69,7 +69,7 @@ function layerStyle(element: TextElement, frame: FrameSettings, scale: number): 
 }
 
 export function TextOverlay({ photo, frame, interactive, canvasSize, imageBounds, onRevealInspector }: TextOverlayProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const root = useRef<HTMLDivElement>(null)
   const verticalGuide = useRef<HTMLSpanElement>(null)
   const horizontalGuide = useRef<HTMLSpanElement>(null)
@@ -227,7 +227,7 @@ export function TextOverlay({ photo, frame, interactive, canvasSize, imageBounds
     <div ref={root} className="text-overlay" aria-hidden={interactive ? undefined : true}>
       {scale > 0 && elements.map((element) => {
         if (!element.visible) return null
-        const { text, missing } = resolveTemplate(element.template, metadata)
+        const { text, missing } = resolveTemplate(element.template, metadata, i18n.resolvedLanguage ?? i18n.language)
         const provisional = missing.length > 0
         if (!interactive && (provisional || !text.trim())) return null
         const style = layerStyle(element, frame, scale)
