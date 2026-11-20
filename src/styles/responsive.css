@@ -16,15 +16,12 @@
 }
 
 @media (max-height: 760px) {
-  .filmstrip { height: 118px; padding-top: 6px; padding-bottom: 6px; }
-  .filmstrip-thumb { height: 57px; }
+  .filmstrip { padding-top: 6px; padding-bottom: 6px; }
   .preview-stage-wrap { min-height: 230px; }
 }
 
 @media (max-height: 620px) {
-  .filmstrip { height: 98px; }
   .filmstrip-heading { height: 22px; }
-  .filmstrip-thumb { height: 44px; }
   .preview-stage-wrap { min-height: 190px; }
   .preview-stage-label { top: 7px; }
 }

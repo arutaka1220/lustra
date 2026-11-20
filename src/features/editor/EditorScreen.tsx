@@ -10,6 +10,7 @@ import { Filmstrip } from './Filmstrip'
 import { FramePreview } from './FramePreview'
 import { FrameControls } from './FrameControls'
 import { prefetchEditPreview, previewNeighborIndices } from './preview-cache'
+import { useFilmstripLayout } from '../../hooks/useFilmstripLayout'
 
 type EditorScreenProps = {
   inspectorOpen: boolean
@@ -39,6 +40,7 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
   const previousPhoto = useSessionStore((state) => state.previousPhoto)
   const filmstripOpen = useSessionStore((state) => state.filmstripOpen)
   const toggleFilmstrip = useSessionStore((state) => state.toggleFilmstrip)
+  const filmstripLayout = useFilmstripLayout()
   const resetOverride = useSessionStore((state) => state.resetPhotoOverride)
   const resetAllOverrides = useSessionStore((state) => state.resetPhotoOverrides)
   const markMissing = useSessionStore((state) => state.markPhotoSourceMissing)
@@ -168,7 +170,7 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
           </div>
         </div>
 
-        <Filmstrip photos={photos} activePhotoId={photo.id} completed={completed} expanded={filmstripOpen} onToggle={toggleFilmstrip} onAddPhotos={onAddPhotos} />
+        <Filmstrip photos={photos} activePhotoId={photo.id} completed={completed} expanded={filmstripOpen} height={filmstripLayout.height} onResize={filmstripLayout.startResize} onResetHeight={filmstripLayout.reset} onResizeBy={filmstripLayout.resizeBy} onToggle={toggleFilmstrip} onAddPhotos={onAddPhotos} />
       </section>
     </main>
   )

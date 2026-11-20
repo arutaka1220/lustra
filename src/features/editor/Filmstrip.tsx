@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next'
 import { useSessionStore } from '../../store/session-store'
 import { PhotoThumbnailCanvas } from '../import/PhotoThumbnailCanvas'
 import type { SessionPhoto } from '../../types/photo'
+import type { CSSProperties, PointerEvent } from 'react'
+import { maxFilmstripHeight } from './filmstrip-layout'
 
 const filmstripDragType = 'application/x-lustra-photo'
 
@@ -13,11 +15,15 @@ type Props = {
   activePhotoId: string
   completed: number
   expanded: boolean
+  height: number
+  onResize: (event: PointerEvent<HTMLElement>) => void
+  onResetHeight: () => void
+  onResizeBy: (amount: number) => void
   onToggle: () => void
   onAddPhotos: () => void
 }
 
-export function Filmstrip({ photos, activePhotoId, completed, expanded, onToggle, onAddPhotos }: Props) {
+export function Filmstrip({ photos, activePhotoId, completed, expanded, height, onResize, onResetHeight, onResizeBy, onToggle, onAddPhotos }: Props) {
   const { t } = useTranslation()
   const activate = useSessionStore((state) => state.setActivePhoto)
   const reorder = useSessionStore((state) => state.reorderPhotos)
@@ -27,6 +33,8 @@ export function Filmstrip({ photos, activePhotoId, completed, expanded, onToggle
   const [optionsId, setOptionsId] = useState<string | null>(null)
   const [confirmRemove, setConfirmRemove] = useState(false)
   const optionsPhoto = photos.find((photo) => photo.id === optionsId)
+  const editorHeight = document.querySelector<HTMLElement>('.editor-layout')?.clientHeight ?? window.innerHeight
+  const maximumHeight = maxFilmstripHeight(window.innerHeight, editorHeight)
 
   function openOptions(id: string) {
     setConfirmRemove(false)
@@ -53,7 +61,11 @@ export function Filmstrip({ photos, activePhotoId, completed, expanded, onToggle
   }
 
   return <>
-    <section className={`filmstrip${expanded ? '' : ' is-collapsed'}`} aria-label={t('edit.photos')}>
+    <section className={`filmstrip${expanded ? '' : ' is-collapsed'}`} aria-label={t('edit.photos')} style={{ '--filmstrip-height': `${height}px` } as CSSProperties}>
+      {expanded && <div className="filmstrip-resizer" role="separator" aria-orientation="horizontal" aria-valuemin={100} aria-valuemax={maximumHeight} aria-valuenow={height} aria-label={t('edit.resizeFilmstrip')} tabIndex={0} title={t('edit.resizeFilmstrip')} onPointerDown={onResize} onDoubleClick={onResetHeight} onKeyDown={(event) => {
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); onResizeBy((event.key === 'ArrowUp' ? 1 : -1) * (event.shiftKey ? 20 : 8)) }
+        else if (event.key === 'Home') { event.preventDefault(); onResetHeight() }
+      }} />}
       <div className="filmstrip-heading">
         <div className="filmstrip-heading__main">
           <button className="filmstrip-toggle" onClick={onToggle} aria-expanded={expanded} aria-controls={expanded ? 'filmstrip-track' : undefined} aria-label={t(expanded ? 'edit.hideFilmstrip' : 'edit.showFilmstrip')} title={t(expanded ? 'edit.hideFilmstrip' : 'edit.showFilmstrip')}>

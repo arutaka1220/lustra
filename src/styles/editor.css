@@ -106,6 +106,11 @@
 .complete-state.is-complete { color: var(--status-success); }
 .complete-state.is-complete > span { background: var(--status-success); border-color: var(--status-success); }
 .filmstrip { display: flex; height: var(--filmstrip-height); flex: 0 0 auto; flex-direction: column; padding: 0 16px 8px; background: var(--panel-bg); border-top: 1px solid var(--stroke-color); }
+.filmstrip-resizer { position: absolute; z-index: 2; top: -5px; right: 0; left: 0; height: 10px; cursor: ns-resize; touch-action: none; }
+.filmstrip-resizer::after { position: absolute; top: 4px; right: 0; left: 0; height: 1px; background: var(--stroke-color); content: ''; transition: background-color var(--motion-fast), height var(--motion-fast); }
+.filmstrip-resizer:hover::after, .filmstrip-resizer:focus-visible::after { height: 2px; background: var(--text-muted); }
+.filmstrip-resizer:focus-visible { outline: none; }
+.filmstrip { position: relative; }
 .filmstrip.is-collapsed { height: 42px; padding-bottom: 0; }
 .filmstrip-heading { display: flex; min-height: 38px; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 12px; }
 .filmstrip-heading__main { display: flex; min-width: 0; align-items: center; gap: 9px; }
@@ -119,14 +124,16 @@
 .filmstrip-add { display: flex; min-height: 30px; align-items: center; gap: 6px; padding: 0 8px; color: var(--text-secondary); background: transparent; border: 0; border-radius: 6px; font-size: 11px; cursor: pointer; }
 .filmstrip-add:hover { color: var(--text-primary); background: var(--surface-hover); }
 .filmstrip-track { display: flex; min-height: 0; flex: 1; gap: 9px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; scrollbar-color: var(--stroke-color) transparent; }
-.filmstrip-item { display: flex; min-width: 108px; max-width: 108px; flex-direction: column; gap: 5px; padding: 0; background: transparent; border: 0; text-align: left; cursor: pointer; }
-.filmstrip-thumb { position: relative; display: block; overflow: hidden; height: 72px; background: var(--surface-hover); border: 2px solid transparent; border-radius: 7px; }
+.filmstrip-item { display: flex; min-width: 108px; max-width: 108px; height: 100%; flex-direction: column; gap: 5px; padding: 0; background: transparent; border: 0; text-align: left; cursor: pointer; }
+.filmstrip-thumb { position: relative; display: block; min-height: 44px; flex: 1; overflow: hidden; background: var(--surface-hover); border: 2px solid transparent; border-radius: 7px; }
 .filmstrip-thumb > img { width: 100%; height: 100%; object-fit: contain; }
 .filmstrip-item.is-active .filmstrip-thumb { border-color: var(--text-primary); box-shadow: 0 0 0 1px var(--panel-bg), 0 0 0 3px var(--text-primary); }
 .filmstrip-check { position: absolute; right: 5px; bottom: 5px; display: grid; width: 17px; height: 17px; place-items: center; color: #fff; background: var(--status-success); border: 1px solid rgba(255,255,255,.8); border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
 .filmstrip-name { display: flex; gap: 5px; overflow: hidden; color: var(--text-secondary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .filmstrip-name > span { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .filmstrip-item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; border-radius: 8px; }
+body.is-resizing-filmstrip { cursor: ns-resize; user-select: none; }
+body.is-resizing-filmstrip * { cursor: ns-resize !important; }
 
 @media (max-width: 1120px) {
   .editor-layout { grid-template-columns: minmax(260px, var(--inspector-width)) 6px minmax(0, 1fr); }
