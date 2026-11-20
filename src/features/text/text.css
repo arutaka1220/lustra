@@ -97,14 +97,15 @@
 .text-color-controls { display: flex; align-items: center; gap: 8px; }
 .text-color-controls input[type="color"] { width: 40px; height: 28px; }
 .text-color-controls label, .text-guide-toggle { display: flex; gap: 5px; align-items: center; }
-.text-metadata summary, .metadata-corrections summary {
+.text-metadata summary {
   color: var(--text-primary);
   font-size: 12px;
   font-weight: 550;
   cursor: pointer;
 }
 .text-metadata { margin-top: 12px; }
-.metadata-corrections { padding: 12px 0; border-bottom: 1px solid var(--stroke-color); }
+.metadata-corrections { display: grid; gap: 12px; padding: 0 0 12px; }
+.metadata-corrections > h2 { margin: 0; color: var(--text-primary); font-size: 16px; font-weight: 600; }
 .correction-rules { display: grid; gap: 7px; justify-items: start; margin-top: 14px; }
 .correction-rules > * { width: 100%; margin: 0; }
 .correction-rules > button { width: auto; }

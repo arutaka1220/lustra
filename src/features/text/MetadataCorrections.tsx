@@ -1,5 +1,5 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react'
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SelectField } from '../../components/ui/SelectField'
 import { useMetadataCorrections } from './metadata-corrections-store'
@@ -75,9 +75,11 @@ export function MetadataCorrections() {
   const { t } = useTranslation()
   const { status, saveError, load, save } = useMetadataCorrections()
 
+  useEffect(() => { void load() }, [load])
+
   return (
-    <details className="metadata-corrections" onToggle={(event) => { if (event.currentTarget.open) void load() }}>
-      <summary>{t('text.corrections')}</summary>
+    <div className="metadata-corrections">
+      <h2>{t('text.corrections')}</h2>
       {status === 'loadError' && <p className="text-feedback" role="status">
         {t('text.corrections.loadError')} <button className="text-button" type="button" onClick={() => void load()}>{t('text.corrections.retry')}</button>
       </p>}
@@ -89,6 +91,6 @@ export function MetadataCorrections() {
         <CorrectionRules category="camera" />
         <CorrectionRules category="lens" />
       </>}
-    </details>
+    </div>
   )
 }
