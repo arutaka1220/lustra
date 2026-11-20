@@ -52,7 +52,7 @@ describe('metadata corrections and text export', () => {
       { ...createTextElement('Not visible'), visible: false },
     ]
     expect(resolveTextLayers(photo, { ...frame, textElements })).toMatchObject([
-      { text: 'ISO 100', anchor: 'bottom-right', x: -30, y: -22, color: '#161616' },
+      { text: 'ISO 100', anchor: 'bottom-right', x: -30, y: -22, color: '#000000' },
     ])
   })
 

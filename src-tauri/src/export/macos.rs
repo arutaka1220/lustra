@@ -199,6 +199,39 @@ fn parse_hex_color(value: &str) -> u32 {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::{NativeText, TextData};
+    use crate::export::TextItem;
+
+    fn item(color: &str) -> TextItem {
+        TextItem {
+            text: "Lustra".to_owned(),
+            anchor: "center".to_owned(),
+            x: 0.0,
+            y: 0.0,
+            size: 24.0,
+            font_family: "Arial".to_owned(),
+            weight: 400,
+            color: color.to_owned(),
+        }
+    }
+
+    #[test]
+    fn text_color_hex_is_preserved_as_opaque_native_rgba() {
+        for (hex, expected) in [
+            ("#E8C7A4", 0xE8C7A4FF),
+            ("#000000", 0x000000FF),
+            ("#FFFFFF", 0xFFFFFFFF),
+        ] {
+            let item = item(hex);
+            let data = TextData::from_item(&item).unwrap();
+            let native: NativeText = data.native();
+            assert_eq!(native.rgba, expected);
+        }
+    }
+}
+
 fn error_message(error: u32) -> String {
     match error {
         1 => "The source could not be decoded as an image.",

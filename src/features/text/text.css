@@ -95,8 +95,11 @@
 .text-layer-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .text-layer-name small { width: 100%; color: var(--text-secondary); }
 .text-color-controls { display: flex; align-items: center; gap: 8px; }
-.text-color-controls input[type="color"] { width: 40px; height: 28px; }
-.text-color-controls label, .text-guide-toggle { display: flex; gap: 5px; align-items: center; }
+.text-color-controls .custom-color__trigger { min-width: 145px; margin-top: 0; }
+.text-color-mode { display: inline-flex; min-height: 30px; padding: 2px; gap: 2px; background: var(--surface-hover); border-radius: 6px; }
+.text-color-mode button { padding: 0 9px; color: var(--text-secondary); background: transparent; border: 0; border-radius: 4px; cursor: pointer; }
+.text-color-mode button.is-active { color: var(--text-primary); background: var(--panel-bg); box-shadow: 0 1px 2px #0002; }
+.text-guide-toggle { display: flex; gap: 5px; align-items: center; }
 .text-metadata summary {
   color: var(--text-primary);
   font-size: 12px;

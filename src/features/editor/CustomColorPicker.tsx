@@ -12,13 +12,14 @@ type Props = {
   tile?: boolean
   selected?: boolean
   label?: string
+  title?: string
   onEditStart?: () => void
   onEditEnd?: () => void
 }
 
 type Point = { top: number; left: number; placement: 'right' | 'left' }
 
-export function CustomColorPicker({ color: rawColor, onChange, onOpen, tile = false, selected = false, label = 'Custom', onEditStart, onEditEnd }: Props) {
+export function CustomColorPicker({ color: rawColor, onChange, onOpen, tile = false, selected = false, label = 'Custom', title = 'Frame Color', onEditStart, onEditEnd }: Props) {
   const color = parseHex(rawColor) ?? '#000000'
   const trigger = useRef<HTMLButtonElement>(null)
   const popover = useRef<HTMLDivElement>(null)
@@ -112,12 +113,12 @@ export function CustomColorPicker({ color: rawColor, onChange, onOpen, tile = fa
   }
 
   return <>
-    <button ref={trigger} type="button" className={tile ? `style-option custom-color__tile ${selected ? 'is-active' : ''}` : 'custom-color__trigger'} aria-label={tile ? `${label} frame color` : 'Choose custom frame color'} aria-expanded={open} aria-pressed={tile ? selected : undefined} onClick={() => { onOpen?.(); setHexDraft(color); position(); setOpen(true) }}>
+    <button ref={trigger} type="button" className={tile ? `style-option custom-color__tile ${selected ? 'is-active' : ''}` : 'custom-color__trigger'} aria-label={tile ? `${label} frame color` : `Choose custom ${title.toLowerCase()}`} aria-expanded={open} aria-pressed={tile ? selected : undefined} onClick={() => { onOpen?.(); setHexDraft(color); position(); setOpen(true) }}>
       {tile ? <><span className="style-preview style-preview--custom" style={{ '--custom-frame-color': color } as React.CSSProperties}><span /></span><span>{label}</span></> : <><span className="custom-color__trigger-swatch" style={{ backgroundColor: color }} /><span className="custom-color__trigger-value">{color}</span><span className="custom-color__trigger-chevron" aria-hidden="true">⌄</span></>}
       {tile && selected && <Check className="custom-color__tile-check" size={14} aria-hidden="true" />}
     </button>
-    {open && createPortal(<div ref={popover} className="custom-color__popover" role="dialog" aria-label="Frame Color" data-placement={point.placement} style={{ top: point.top, left: point.left }}>
-      <header className="custom-color__header"><h2>Frame Color</h2><button type="button" className="custom-color__close" aria-label="Close color picker" onClick={() => { end(); setOpen(false); trigger.current?.focus() }}><X size={17}/></button></header>
+    {open && createPortal(<div ref={popover} className="custom-color__popover" role="dialog" aria-label={title} data-placement={point.placement} style={{ top: point.top, left: point.left }}>
+      <header className="custom-color__header"><h2>{title}</h2><button type="button" className="custom-color__close" aria-label="Close color picker" onClick={() => { end(); setOpen(false); trigger.current?.focus() }}><X size={17}/></button></header>
       <div ref={field} className="custom-color__field" role="slider" tabIndex={0} aria-label="Saturation and brightness" aria-valuetext={`Saturation ${Math.round(hsv.s)}%, brightness ${Math.round(hsv.v)}%`} onKeyDown={event => {
         if (!event.key.startsWith('Arrow')) return
         event.preventDefault(); begin()

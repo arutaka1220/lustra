@@ -3,12 +3,13 @@ import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSessionStore } from '../../store/session-store'
 import type { FrameSettings, SessionPhoto } from '../../types/photo'
+import type { PhotoRaster } from '../editor/frame-paint'
 import { useMetadataCorrections } from './metadata-corrections-store'
 import { useSelectedTextIds, useTextEditor } from './text-editor-store'
 import { findTextGuides } from './text-guides'
 import type { TextBounds } from './text-guides'
 import {
-  getCanvasFontFamily, getEffectiveMetadata, getTextAnchorPosition, getTextElements, resolveTemplate,
+  getCanvasFontFamily, getEffectiveMetadata, getTextAnchorPosition, getTextElements, resolveTemplate, sampleBlurredTextBackground,
   TEXT_LINE_HEIGHT, TEXT_REFERENCE_SIZE, textColor,
 } from './text-model'
 import type { MetadataField, TextElement } from './text-model'
@@ -21,6 +22,7 @@ type TextOverlayProps = {
   interactive?: boolean
   canvasSize?: Size
   imageBounds?: TextBounds
+  raster?: PhotoRaster
   onRevealInspector?: () => void
 }
 type DragState = {
@@ -53,13 +55,13 @@ function joinBounds(rects: TextBounds[]): TextBounds {
   }
 }
 
-function layerStyle(element: TextElement, frame: FrameSettings, scale: number): CSSProperties {
+function layerStyle(element: TextElement, frame: FrameSettings, scale: number, blurredColor?: string): CSSProperties {
   const [column, row] = getTextAnchorPosition(element.anchor)
   return {
     left: `calc(${column * 100}% + ${element.x * scale}px)`,
     top: `calc(${row * 100}% + ${element.y * scale}px)`,
     transform: `translate(${column * -100}%, ${row * -100}%) translate(var(--text-drag-x, 0px), var(--text-drag-y, 0px))`,
-    color: textColor(element.color, frame.style),
+    color: textColor(element.color, frame.style, frame.customColor, blurredColor),
     fontFamily: getCanvasFontFamily(element.fontFamily),
     fontWeight: element.weight,
     fontSize: element.size * scale,
@@ -68,7 +70,7 @@ function layerStyle(element: TextElement, frame: FrameSettings, scale: number): 
   }
 }
 
-export function TextOverlay({ photo, frame, interactive, canvasSize, imageBounds, onRevealInspector }: TextOverlayProps) {
+export function TextOverlay({ photo, frame, interactive, canvasSize, imageBounds, raster, onRevealInspector }: TextOverlayProps) {
   const { t, i18n } = useTranslation()
   const root = useRef<HTMLDivElement>(null)
   const verticalGuide = useRef<HTMLSpanElement>(null)
@@ -230,7 +232,10 @@ export function TextOverlay({ photo, frame, interactive, canvasSize, imageBounds
         const { text, missing } = resolveTemplate(element.template, metadata, i18n.resolvedLanguage ?? i18n.language)
         const provisional = missing.length > 0
         if (!interactive && (provisional || !text.trim())) return null
-        const style = layerStyle(element, frame, scale)
+        const blurredColor = element.color === 'auto' && raster && size && frame.style === 'blurred'
+          ? sampleBlurredTextBackground(raster, frame, size, element)
+          : undefined
+        const style = layerStyle(element, frame, scale, blurredColor)
         if (!interactive) return <span className="canvas-text" key={element.id} style={style}>{text}</span>
         const message = provisional
           ? photo.metadataState === 'loading' && !photo.metadataOverrides
