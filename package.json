@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 1420",
     "build": "tsc -b && vite build",
-    "test": "bun test tests && vitest run",
+    "test": "vitest run",
     "test:unit": "vitest run",
+    "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:file": "LUSTRA_E2E_FILE_MODE=1 bun run build && LUSTRA_E2E_FILE_MODE=1 playwright test",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import { canvasAspectRatio, getPhotoLayout } from '../src/features/editor/frame-layout'
 import { hasLegacyCanvasSettings, withoutLegacyCanvasSettings } from '../src/features/editor/frame-migration'
 import type { FrameSettings } from '../src/types/photo'

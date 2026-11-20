@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import { findTextGuides } from '../src/features/text/text-guides'
 import {
   applyMetadataCorrection, createTextElement, getEffectiveMetadata, getTextAnchorPosition, isValidCorrectionPattern,

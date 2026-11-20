@@ -613,3 +613,8 @@ v0.3時点での仕様を記録した説明。最新の確定内容は本文と�
 
 - 編集画面左上のLustraを選ぶと保存してホームへ戻り、Suspended Sessions一覧から個別に再開できる。Suspended一覧はRecent Sessionsの件数制限の対象外。
 - HomeのImport Photosは空の新規セッションで開始し、Suspended項目は再開操作でのみ開く。
+
+### v0.13（2026-11-20）Vitest統合
+
+- フロントエンドのTypeScript、React、ZustandテストをVitestとjsdomで実行する。画面遷移E2EはPlaywright、ネイティブ処理は`cargo test`を使う。
+- 開発者向けの単体テスト実行コマンドを`bun run test`とし、watch実行は`bun run test:watch`とする。

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'bun:test'
+import { beforeEach, describe, expect, test } from 'vitest'
 import { getEffectiveFrame, getSessionSnapshot, restoreSessionSnapshot, useSessionStore } from '../src/store/session-store'
 import type { ImportCandidate } from '../src/types/photo'
 

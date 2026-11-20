@@ -516,6 +516,11 @@ RAW現像や明るさ調整・色調整などの編集機能は搭載しない�
 - 編集画面のLustraロゴはFinishではなくSuspendedとして現在のセッションを保存し、ホームへ戻る。保存失敗時は編集画面へ戻してRetryを表示する。
 - Suspended一覧はRecentの表示上限から独立して保持し、同じセッションID、写真、編集、完了状態、Undo履歴で再開する。HomeからImport Photosを行うと必ず新規セッションを作る。
 - 旧snapshotのparked workspaceはSuspendedへ移行し、snapshot version 3として保存する。未対応版や破損データは自動削除しない。
+
+### v0.11（2026-11-20）フロントエンドテスト統合
+
+- TypeScript単体・状態管理テストはVitestへ統一し、React DOMテストはjsdomで実行する。PlaywrightとRustのテスト実行経路は独立させる。
+- Bunは依存管理とスクリプト起動に使い、`bun run test`はVitestのみを実行する。正式な実行例に`bun test`を使わない。
 # 変更追補（2026-11-20）
 
 この追補は本文中の旧仕様より優先する。フレームはBlack `#000000`、White `#FFFFFF`、Blurred、Soft Black `#242424`、Soft White `#fafaf8`、Customの6種類とし、3列×2行で指定順に表示する。Preset機能は廃止し、セッション単位の編集設定とUndo/Redoは維持する。PaddingはVertical（Top/Bottom）とHorizontal（Left/Right）に分けて連動を操作し、解除時はリンク前の独立値に戻す。Custom色のMy Paletteはアプリ共通で最大16色とする。
