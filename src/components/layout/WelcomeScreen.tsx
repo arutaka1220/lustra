@@ -18,10 +18,12 @@ export function WelcomeScreen({ onImportPhotos, onImportFolder }: WelcomeScreenP
   const photos = useSessionStore((state) => state.photos)
   const parkedSession = useSessionStore((state) => state.parkedSession)
   const recentSessions = useSessionStore((state) => state.recentSessions)
+  const suspendedSessions = useSessionStore((state) => state.suspendedSessions)
   const activeRecentId = useSessionStore((state) => state.activeRecentId)
   const removedPhotos = useSessionStore((state) => state.removedPhotos)
   const restorePhoto = useSessionStore((state) => state.restorePhoto)
   const resumeCurrent = useSessionStore((state) => state.resumeCurrentSession)
+  const resumeSuspended = useSessionStore((state) => state.resumeSuspendedSession)
   const openRecent = useSessionStore((state) => state.openRecentSession)
   const setScreen = useSessionStore((state) => state.setScreen)
   const dateFormat = new Intl.DateTimeFormat(i18n.resolvedLanguage, { dateStyle: 'medium', timeStyle: 'short' })
@@ -48,6 +50,16 @@ export function WelcomeScreen({ onImportPhotos, onImportFolder }: WelcomeScreenP
           </div>
         </section>
         <div className="start-screen__footnote">JPEG · PNG · WebP</div>
+        {suspendedSessions.length > 0 && <section className="recent-sessions" aria-labelledby="suspended-title">
+          <h2 id="suspended-title"><History size={16} /> {t('session.suspended')}</h2>
+          <ul>{suspendedSessions.map((session) => <li key={session.id}>
+            <button className="recent-session" onClick={() => resumeSuspended(session.id)} aria-label={t('session.resumeNamed', { name: session.photos[0]?.name ?? session.id })}>
+              <RecentThumbnail sessionId={session.id} />
+              <span><strong>{dateFormat.format(new Date(session.updatedAt))}</strong><small>{t('session.photoCount', { count: session.photos.length })}</small></span>
+              <ArrowRight size={16} className="recent-session__arrow" />
+            </button>
+          </li>)}</ul>
+        </section>}
         {recentSessions.length > 0 && <section className="recent-sessions" aria-labelledby="recent-title">
           <h2 id="recent-title"><History size={16} /> {t('session.recent')}</h2>
           <ul>

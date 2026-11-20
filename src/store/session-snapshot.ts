@@ -23,12 +23,13 @@ type Workspace<P, Source> = {
 export type SessionWorkspace = Workspace<SessionPhoto, PhotoSource>
 type StoredWorkspace = Workspace<StoredPhoto, StoredSource>
 
-export const SESSION_SNAPSHOT_VERSION = 2 as const
+export const SESSION_SNAPSHOT_VERSION = 3 as const
 
 export type SessionSnapshot = {
   version: number
   active: StoredWorkspace
   parked: StoredWorkspace | null
+  suspended?: StoredWorkspace[]
   recent: StoredWorkspace[]
   activeRecentId: string | null
 }

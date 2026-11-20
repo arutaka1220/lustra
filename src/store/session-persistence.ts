@@ -138,6 +138,7 @@ function sessionChanged(state: SessionState, previous: SessionState): boolean {
     || state.history !== previous.history
     || state.pendingEdit !== previous.pendingEdit
     || state.recentSessions !== previous.recentSessions
+    || state.suspendedSessions !== previous.suspendedSessions
     || state.parkedSession !== previous.parkedSession
     || state.sessionId !== previous.sessionId
     || state.activeRecentId !== previous.activeRecentId
@@ -206,7 +207,7 @@ function startRestore(): void {
     let recentSessionsTrimmed = false
     if (archive?.snapshot) {
       if (isTauri()) {
-        const workspaces = [archive.snapshot.active, ...(archive.snapshot.parked ? [archive.snapshot.parked] : []), ...archive.snapshot.recent]
+        const workspaces = [archive.snapshot.active, ...(archive.snapshot.parked ? [archive.snapshot.parked] : []), ...(archive.snapshot.suspended ?? []), ...archive.snapshot.recent]
         const paths = workspaces.flatMap((workspace) => workspace.photos
           .filter((photo) => photo.source.kind === 'path' && !archive.missingPaths.includes(photo.source.path))
           .map((photo) => photo.source.path))

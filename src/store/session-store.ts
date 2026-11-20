@@ -30,6 +30,7 @@ export type SessionState = {
   pendingEdit: SessionChange | null
   sessionId: string
   recentSessions: SessionWorkspace[]
+  suspendedSessions: SessionWorkspace[]
   parkedSession: SessionWorkspace | null
   activeRecentId: string | null
   recentLimit: number
@@ -69,6 +70,8 @@ export type SessionState = {
   setUndoLimit: (limit: number) => void
   setRecentLimit: (limit: number) => void
   finishSession: () => void
+  suspendCurrentSession: () => string | null
+  resumeSuspendedSession: (id: string) => void
   openRecentSession: (id: string) => void
   resumeCurrentSession: () => void
 }
@@ -343,6 +346,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   candidatesReordered: false,
   settingsOpen: false,
   recentSessions: [],
+  suspendedSessions: [],
   parkedSession: null,
   activeRecentId: null,
   recentLimit: 3,
@@ -557,6 +561,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       undoLimit,
       history: trim(currentWorkspace(state)).history,
       recentSessions: state.recentSessions.map(trim),
+      suspendedSessions: state.suspendedSessions.map(trim),
       parkedSession: state.parkedSession && trim(state.parkedSession),
     }
   }),
@@ -574,17 +579,52 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       screen: 'edit',
     }
     const recentSessions = [finished, ...state.recentSessions.filter((workspace) => workspace.id !== finished.id)].slice(0, state.recentLimit)
-    const workspace = state.parkedSession ? workspaceState(state.parkedSession, 'welcome') : freshWorkspace()
+    const workspace = freshWorkspace()
     state.candidates.forEach(releaseCandidate)
     return { ...workspace, candidates: [], candidatesReordered: false, activeRecentId: null, parkedSession: null, recentSessions }
+  }),
+  suspendCurrentSession: () => {
+    let suspendedId: string | null = null
+    set((state) => {
+      if (!state.photos.length) return state
+      const active = currentWorkspace(state)
+      suspendedId = active.id
+      const suspendedSessions = [active, ...state.suspendedSessions.filter(({ id }) => id !== active.id)]
+      state.candidates.forEach(releaseCandidate)
+      return {
+        ...freshWorkspace(), screen: 'welcome',
+        candidates: [], candidatesReordered: false, activeRecentId: null,
+        suspendedSessions, parkedSession: null,
+        recentSessions: state.activeRecentId === active.id
+          ? state.recentSessions.filter(({ id }) => id !== active.id)
+          : saveRecentDraft(state),
+      }
+    })
+    return suspendedId
+  },
+  resumeSuspendedSession: (id) => set((state) => {
+    const workspace = state.suspendedSessions.find((entry) => entry.id === id)
+    if (!workspace) return state
+    const suspendedSessions = state.suspendedSessions.filter((entry) => entry.id !== id)
+    const shouldSuspendActive = hasWorkspaceData(state) && state.sessionId !== id
+    const active = shouldSuspendActive ? currentWorkspace(state) : null
+    const nextSuspended = active ? [active, ...suspendedSessions.filter(({ id: other }) => other !== active.id)] : suspendedSessions
+    state.candidates.forEach(releaseCandidate)
+    return {
+      ...workspaceState(workspace, workspace.photos.length ? 'edit' : 'welcome'),
+      candidates: [], candidatesReordered: false, activeRecentId: null,
+      parkedSession: null, suspendedSessions: nextSuspended,
+      recentSessions: saveRecentDraft(state),
+    }
   }),
   openRecentSession: (id) => set((state) => {
     if (id === state.activeRecentId) return { ...closeFrameEdit(state), screen: state.photos.length ? 'edit' : 'welcome' }
     const recent = state.recentSessions.find((workspace) => workspace.id === id)
     if (!recent) return state
-    const parkedSession = state.activeRecentId === null && hasWorkspaceData(state) ? currentWorkspace(state) : state.parkedSession
+    const active = state.activeRecentId === null && hasWorkspaceData(state) ? currentWorkspace(state) : null
+    const suspendedSessions = active ? [active, ...state.suspendedSessions.filter(({ id: other }) => other !== active.id)] : state.suspendedSessions
     state.candidates.forEach(releaseCandidate)
-    return { ...workspaceState(recent, recent.photos.length ? 'edit' : 'welcome'), candidates: [], candidatesReordered: false, activeRecentId: id, parkedSession, recentSessions: saveRecentDraft(state) }
+    return { ...workspaceState(recent, recent.photos.length ? 'edit' : 'welcome'), candidates: [], candidatesReordered: false, activeRecentId: id, parkedSession: null, suspendedSessions, recentSessions: saveRecentDraft(state) }
   }),
   resumeCurrentSession: () => set((state) => {
     if (state.activeRecentId === null) return { ...closeFrameEdit(state), screen: state.photos.length ? 'edit' : 'welcome' }
@@ -614,6 +654,7 @@ export function getSessionSnapshot(state = useSessionStore.getState()): SessionS
     version: SESSION_SNAPSHOT_VERSION,
     active: serializeWorkspace(currentWorkspace(state)),
     parked: state.parkedSession && serializeWorkspace(state.parkedSession),
+    suspended: state.suspendedSessions.map(serializeWorkspace),
     recent: state.recentSessions.map(serializeWorkspace).filter((workspace) => (
       workspace.photos.length > 0 || workspace.removedPhotos.length > 0 || Object.keys(workspace.history.detachedPhotos).length > 0
     )),
@@ -630,7 +671,8 @@ export function restoreSessionSnapshot(snapshot: SessionSnapshot, missingPaths: 
   useSessionStore.setState({
     ...workspaceState(active),
     activeRecentId: snapshot.activeRecentId,
-    parkedSession: snapshot.parked && restore(snapshot.parked),
+    parkedSession: null,
+    suspendedSessions: (snapshot.suspended ?? (snapshot.parked ? [snapshot.parked] : [])).map(restore),
     recentSessions: snapshot.recent.slice(0, recentLimit).map(restore),
     candidates: [],
     candidatesReordered: false,

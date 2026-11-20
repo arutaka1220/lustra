@@ -608,3 +608,8 @@ v0.3時点での仕様を記録した説明。最新の確定内容は本文と�
 
 - Padding Inspectorに「同じ画像比率の写真に適用」の補足と「グローバル初期値として保存」操作を表示する。
 - 横長・縦長・正方形の標準比率は個別設定し、その他の比率も独立設定とする。セッション共通値、写真別上書き、既存のLink操作を維持する。
+
+### v0.12（2026-11-20）Suspended Sessions
+
+- 編集画面左上のLustraを選ぶと保存してホームへ戻り、Suspended Sessions一覧から個別に再開できる。Suspended一覧はRecent Sessionsの件数制限の対象外。
+- HomeのImport Photosは空の新規セッションで開始し、Suspended項目は再開操作でのみ開く。

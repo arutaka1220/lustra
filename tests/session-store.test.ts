@@ -95,7 +95,7 @@ describe('session history and recovery', () => {
     old.version = 1
     useSessionStore.setState(useSessionStore.getInitialState(), true)
     restoreSessionSnapshot(old)
-    expect(getSessionSnapshot().version).toBe(2)
+    expect(getSessionSnapshot().version).toBe(3)
     expect(session().commonFrame.style).toBe('softWhite')
     expect(session().photos[0].overrides.style).toBe('softWhite')
     expect(session().history.common.undo.at(-1)?.change).toMatchObject({ kind: 'common', values: { before: { style: 'black' }, after: { style: 'softWhite' } } })
@@ -106,10 +106,10 @@ describe('session history and recovery', () => {
   test('writes the current archive version and rejects unsupported versions without changing the store', () => {
     session().addToSession([photo('versioned')])
     const current = getSessionSnapshot()
-    expect(current.version).toBe(2)
+    expect(current.version).toBe(3)
 
     const before = session().photos
-    expect(() => restoreSessionSnapshot({ ...current, version: 3 })).toThrow('This session archive requires a newer version of Lustra.')
+    expect(() => restoreSessionSnapshot({ ...current, version: 4 })).toThrow('This session archive requires a newer version of Lustra.')
     expect(session().photos).toBe(before)
     expect(() => restoreSessionSnapshot({ ...current, version: 0 })).toThrow('This session archive is invalid or damaged.')
   })
@@ -127,7 +127,7 @@ describe('session history and recovery', () => {
       const archived = JSON.parse(JSON.stringify(getSessionSnapshot()))
       useSessionStore.setState(useSessionStore.getInitialState(), true)
       restoreSessionSnapshot(archived)
-      expect(getSessionSnapshot().version).toBe(2)
+      expect(getSessionSnapshot().version).toBe(3)
       expect(session().screen).toBe('edit')
       expect(session().photos).toHaveLength(1)
       expect(session().photos[0].completed).toBe(true)
@@ -216,7 +216,7 @@ describe('session history and recovery', () => {
     expect(session().commonFrame.style).toBe('softBlack')
   })
 
-  test('finishing a reopened session updates its history item and brings back the parked work', () => {
+  test('finishing a reopened session updates its history and preserves the other workspace as suspended', () => {
     session().addToSession([photo('a'), photo('b')])
     const firstId = session().sessionId
     session().finishSession()
@@ -226,7 +226,8 @@ describe('session history and recovery', () => {
     session().removePhoto('b')
     session().finishSession()
 
-    expect(session().photos.map((item) => item.id)).toEqual(['c'])
+    expect(session().photos).toEqual([])
+    expect(session().suspendedSessions[0].photos.map((item) => item.id)).toEqual(['c'])
     expect(session().recentSessions.map((item) => item.id)).toEqual([firstId])
     expect(session().recentSessions[0].photos.map((item) => item.id)).toEqual(['a'])
     expect(session().recentSessions[0].removedPhotos).toEqual([])

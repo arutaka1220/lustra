@@ -12,7 +12,7 @@ import { useEditorShortcuts } from './hooks/useEditorShortcuts'
 import { useInspectorLayout } from './hooks/useInspectorLayout'
 import { usePhotoImport } from './features/import/usePhotoImport'
 import { useSessionStore } from './store/session-store'
-import { readAppPreference, useSessionPersistence } from './store/session-persistence'
+import { flushSessionPersistence, readAppPreference, useSessionPersistence } from './store/session-persistence'
 import { useMetadataCorrections } from './features/text/metadata-corrections-store'
 import { ExportScreen } from './features/export/ExportScreen'
 import './styles/workflow.css'
@@ -24,6 +24,9 @@ export function App() {
   const photos = useSessionStore((state) => state.photos)
   const commonFrame = useSessionStore((state) => state.commonFrame)
   const finishSession = useSessionStore((state) => state.finishSession)
+  const endFrameEdit = useSessionStore((state) => state.endFrameEdit)
+  const suspendCurrentSession = useSessionStore((state) => state.suspendCurrentSession)
+  const resumeSuspendedSession = useSessionStore((state) => state.resumeSuspendedSession)
   const clearImport = useSessionStore((state) => state.clearImport)
   const settingsOpen = useSessionStore((state) => state.settingsOpen)
   const toggleSettings = useSessionStore((state) => state.toggleSettings)
@@ -31,8 +34,40 @@ export function App() {
   const inspector = useInspectorLayout()
   const persistence = useSessionPersistence()
   const [exportBusy, setExportBusy] = useState(false)
+  const [suspending, setSuspending] = useState(false)
+  const [suspendError, setSuspendError] = useState<string | null>(null)
   const photoImport = usePhotoImport(persistence.ready, screen !== 'export')
   const loadMetadataCorrections = useMetadataCorrections((state) => state.load)
+
+  const goHome = async () => {
+    if (screen === 'import' && !photos.length) {
+      clearImport()
+      setScreen('welcome')
+      return
+    }
+    if (!photos.length) {
+      setScreen('welcome')
+      return
+    }
+    setSuspending(true)
+    setSuspendError(null)
+    try {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+      endFrameEdit()
+      const id = suspendCurrentSession()
+      if (!id) {
+        setScreen('welcome')
+        return
+      }
+      await flushSessionPersistence()
+    } catch (error) {
+      const id = useSessionStore.getState().suspendedSessions[0]?.id
+      if (id) resumeSuspendedSession(id)
+      setSuspendError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setSuspending(false)
+    }
+  }
 
   useEditorShortcuts(persistence.ready && !settingsOpen ? screen : 'welcome')
   useEffect(() => { void loadMetadataCorrections() }, [loadMetadataCorrections])
@@ -77,15 +112,17 @@ export function App() {
         completedCount={completedCount}
         screen={screen}
         inspectorOpen={inspector.inspectorOpen}
-        navigationLocked={!persistence.ready || exportBusy}
-        onHome={() => {
-          if (screen === 'import') clearImport()
-          setScreen('welcome')
-        }}
+        navigationLocked={!persistence.ready || exportBusy || suspending}
+        onHome={() => { void goHome() }}
         onToggleInspector={inspector.toggleInspector}
         onOpenSettings={toggleSettings}
         onReview={() => setScreen('review')}
       />
+
+      {suspendError && <div className="persistence-notice" role="alert">
+        <div><strong>{t('session.saveError')}</strong><small>{suspendError}</small></div>
+        <button className="button button--secondary button--small" onClick={() => { void goHome() }}>{t('common.retry')}</button>
+      </div>}
 
       {persistence.error && <div className="persistence-notice" role="alert">
         <div><strong>{t(persistence.protectedArchive || !persistence.ready ? 'session.loadError' : 'session.saveError')}</strong><small>{persistence.error}</small>
