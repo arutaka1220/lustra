@@ -1,0 +1,257 @@
+name: Build and publish release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to publish or retry feed distribution for
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lustra-release-feed
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      prerelease: ${{ steps.check.outputs.prerelease }}
+      tag: ${{ steps.check.outputs.tag }}
+      existing: ${{ steps.check.outputs.existing }}
+      draft: ${{ steps.check.outputs.draft }}
+      sha: ${{ steps.check.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: check
+        env:
+          EVENT: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
+          INPUT_TAG: ${{ inputs.tag }}
+          TAG_REF: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+          LUSTRA_UPDATER_PUBKEY: ${{ vars.LUSTRA_UPDATER_PUBKEY }}
+        run: |
+          set -euo pipefail
+          test -n "$LUSTRA_UPDATER_PUBKEY"
+          git fetch origin main --tags
+          if [[ "$EVENT" == workflow_dispatch ]]; then
+            test "$EVENT_REF" = refs/heads/main
+            TAG="$INPUT_TAG"
+          else
+            TAG="$TAG_REF"
+          fi
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[1-9][0-9]*)?$ ]]
+          commit=$(git rev-parse --verify "${TAG}^{commit}")
+          git merge-base --is-ancestor "$commit" origin/main
+          git checkout --detach "$commit"
+          version="${TAG#v}"
+          test "$(./scripts/intelirelease version "$version")" = "$version"
+          test "$(./scripts/intelirelease read-version .github/release-setup.json)" = "$version"
+          if [[ "$version" == *-beta.* ]]; then
+            test "$(jq -r .channelMode .github/release-setup.json)" = stable-beta
+            prerelease=true
+          else
+            prerelease=false
+          fi
+          existing=false draft=false
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            existing=true
+            if [[ "$EVENT" != workflow_dispatch ]]; then
+              echo "Release $TAG already exists; use manual dispatch only to retry feed delivery." >&2
+              exit 1
+            fi
+            actual_prerelease=$(gh release view "$TAG" --json isPrerelease --jq .isPrerelease)
+            test "$actual_prerelease" = "$prerelease"
+            draft=$(gh release view "$TAG" --json isDraft --jq .isDraft)
+          fi
+          printf 'version=%s\nprerelease=%s\ntag=%s\nexisting=%s\ndraft=%s\nsha=%s\n' \
+            "$version" "$prerelease" "$TAG" "$existing" "$draft" "$commit" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: preflight
+    if: needs.preflight.outputs.existing == 'false'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: darwin-aarch64
+          - os: macos-15-intel
+            target: darwin-x86_64
+          - os: windows-latest
+            target: windows-x86_64
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.preflight.outputs.sha }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Run app unit tests
+        run: |
+          bun run test
+          bun run test:rust
+      - name: Build signed updater bundles
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          LUSTRA_UPDATER_PUBKEY: ${{ vars.LUSTRA_UPDATER_PUBKEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TAURI_SIGNING_PRIVATE_KEY"
+          test -n "$LUSTRA_UPDATER_PUBKEY"
+          bun run tauri build
+          mkdir -p release-assets
+          case "${{ matrix.target }}" in
+            darwin-*)
+              source=$(find src-tauri/target/release/bundle/macos -type f -name '*.app.tar.gz' -print -quit)
+              test -n "$source" && test -s "$source.sig"
+              cp "$source" "release-assets/Lustra-${{ matrix.target }}.app.tar.gz"
+              cp "$source.sig" "release-assets/Lustra-${{ matrix.target }}.app.tar.gz.sig"
+              dmg=$(find src-tauri/target/release/bundle/dmg -type f -name '*.dmg' -print -quit)
+              test -n "$dmg" && test -s "$dmg"
+              cp "$dmg" "release-assets/Lustra-${{ matrix.target }}.dmg"
+              ;;
+            windows-*)
+              source=$(find src-tauri/target/release/bundle/nsis -type f -name '*-setup.exe' -print -quit)
+              test -n "$source" && test -s "$source.sig"
+              cp "$source" "release-assets/Lustra-${{ matrix.target }}-setup.exe"
+              cp "$source.sig" "release-assets/Lustra-${{ matrix.target }}-setup.exe.sig"
+              ;;
+          esac
+          test "$(find release-assets -type f -name '*.sig' | wc -l | tr -d ' ')" = 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: release-assets/*
+          if-no-files-found: error
+
+  publish:
+    needs: [preflight, build]
+    if: always() && needs.preflight.result == 'success' && (needs.build.result == 'success' || needs.build.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.preflight.outputs.prerelease == 'true' && 'beta-release' || 'stable-release' }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.preflight.outputs.tag }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        if: needs.preflight.outputs.existing == 'false'
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Download existing release assets for publication or feed retry
+        if: needs.preflight.outputs.existing == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.preflight.outputs.tag }}
+        run: gh release download "$TAG" --dir release-assets
+      - name: Create a draft release with generated notes
+        if: needs.preflight.outputs.existing == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.preflight.outputs.tag }}
+          PRERELEASE: ${{ needs.preflight.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          args=("$TAG" release-assets/* --title "$TAG" --generate-notes --draft)
+          if [[ "$PRERELEASE" == true ]]; then args+=(--prerelease); fi
+          gh release create "${args[@]}"
+      - name: Verify updater artifacts and prepare feed files
+        env:
+          VERSION: ${{ needs.preflight.outputs.version }}
+          RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets generated-feed
+          while IFS= read -r filename; do
+            test -s "release-assets/$filename"
+            test -s "release-assets/$filename.sig"
+          done < <(jq -r '.feed.tauri.artifacts[]' .github/release-setup.json)
+          previous_stable= previous_beta=
+          if git ls-remote --exit-code origin refs/heads/release-feed >/dev/null 2>&1; then
+            git fetch origin release-feed:refs/remotes/origin/release-feed
+            previous_stable=$(git show origin/release-feed:stable/stable.json 2>/dev/null | jq -r '.version // empty' || true)
+            previous_beta=$(git show origin/release-feed:beta/beta.json 2>/dev/null | jq -r '.version // empty' || true)
+          fi
+          release_json=$(gh release view "$RELEASE_TAG" --json body,publishedAt)
+          notes_file=$(mktemp)
+          jq -r '.body // ""' <<<"$release_json" > "$notes_file"
+          published_at=$(jq -r '.publishedAt // empty' <<<"$release_json")
+          PREVIOUS_STABLE="$previous_stable" PREVIOUS_BETA="$previous_beta" \
+          ALLOW_FEED_RETRY="${{ needs.preflight.outputs.existing }}" \
+          RELEASE_NOTES_FILE="$notes_file" RELEASE_PUB_DATE="$published_at" \
+            node scripts/generate-update-feed.mjs "$VERSION" release-assets generated-feed
+          for file in generated-feed/*/*.json; do
+            node -e 'const f=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); if(!f.version||!f.pub_date||!f.platforms||!Object.keys(f.platforms).length) process.exit(1)' "$file"
+          done
+      - name: Publish release after approval and verify download URLs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.preflight.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG" --draft=false
+          while IFS= read -r filename; do
+            curl --head --fail --silent --show-error --location --retry 3 --max-time 20 \
+              "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${filename}" >/dev/null
+            curl --head --fail --silent --show-error --location --retry 3 --max-time 20 \
+              "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${filename}.sig" >/dev/null
+          done < <(jq -r '.feed.tauri.artifacts[]' .github/release-setup.json)
+      - name: Publish channel feed with a fast-forward-only update
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.preflight.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code origin refs/heads/release-feed >/dev/null 2>&1; then
+            git switch --track origin/release-feed
+          else
+            git switch --orphan release-feed
+            git rm -rf --ignore-unmatch . >/dev/null
+          fi
+          for channel in generated-feed/*; do
+            test -d "$channel" || continue
+            feed_channel=${channel##*/}
+            mkdir -p "$feed_channel"
+            cp -R "$channel"/* "$feed_channel/"
+            git add -- "$feed_channel"/*
+          done
+          git config user.name github-actions[bot]
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update Lustra updater feed for $TAG"
+            git push origin HEAD:release-feed
+          else
+            echo 'Feed already contains this exact release; distribution retry is complete.'
+          fi

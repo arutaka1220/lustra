@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "channelMode": "stable-beta",
+  "releaseBranch": "main",
+  "trigger": "tag",
+  "publishMode": "auto",
+  "scriptLanguage": "javascript",
+  "changelogPolicy": "preserve",
+  "versionFiles": [
+    { "path": "package.json", "kind": "json", "key": "version" },
+    { "path": "src-tauri/tauri.conf.json", "kind": "json", "key": "version" },
+    { "path": "src-tauri/Cargo.toml", "kind": "text", "prefix": "version = \"", "suffix": "\"" },
+    { "path": "src-tauri/Cargo.lock", "kind": "text", "prefix": "name = \"lustra\"\nversion = \"", "suffix": "\"" }
+  ],
+  "feed": {
+    "kind": "branch",
+    "provider": "tauri",
+    "branch": "release-feed",
+    "root": ".",
+    "tauri": {
+      "sessionSnapshotVersions": [3],
+      "artifacts": {
+        "darwin-aarch64": "Lustra-darwin-aarch64.app.tar.gz",
+        "darwin-x86_64": "Lustra-darwin-x86_64.app.tar.gz",
+        "windows-x86_64": "Lustra-windows-x86_64-setup.exe"
+      },
+      "paths": {
+        "stable": { "stable.json": "aggregate" },
+        "beta": { "beta.json": "aggregate" }
+      }
+    }
+  },
+  "secrets": {
+    "TAURI_SIGNING_PRIVATE_KEY": "TAURI_SIGNING_PRIVATE_KEY",
+    "TAURI_SIGNING_PRIVATE_KEY_PASSWORD": "TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
+  }
+}
