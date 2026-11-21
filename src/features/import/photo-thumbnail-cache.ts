@@ -65,30 +65,46 @@ async function decodeThumbnail(url: string, signal: AbortSignal): Promise<PhotoR
   signal.addEventListener('abort', abortDecode, { once: true })
   image.src = url
   let bitmap: ImageBitmap | undefined
+  let discardLateBitmap = false
   try {
     await Promise.race([image.decode(), aborted, timedOut])
     if (signal.aborted) throw abortError()
     const scale = Math.min(1, THUMBNAIL_EDGE / Math.max(image.naturalWidth, image.naturalHeight))
     const width = Math.max(1, Math.round(image.naturalWidth * scale))
     const height = Math.max(1, Math.round(image.naturalHeight * scale))
-    let keepBitmap = false
     const pendingBitmap = createImageBitmap(image, { resizeWidth: width, resizeHeight: height, resizeQuality: 'high' }).then((result) => {
-      if (!keepBitmap) result.close()
+      if (discardLateBitmap) result.close()
       return result
     })
-    bitmap = await Promise.race([
-      pendingBitmap,
-      aborted,
-      timedOut,
-    ])
-    keepBitmap = true
+    try {
+      bitmap = await Promise.race([
+        pendingBitmap,
+        aborted,
+        timedOut,
+      ])
+    } catch (error) {
+      discardLateBitmap = true
+      if (signal.aborted) throw error
+      // Some WebViews can decode an image but reject createImageBitmap's resize overload.
+      // The already-decoded image can still be drawn directly to the thumbnail canvas.
+    }
     if (signal.aborted) throw abortError()
     const canvas = document.createElement('canvas')
     canvas.width = width
     canvas.height = height
     const context = canvas.getContext('2d')
     if (!context) throw new Error('Canvas is unavailable')
-    context.drawImage(bitmap, 0, 0, width, height)
+    if (bitmap) {
+      try {
+        context.drawImage(bitmap, 0, 0, width, height)
+      } catch {
+        bitmap.close()
+        bitmap = undefined
+        context.drawImage(image, 0, 0, width, height)
+      }
+    } else {
+      context.drawImage(image, 0, 0, width, height)
+    }
     return { image: canvas, width, height }
   } finally {
     signal.removeEventListener('abort', abortDecode)

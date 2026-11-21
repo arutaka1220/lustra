@@ -5,6 +5,12 @@ import { pathToFileURL } from 'node:url'
 const appUrl = process.env.LUSTRA_E2E_FILE_MODE === '1' ? pathToFileURL(resolve('dist/index.html')).href : '/'
 
 test('review opens a framed preview and can switch between images', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'createImageBitmap', {
+      configurable: true,
+      value: async () => { throw new Error('createImageBitmap resize is unavailable') },
+    })
+  })
   await page.goto(appUrl)
   await page.getByRole('button', { name: /import photos/i }).click()
   await page.locator('input[type=file]').first().setInputFiles([resolve('test-data/DSC_8575.jpg'), resolve('test-data/DSC_8575.png')])
@@ -17,6 +23,9 @@ test('review opens a framed preview and can switch between images', async ({ pag
 
   const first = page.getByRole('button', { name: /preview dsc_8575\.jpg/i })
   const second = page.getByRole('button', { name: /preview dsc_8575\.png/i })
+  for (const card of [first, second]) {
+    await expect(card.locator('.review-thumbnail__canvas')).toBeVisible({ timeout: 10_000 })
+  }
   const dialog = page.getByRole('dialog').filter({ has: page.locator('.review-preview-stage') })
   for (const card of [first, second, first]) {
     await card.click()
