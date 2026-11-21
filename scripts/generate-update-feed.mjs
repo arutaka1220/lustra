@@ -29,7 +29,7 @@ function readSignature(directory, filename) {
   let signature = contents;
   if (!signature.includes('\n') && base64(signature)) {
     const decoded = Buffer.from(signature, 'base64');
-    if (decoded.toString('base64') === signature) signature = decoded.toString('utf8');
+    if (decoded.toString('base64') === signature) signature = decoded.toString('utf8').trim();
   }
   const lines = signature.split(/\r?\n/);
   if (lines.length !== 4 || !lines[0].startsWith('untrusted comment:') ||

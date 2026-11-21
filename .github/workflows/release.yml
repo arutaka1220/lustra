@@ -162,6 +162,11 @@ jobs:
         with:
           ref: ${{ needs.preflight.outputs.tag }}
           fetch-depth: 0
+      - uses: actions/checkout@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          ref: ${{ github.sha }}
+          path: release-tools
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -213,7 +218,8 @@ jobs:
           PREVIOUS_STABLE="$previous_stable" PREVIOUS_BETA="$previous_beta" \
           ALLOW_FEED_RETRY="${{ needs.preflight.outputs.existing }}" \
           RELEASE_NOTES_FILE="$notes_file" RELEASE_PUB_DATE="$published_at" \
-            node scripts/generate-update-feed.mjs "$VERSION" release-assets generated-feed
+            node "${{ github.event_name == 'workflow_dispatch' && 'release-tools/scripts/generate-update-feed.mjs' || 'scripts/generate-update-feed.mjs' }}" \
+              "$VERSION" release-assets generated-feed
           for file in generated-feed/*/*.json; do
             node -e 'const f=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); if(!f.version||!f.pub_date||!f.platforms||!Object.keys(f.platforms).length) process.exit(1)' "$file"
           done

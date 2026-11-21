@@ -46,6 +46,21 @@ test('generates channel-specific aggregate feeds from artifact and signature fil
   }
 });
 
+test('preserves Tauri base64-encoded minisign signatures in the feed', () => {
+  const { dir, config } = setupAssets();
+  const encoded = Buffer.from(fixtureSignature()).toString('base64');
+  for (const filename of Object.values(config.feed.tauri.artifacts)) {
+    fs.writeFileSync(path.join(dir, `${filename}.sig`), encoded);
+  }
+  const output = makeDir();
+  const result = generate('0.2.0-beta.1', dir, output);
+  assert.equal(result.status, 0, result.stderr);
+  const beta = JSON.parse(fs.readFileSync(path.join(output, 'beta/beta.json'), 'utf8'));
+  for (const target of Object.keys(config.feed.tauri.artifacts)) {
+    assert.equal(beta.platforms[target].signature, encoded);
+  }
+});
+
 test('a Stable feed also reaches Beta only when Stable promotes a newer compatible version', () => {
   const { dir } = setupAssets();
   const output = makeDir();
