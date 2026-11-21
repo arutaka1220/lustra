@@ -29,6 +29,20 @@ jobs:
         run: node --test scripts/intelirelease.test.mjs
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Install Tauri Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
       - name: Run app unit tests and build
         run: |
           bun run test
