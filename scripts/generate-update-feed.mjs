@@ -25,8 +25,13 @@ function safeFile(directory, name) {
 }
 function readSignature(directory, filename) {
   const contents = fs.readFileSync(safeFile(directory, `${filename}.sig`), 'utf8').trim();
-  const lines = contents.split(/\r?\n/);
   const base64 = (value) => /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value);
+  let signature = contents;
+  if (!signature.includes('\n') && base64(signature)) {
+    const decoded = Buffer.from(signature, 'base64');
+    if (decoded.toString('base64') === signature) signature = decoded.toString('utf8');
+  }
+  const lines = signature.split(/\r?\n/);
   if (lines.length !== 4 || !lines[0].startsWith('untrusted comment:') ||
       !lines[2].startsWith('trusted comment:') || !base64(lines[1]) || !base64(lines[3]) ||
       Buffer.from(lines[1], 'base64').length !== 74 || Buffer.from(lines[3], 'base64').length !== 64) {
