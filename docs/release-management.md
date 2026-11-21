@@ -61,7 +61,7 @@ Add these GitHub repository settings before a release build:
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Actions secret | Password selected when generating the key |
 | `LUSTRA_UPDATER_PUBKEY` | Actions variable | Complete contents of `~/.tauri/lustra.key.pub` |
 
-The public key is compiled into the desktop app from the `LUSTRA_UPDATER_PUBKEY` Actions variable; the release preflight and build fail closed if it is missing. No source edit is needed after setting that variable. macOS Developer ID signing, Apple notarization, and paid Windows code signing are not configured here. OS install prompts and first-run restrictions must be tested on real macOS and Windows machines; the workflow does not claim they are bypassed.
+The public key is compiled into the desktop app from the `LUSTRA_UPDATER_PUBKEY` Actions variable; the release preflight and build fail closed if it is missing. The workflow also passes the same value as a Tauri config override because the bundler needs `plugins.updater.pubkey` while generating signed artifacts. For a local build, export `LUSTRA_UPDATER_PUBKEY`, write it into a temporary JSON config file, then pass that file with `--config` to avoid shell escaping issues. No source edit is needed after setting the repository variable. macOS Developer ID signing, Apple notarization, and paid Windows code signing are not configured here. OS install prompts and first-run restrictions must be tested on real macOS and Windows machines; the workflow does not claim they are bypassed.
 
 ## GitHub Actions and retry behavior
 

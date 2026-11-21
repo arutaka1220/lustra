@@ -121,7 +121,9 @@ jobs:
           set -euo pipefail
           test -n "$TAURI_SIGNING_PRIVATE_KEY"
           test -n "$LUSTRA_UPDATER_PUBKEY"
-          bun run tauri build
+          node -e 'require("node:fs").writeFileSync(".tauri-updater.generated.conf.json", JSON.stringify({ plugins: { updater: { pubkey: process.env.LUSTRA_UPDATER_PUBKEY } } }))'
+          trap 'rm -f .tauri-updater.generated.conf.json' EXIT
+          bun run tauri build --config .tauri-updater.generated.conf.json
           mkdir -p release-assets
           case "${{ matrix.target }}" in
             darwin-*)
