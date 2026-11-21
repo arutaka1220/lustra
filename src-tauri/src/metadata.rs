@@ -1266,9 +1266,9 @@ mod tests {
 
     #[test]
     fn reads_the_repository_png_and_jpeg_metadata_samples() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../test-data");
-        let jpeg = read_photo_metadata_file(&root.join("DSC_8575.jpg"));
-        let png = read_photo_metadata_file(&root.join("DSC_8575.png"));
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+        let jpeg = read_photo_metadata_file(&root.join("test_exif_01.jpg"));
+        let png = read_photo_metadata_file(&root.join("test_exif_02.png"));
         for result in [jpeg, png] {
             assert_eq!(
                 result.metadata.camera.as_deref(),
