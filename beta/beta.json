@@ -1,0 +1,22 @@
+{
+  "version": "1.0.0-beta.3",
+  "notes": "**Full Changelog**: https://github.com/arutaka1220/lustra/commits/v1.0.0-beta.3",
+  "pub_date": "2026-11-21T16:09:17.206Z",
+  "session_snapshot_versions": [
+    3
+  ],
+  "platforms": {
+    "darwin-aarch64": {
+      "url": "https://github.com/arutaka1220/lustra/releases/download/v1.0.0-beta.3/Lustra-darwin-aarch64.app.tar.gz",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTK0QzZHh5blF4RHA3dnQ0ZUIxWWo3TU53T3UzYThKQmVJbnhJOUloVU5vSkxZN1dORzNsNTRFNitPSytUVXlzTm9QQXVCQldzeEdvdXVmTWxFWmU1cGozK0tTbkQ1akFBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1Mjc1OTkzCWZpbGU6THVzdHJhLmFwcC50YXIuZ3oJdmVyc2lvbjoxLjAuMC1iZXRhLjMKb0xJNjU5QmszbENVYWJmUThRQTM2b2w0aGN0VzU5KzhQWVNleHRaVTBicGNMYTV5ZGNmZ1NESk9CbGpyRzE0TExkdHZrNWtjazVyc1oyZm1Fbk1HQmc9PQo="
+    },
+    "darwin-x86_64": {
+      "url": "https://github.com/arutaka1220/lustra/releases/download/v1.0.0-beta.3/Lustra-darwin-x86_64.app.tar.gz",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTK0QzZHh5blF4RHR5VFZEYzBFVDR3N1Q3b2JiVnY0T2tIUHhzMDZSYnVJNkttRTJrRXdOWmUrUFBDc0psbFdtSEcxQ3FUdjRDNVEzYm9lWDkyS1JjSHYxYlJNcTRZVmdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1Mjc3MzE0CWZpbGU6THVzdHJhLmFwcC50YXIuZ3oJdmVyc2lvbjoxLjAuMC1iZXRhLjMKL1oyUXU0ck0zbFg1TzExUkpzV2VTRTB1eU9WTUdpZGJ0RHhNZGRvd2p5T1dDeXBmSUV0czZBSkFudGZUbDRoKzkrYlkrMDFmbHRlenc2NktWT05LQ0E9PQo="
+    },
+    "windows-x86_64": {
+      "url": "https://github.com/arutaka1220/lustra/releases/download/v1.0.0-beta.3/Lustra-windows-x86_64-setup.exe",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTK0QzZHh5blF4RGppc0hZeVNBYVdoNFpFMUprRzdiZEFBVkdFcUtHd2xWWk9lZnZuNDJaRk9vSWpXTWlWUS9ZWEl4VStnOGFRTEdKeEhmVWltR2lOelBpVE1hb3RJOHd3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1Mjc2MTk4CWZpbGU6THVzdHJhXzEuMC4wLWJldGEuM194NjQtc2V0dXAuZXhlCXZlcnNpb246MS4wLjAtYmV0YS4zCkxVSGpMaHFCbzg4SWNMR3I0NVFsYitndFZSVzh3TnFheDVFM05VNW9wUFMyamhOcytNMjdLOFpVUG4yMW82UlBLU3owcG9uUmZNRFJ5V3VmVXV1aUNRPT0K"
+    }
+  }
+}
