@@ -18,6 +18,8 @@ use tauri_plugin_fs::FsExt;
 
 const SESSIONS: &str = "sessions";
 const LEGACY_SESSION_BACKUP: &str = "sessions.migration-backup.v1";
+const PRE_UPDATE_SESSION_BACKUP: &str = "sessions.pre-update.json";
+pub(crate) const SESSION_SNAPSHOT_VERSION: u64 = 3;
 const METADATA_CORRECTIONS: &str = "metadata_corrections";
 const MAX_THUMBNAIL_BYTES: usize = 256 * 1024;
 
@@ -58,6 +60,55 @@ fn read_record(database: &Database, key: &str) -> Result<Option<Value>, String> 
         .read(key)?
         .map(|text| serde_json::from_str(&text).map_err(|error| error.to_string()))
         .transpose()
+}
+
+fn snapshot_version_supported(snapshot: &Value) -> bool {
+    snapshot
+        .get("version")
+        .and_then(Value::as_u64)
+        .is_some_and(|version| (1..=SESSION_SNAPSHOT_VERSION).contains(&version))
+}
+
+fn read_pre_update_backup(data_dir: &Path) -> Result<Option<Value>, String> {
+    match fs::read(data_dir.join(PRE_UPDATE_SESSION_BACKUP)) {
+        Ok(bytes) => {
+            let snapshot: Value = serde_json::from_slice(&bytes)
+                .map_err(|error| format!("The pre-update session backup is invalid: {error}"))?;
+            if snapshot.is_object() && snapshot_version_supported(&snapshot) {
+                Ok(Some(snapshot))
+            } else {
+                Err("The pre-update session backup uses an unsupported format.".into())
+            }
+        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+fn recover_session_snapshot(
+    current: Result<Option<Value>, String>,
+    data_dir: &Path,
+) -> Result<Option<Value>, String> {
+    let current_error = match current {
+        Ok(Some(snapshot)) if snapshot.is_object() && snapshot_version_supported(&snapshot) => {
+            return Ok(Some(snapshot));
+        }
+        Ok(None) => None,
+        Ok(Some(_)) => Some("The saved session uses an unsupported format.".to_owned()),
+        Err(error) => Some(error),
+    };
+    match read_pre_update_backup(data_dir) {
+        Ok(Some(snapshot)) => Ok(Some(snapshot)),
+        Ok(None) if current_error.is_none() => Ok(None),
+        Ok(None) => Err(format!(
+            "{} No compatible pre-update session backup was found.",
+            current_error.unwrap()
+        )),
+        Err(backup_error) => Err(format!(
+            "Could not restore the saved session ({}; backup: {backup_error}).",
+            current_error.unwrap_or_else(|| "no current session snapshot".into())
+        )),
+    }
 }
 
 fn preserve_v1_session_before_upgrade(
@@ -118,7 +169,8 @@ fn source_paths(snapshot: &Value) -> Result<BTreeSet<&str>, String> {
 #[tauri::command]
 pub(crate) async fn load_sessions(app: AppHandle) -> Result<RestoredSessions, String> {
     with_storage(app, |app, data_dir| {
-        let snapshot = read_record(&database(data_dir)?, SESSIONS)?;
+        let current = database(data_dir).and_then(|database| read_record(&database, SESSIONS));
+        let snapshot = recover_session_snapshot(current, data_dir)?;
         let mut missing_paths = Vec::new();
         if let Some(snapshot) = &snapshot {
             let asset_scope = app.asset_protocol_scope();
@@ -182,6 +234,26 @@ pub(crate) async fn save_sessions(app: AppHandle, snapshot: Value) -> Result<(),
     .await
 }
 
+pub(crate) async fn backup_sessions_before_update(app: AppHandle) -> Result<(), String> {
+    with_storage(app, |_app, data_dir| backup_session_record(data_dir)).await
+}
+
+fn backup_session_record(data_dir: &Path) -> Result<(), String> {
+    let database = database(data_dir)?;
+    let Some(snapshot) = database.read(SESSIONS)? else {
+        return Ok(());
+    };
+    let parsed: Value = serde_json::from_str(&snapshot)
+        .map_err(|error| format!("Could not validate the saved session before update: {error}"))?;
+    if !parsed.is_object() {
+        return Err("Could not validate the saved session before update.".into());
+    }
+    write_atomically(
+        &data_dir.join(PRE_UPDATE_SESSION_BACKUP),
+        snapshot.as_bytes(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,6 +288,33 @@ mod tests {
             read_record(&database, LEGACY_SESSION_BACKUP).unwrap(),
             Some(v1)
         );
+        let _ = fs::remove_dir_all(folder);
+    }
+
+    #[test]
+    fn writes_a_pre_update_copy_of_the_saved_session_atomically() {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let folder = std::env::temp_dir().join(format!("lustra-update-backup-{}-{now}", process::id()));
+        fs::create_dir(&folder).unwrap();
+        let database = Database::open(&folder.join("sessions.sqlite3")).unwrap();
+        let snapshot = r#"{"version":3,"active":{"id":"current"}}"#;
+        database.write(SESSIONS, snapshot).unwrap();
+
+        backup_session_record(&folder).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(folder.join("sessions.pre-update.json")).unwrap(),
+            snapshot
+        );
+        let recovered = recover_session_snapshot(
+            Ok(Some(serde_json::json!({ "version": 4, "active": {} }))),
+            &folder,
+        )
+        .unwrap();
+        assert_eq!(recovered, Some(serde_json::from_str(snapshot).unwrap()));
         let _ = fs::remove_dir_all(folder);
     }
 }

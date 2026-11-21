@@ -167,3 +167,9 @@
 .preferences-content { min-width: 0; max-height: calc(100vh - 112px); overflow: auto; padding: 16px; }
 .preferences-content .preference-row { margin-top: 0; padding: 12px 0; border-top: 0; }
 .preferences-content .preference-row:last-child { border-bottom: 0; }
+.preferences-note { margin: 8px 0; color: var(--text-secondary); font-size: 12px; line-height: 18px; }
+.preferences-content progress { width: 150px; }
+.update-notice { position: fixed; z-index: 19; top: 12px; right: 16px; display: flex; max-width: min(560px, calc(100vw - 32px)); align-items: center; gap: 12px; padding: 12px; color: var(--text-primary); background: var(--panel-bg); border: 1px solid var(--stroke-color); border-radius: var(--radius-sm); box-shadow: var(--shadow-menu); }
+.update-notice > div { display: grid; gap: 3px; min-width: 0; }
+.update-notice strong { font-size: 12px; }
+.update-notice span { color: var(--text-secondary); font-size: 12px; }

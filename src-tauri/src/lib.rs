@@ -2,6 +2,7 @@ mod export;
 mod fonts;
 mod metadata;
 mod persistence;
+mod updates;
 
 use std::path::Path;
 use tauri::Manager;
@@ -75,6 +76,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
+            app.manage(updates::PendingUpdate::default());
             #[cfg(target_os = "macos")]
             persistence::install_quit_menu(app)?;
             Ok(())
@@ -99,6 +103,9 @@ pub fn run() {
             export::check_export_destination,
             export::begin_export,
             export::cancel_export,
+            updates::fetch_update,
+            updates::download_update,
+            updates::install_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Lustra");

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Aperture } from 'lucide-react'
+import { Aperture, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { PhotoMetadataNoticeDialog } from './components/layout/PhotoMetadataNoticeDialog'
 import { PreferencesDialog } from './components/layout/PreferencesDialog'
@@ -15,6 +15,7 @@ import { useSessionStore } from './store/session-store'
 import { flushSessionPersistence, readAppPreference, useSessionPersistence } from './store/session-persistence'
 import { useMetadataCorrections } from './features/text/metadata-corrections-store'
 import { ExportScreen } from './features/export/ExportScreen'
+import { useUpdateStore } from './features/updates/update-store'
 import './styles/workflow.css'
 
 export function App() {
@@ -30,6 +31,9 @@ export function App() {
   const clearImport = useSessionStore((state) => state.clearImport)
   const settingsOpen = useSessionStore((state) => state.settingsOpen)
   const toggleSettings = useSessionStore((state) => state.toggleSettings)
+  const updater = useUpdateStore()
+  const [dismissedUpdateNotice, setDismissedUpdateNotice] = useState('')
+  const [focusUpdatesRevision, setFocusUpdatesRevision] = useState(0)
   const completedCount = photos.filter((photo) => photo.completed).length
   const inspector = useInspectorLayout()
   const persistence = useSessionPersistence()
@@ -38,6 +42,14 @@ export function App() {
   const [suspendError, setSuspendError] = useState<string | null>(null)
   const photoImport = usePhotoImport(persistence.ready, screen !== 'export')
   const loadMetadataCorrections = useMetadataCorrections((state) => state.load)
+  const updateNoticeKey = `${updater.status}:${updater.channel}:${updater.update?.version ?? ''}`
+  const showUpdateNotice = ['available', 'readyToRestart', 'failed'].includes(updater.status)
+    && dismissedUpdateNotice !== updateNoticeKey
+
+  function openUpdateSettings() {
+    setFocusUpdatesRevision((revision) => revision + 1)
+    if (!settingsOpen) toggleSettings()
+  }
 
   const goHome = async () => {
     if (screen === 'import' && !photos.length) {
@@ -162,8 +174,20 @@ export function App() {
 
       <PreferencesDialog
         open={settingsOpen}
+        exportBusy={exportBusy}
+        persistenceReady={persistence.ready && !persistence.error}
+        focusUpdatesRevision={focusUpdatesRevision}
         onOpenChange={(open) => { if (!open && settingsOpen) toggleSettings() }}
       />
+      {showUpdateNotice && <aside className="update-notice" role={updater.status === 'failed' ? 'alert' : 'status'}>
+        <div><strong>{t('updates.noticeTitle')}</strong><span>{updater.status === 'failed'
+          ? t('updates.errorDetail', { error: updater.error ?? t('updates.error') })
+          : updater.status === 'readyToRestart'
+            ? t('updates.status.readyToRestart')
+            : t('updates.noticeAvailable', { version: updater.update?.version ?? '' })}</span></div>
+        <button className="button button--secondary button--small" onClick={openUpdateSettings}>{t('updates.openSettings')}</button>
+        <button className="icon-button" aria-label={t('updates.dismiss')} onClick={() => setDismissedUpdateNotice(updateNoticeKey)}><X size={15} /></button>
+      </aside>}
       <PhotoMetadataNoticeDialog open={photoImport.formatNoticeOpen} onDismiss={photoImport.dismissFormatNotice} />
     </div>
   )
