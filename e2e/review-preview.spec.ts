@@ -13,7 +13,7 @@ test('review opens a framed preview and can switch between images', async ({ pag
   })
   await page.goto(appUrl)
   await page.getByRole('button', { name: /import photos/i }).click()
-  await page.locator('input[type=file]').first().setInputFiles([resolve('test-data/DSC_8575.jpg'), resolve('test-data/DSC_8575.png')])
+  await page.locator('input[type=file]').first().setInputFiles([resolve('src-tauri/tests/fixtures/test_exif_01.jpg'), resolve('src-tauri/tests/fixtures/test_exif_02.png')])
   await page.getByRole('button', { name: /got it/i }).click()
   await page.getByRole('button', { name: /import 2 photos/i }).click()
   await expect(page.getByRole('region', { name: /photos/i })).toBeVisible({ timeout: 10_000 })
@@ -21,8 +21,8 @@ test('review opens a framed preview and can switch between images', async ({ pag
   await page.getByRole('button', { name: /done & next/i }).click()
   await expect(page.getByRole('heading', { name: /take one last look/i })).toBeVisible()
 
-  const first = page.getByRole('button', { name: /preview dsc_8575\.jpg/i })
-  const second = page.getByRole('button', { name: /preview dsc_8575\.png/i })
+  const first = page.getByRole('button', { name: /preview test_exif_01\.jpg/i })
+  const second = page.getByRole('button', { name: /preview test_exif_02\.png/i })
   for (const card of [first, second]) {
     await expect(card.locator('.review-thumbnail__canvas')).toBeVisible({ timeout: 10_000 })
   }

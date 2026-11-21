@@ -6,8 +6,8 @@ import type { ImportCandidate } from '../src/types/photo'
 
 describe('capture metadata parsing from local images', () => {
   it('keeps the raw EXIF capture date and offset for the JPEG sample', async () => {
-    const name = 'DSC_8575.jpg'
-    const bytes = await readFile(resolve(process.cwd(), 'test-data', name))
+    const name = 'test_exif_01.jpg'
+    const bytes = await readFile(resolve(process.cwd(), 'src-tauri/tests/fixtures', name))
     const file = new File([bytes], name)
     const candidate: ImportCandidate = {
       id: name,

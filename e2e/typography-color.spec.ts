@@ -7,7 +7,7 @@ const appUrl = process.env.LUSTRA_E2E_FILE_MODE === '1' ? pathToFileURL(resolve(
 test('Typography custom colors update the real preview and retain Auto state', async ({ page }) => {
   await page.goto(appUrl)
   await page.getByRole('button', { name: /import photos/i }).click()
-  await page.locator('input[type=file]').first().setInputFiles([resolve('test-data/DSC_8575.jpg')])
+  await page.locator('input[type=file]').first().setInputFiles([resolve('src-tauri/tests/fixtures/test_exif_01.jpg')])
   await page.getByRole('button', { name: /import 1 photo/i }).click()
   await expect(page.getByRole('region', { name: /photos/i })).toBeVisible({ timeout: 10_000 })
 
