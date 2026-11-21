@@ -31,7 +31,7 @@ test('orders stable after its beta and compares beta sequence', () => {
 test('validates repository version mirrors and catches a mismatch', () => {
   const good = run('read-version', '.github/release-setup.json');
   assert.equal(good.status, 0, good.stderr);
-  assert.equal(good.stdout.trim(), '0.1.0');
+  assert.equal(good.stdout.trim(), JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')).version);
   const dir = tempDir();
   fs.writeFileSync(path.join(dir, 'a.json'), '{"version":"1.0.0"}');
   fs.writeFileSync(path.join(dir, 'b.txt'), 'version = "1.1.0"');
