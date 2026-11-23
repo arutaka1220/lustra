@@ -14,6 +14,20 @@ const activeFrame = () => getEffectiveFrame(session().photos.find(({ id }) => id
 beforeEach(() => useSessionStore.setState(useSessionStore.getInitialState(), true))
 
 describe('session history and recovery', () => {
+  test('Ambient Gradient settings survive undo, redo, and session snapshot restoration', () => {
+    session().addToSession([photo('ambient')])
+    session().setScreen('edit')
+    session().patchFrame({ style: 'ambientGradient', ambientIntensity: 42, ambientSoftness: 31, ambientBrightness: -18, ambientColorSource: 'edges' })
+    session().undo()
+    expect(session().commonFrame.style).toBe('black')
+    session().redo()
+    expect(session().commonFrame).toMatchObject({ style: 'ambientGradient', ambientIntensity: 42, ambientSoftness: 31, ambientBrightness: -18, ambientColorSource: 'edges' })
+    const archived = JSON.parse(JSON.stringify(getSessionSnapshot()))
+    useSessionStore.setState(useSessionStore.getInitialState(), true)
+    restoreSessionSnapshot(archived)
+    expect(session().commonFrame).toMatchObject({ style: 'ambientGradient', ambientIntensity: 42, ambientSoftness: 31, ambientBrightness: -18, ambientColorSource: 'edges' })
+  })
+
   test('undo prioritizes a reorder and a new shared edit leaves photo redo available', () => {
     session().addToSession([photo('a'), photo('b')])
     session().setEditMode('this')

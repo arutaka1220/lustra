@@ -27,6 +27,10 @@ typedef struct {
     double blur;
     double brightness;
     double opacity;
+    double ambient_intensity;
+    double ambient_softness;
+    double ambient_brightness;
+    uint32_t ambient_edges;
 } LustraRenderSettings;
 
 typedef struct {
@@ -208,11 +212,57 @@ static bool draw_background(
     const double width = settings->width;
     const double height = settings->height;
     CGRect full = CGRectMake(0, 0, width, height);
-    uint32_t matte = settings->style == 0 ? 0x000000ff : settings->style == 1 ? 0xffffffff : settings->style == 3 ? 0xfafaf8ff : settings->style == 4 ? (settings->custom_color << 8) | 0xff : settings->style == 5 ? 0x242424ff : 0x454842ff;
+    uint32_t matte = settings->style == 0 ? 0x000000ff : settings->style == 1 ? 0xffffffff : settings->style == 3 ? 0xfafaf8ff : settings->style == 4 ? (settings->custom_color << 8) | 0xff : settings->style == 5 ? 0x242424ff : settings->style == 6 ? 0x777777ff : 0x454842ff;
     CGColorRef color = make_color(srgb, matte);
     CGContextSetFillColorWithColor(context, color);
     CGContextFillRect(context, full);
     CGColorRelease(color);
+    if (settings->style == 6) {
+        CGContextRef sample = create_context(48, 48, srgb);
+        if (sample == NULL) return false;
+        draw_oriented(sample, photo, CGRectMake(0, 0, 48, 48));
+        uint8_t *pixels = CGBitmapContextGetData(sample);
+        uint32_t counts[512] = {0}; uint64_t sums[512][3] = {{0}};
+        for (int y = 0; y < 48; y++) for (int x = 0; x < 48; x++) {
+            if (settings->ambient_edges && x > 8 && x < 39 && y > 8 && y < 39) continue;
+            size_t p = ((size_t)y * 48 + x) * 4;
+            uint32_t key = ((pixels[p] >> 5) << 6) | ((pixels[p + 1] >> 5) << 3) | (pixels[p + 2] >> 5);
+            counts[key]++; for (int c = 0; c < 3; c++) sums[key][c] += pixels[p + c];
+        }
+        CGContextRelease(sample);
+        CGContextSaveGState(context);
+        CGContextScaleCTM(context, width / 256.0, height / 256.0);
+        uint32_t used[5] = {0};
+        for (int n = 0; n < 5; n++) {
+            int best = -1; for (int i = 0; i < 512; i++) {
+                bool skip = false; for (int j = 0; j < n; j++) if (used[j] == (uint32_t)i + 1) skip = true;
+                if (!skip && (best < 0 || counts[i] > counts[best])) best = i;
+            }
+            if (best < 0 || counts[best] == 0) break;
+            used[n] = (uint32_t)best + 1;
+            double components[4]; for (int c = 0; c < 3; c++) {
+                double value = sums[best][c] / (double)counts[best];
+                components[c] = fmax(0, fmin(255, value)) / 255.0;
+            } components[3] = 1.0;
+            CGFloat locations[] = {0, 1}; CGFloat c0[] = {components[0],components[1],components[2],components[3]}; CGFloat c1[] = {components[0],components[1],components[2],0};
+            CGColorRef colors[] = { CGColorCreate(srgb,c0), CGColorCreate(srgb,c1) };
+            CGGradientRef gradient = CGGradientCreateWithColors(srgb, (__bridge CFArrayRef)@[( __bridge id)colors[0], (__bridge id)colors[1]], locations);
+            double x = fmod(n * 73 + 29, 192) + 32, y = fmod(n * 107 + 41, 192) + 32;
+            CGFloat radius = 110 + settings->ambient_softness * 210;
+            CGContextSaveGState(context); CGContextSetAlpha(context, settings->ambient_intensity * 0.58);
+            CGContextDrawRadialGradient(context, gradient, CGPointMake(x, 256 - y), 0,
+                CGPointMake(x, 256 - y), radius, kCGGradientDrawsAfterEndLocation);
+            CGContextRestoreGState(context); CGGradientRelease(gradient); CGColorRelease(colors[0]); CGColorRelease(colors[1]);
+        }
+        if (settings->ambient_brightness != 0) {
+            CGFloat alpha = fabs(settings->ambient_brightness) / 200.0;
+            CGColorRef tone = make_color(srgb, settings->ambient_brightness > 0 ? 0xffffffff : 0x000000ff);
+            CGContextSetAlpha(context, alpha); CGContextSetFillColorWithColor(context, tone);
+            CGContextFillRect(context, CGRectMake(0, 0, 256, 256)); CGColorRelease(tone);
+        }
+        CGContextRestoreGState(context);
+        return true;
+    }
     if (settings->style != 2 || settings->opacity <= 0) {
         return true;
     }

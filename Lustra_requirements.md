@@ -543,6 +543,16 @@ RAW現像や明るさ調整・色調整などの編集機能は搭載しない�
 
 この追補は本文中の旧仕様より優先する。フレームはBlack `#000000`、White `#FFFFFF`、Blurred、Soft Black `#242424`、Soft White `#fafaf8`、Customの6種類とし、3列×2行で指定順に表示する。Preset機能は廃止し、セッション単位の編集設定とUndo/Redoは維持する。PaddingはVertical（Top/Bottom）とHorizontal（Left/Right）に分けて連動を操作し、解除時はリンク前の独立値に戻す。Custom色のMy Paletteはアプリ共通で最大16色とする。
 
+### PR #1（2026-11-23）Ambient Gradient
+
+- 本PRでは従来のPreset廃止方針を変更し、Ambient Gradientを含むFrameSettingsの保存・適用・更新を提供する。
+- Frame選択欄の既存スタイルと同じ階層にAmbient Gradientを追加する。写真中央は通常の描画経路を維持し、フレーム背景だけに効果を適用する。
+- 元写真を48×48へ縮小し、Full ImageまたはEdges（内側31×31領域を除外）からRGBの上位5量子化色を抽出する。色抽出はプレビューで写真ラスタごとにキャッシュする。
+- 抽出色を複数の広い放射グラデーションとして重ね、Intensity（初期70%）、Softness（75%）、Brightness（0）、Color Source（Full Image）を背景へ適用する。範囲はIntensity/Softness 0–100、Brightness -100–100。
+- 設定値は既存FrameSettingsに含め、All Photos / This Photo、履歴、セッションsnapshotの共通経路を使う。旧書き出しデータのAmbient設定は初期値で読み込む。
+- Preset name、Save preset、選択して適用、Update presetでFrameSettings全体をアプリ内へ保存し、再起動後も再利用できる。
+- PixiJS・Canvas 2Dの共有背景レイヤーとmacOSネイティブ書き出しでAmbient背景を描画する。書き出しは既存のJPEG、PNG、WebPエンコーダーを使用する。
+
 ### v0.6（2026-11-20）Custom Color UI
 
 - Customフレームのサイドバータイルは現在の色を使ったフレーム見本を表示し、タイルのクリックで選択とカラーピッカー表示を同時に行う。Custom選択中の再クリックでも開く。色設定用の別バーは置かない。

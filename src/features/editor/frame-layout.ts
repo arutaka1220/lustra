@@ -10,6 +10,7 @@ export const FRAME_COLORS = {
   softWhite: '#fafaf8',
   blurred: '#454842',
   custom: '#000000',
+  ambientGradient: '#777777',
 } satisfies Record<FrameSettings['style'], string>
 
 function paddingFraction(value: number): number {

@@ -631,3 +631,11 @@ v0.3時点での仕様を記録した説明。最新の確定内容は本文と�
 - 自動更新では起動時と6時間間隔で確認し、署名検証後に更新を準備する。インストールはexport中を避け、セッション保存と`sessions.pre-update.json`への原子的バックアップを完了し、利用者の承認後に行う。
 - 更新フィードが現行snapshot形式をサポートしない場合は更新を止める。復元中のsnapshotが未対応形式なら、互換性が確認されたpre-updateバックアップを使う。
 - Stableへ切り替えても古いバージョンへ自動ダウングレードしない。更新失敗は再試行でき、更新がない場合は繰り返し通知しない。
+
+### PR #1（2026-11-23）Ambient Gradient
+
+- Frame選択グリッドに単独のAmbient Gradientタイルを追加し、選択時だけIntensity、Softness、Brightness、Color SourceをAppearance欄に表示する。
+- 元画像を48×48の作業画像へ縮小し、3bit/channel RGBヒストグラムの上位5色を使う。Edgesは8px相当の内側領域を除外する。出力色は複数の放射状グラデーションとして同じ座標規則で重ねる。
+- 背景を共有Canvasレイヤーに描き、PixiJSとCanvas 2Dの双方で再利用する。書き出し側は同じ縮小寸法、色量子化、色順序、放射位置を用い、既存の画像形式エンコーダーへ渡す。
+- FrameSettingsのambientIntensity、ambientSoftness、ambientBrightness、ambientColorSourceを保存する。欠損フィールドは70、75、0、Full Imageを既定値として扱う。
+- Frame inspectorに名前付きPresetの保存、適用、更新を置き、FrameSettings全体をアプリのローカルストレージへ永続化する。

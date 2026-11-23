@@ -1,6 +1,7 @@
 import type { FrameSettings } from '../../types/photo'
 import { canvasUnit, FRAME_COLORS, getBackgroundRect, getPhotoLayout } from './frame-layout'
 import type { FrameRect, Size } from './frame-layout'
+import { extractAmbientColors } from './ambient-colors'
 
 export type PhotoRaster = Size & { image: HTMLCanvasElement | HTMLImageElement }
 
@@ -98,6 +99,45 @@ function paintBlurredBackground(context: CanvasRenderingContext2D, scene: FrameS
   context.restore()
 }
 
+const ambientColorCache = new WeakMap<PhotoRaster, { source: string; colors: string[] }>()
+function ambientColors(raster: PhotoRaster, source: 'fullImage' | 'edges') {
+  const cached = ambientColorCache.get(raster)
+  if (cached?.source === source) return cached.colors
+  const sample = document.createElement('canvas')
+  sample.width = sample.height = 48
+  const ctx = sample.getContext('2d', { willReadFrequently: true })
+  if (!ctx) return ['#5d6570', '#83909a', '#b2aaa0', '#606d70']
+  ctx.drawImage(raster.image, 0, 0, 48, 48)
+  const { data } = ctx.getImageData(0, 0, 48, 48)
+  const colors = extractAmbientColors(data, 48, 48, source)
+  ambientColorCache.set(raster, { source, colors })
+  return colors
+}
+
+function paintAmbientBackground(context: CanvasRenderingContext2D, scene: FrameScene) {
+  const { raster, frame, size } = scene
+  const source = frame.ambientColorSource ?? 'fullImage'
+  const colors = ambientColors(raster, source)
+  const intensity = Math.max(0, Math.min(100, frame.ambientIntensity ?? 70)) / 100
+  const softness = Math.max(0, Math.min(100, frame.ambientSoftness ?? 75)) / 100
+  const brightness = Math.max(-100, Math.min(100, frame.ambientBrightness ?? 0))
+  const layer = document.createElement('canvas')
+  layer.width = layer.height = 256
+  const ctx = layer.getContext('2d')
+  if (!ctx) return
+  ctx.fillStyle = '#777777'; ctx.fillRect(0, 0, 256, 256)
+  colors.forEach((color, i) => {
+    const x = ((i * 73 + 29) % 192) + 32, y = ((i * 107 + 41) % 192) + 32
+    const radius = 110 + softness * 210
+    const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius)
+    gradient.addColorStop(0, color); gradient.addColorStop(1, 'rgba(120,120,120,0)')
+    ctx.globalAlpha = intensity * 0.58; ctx.fillStyle = gradient; ctx.fillRect(0, 0, 256, 256)
+  })
+  ctx.globalAlpha = 1
+  if (brightness) { ctx.fillStyle = brightness > 0 ? `rgba(255,255,255,${brightness / 200})` : `rgba(0,0,0,${-brightness / 200})`; ctx.fillRect(0, 0, 256, 256) }
+  context.drawImage(layer, 0, 0, size.width, size.height)
+}
+
 /** Shared backdrop keeps both preview paths identical without rerendering blur on image movement. */
 export class FrameBackdrop {
   readonly canvas = document.createElement('canvas')
@@ -108,7 +148,8 @@ export class FrameBackdrop {
     const { size, raster, frame, layout, dpr } = scene
     const { visible } = layout
     const key = [size.width, size.height, dpr, frame.style, frame.customColor, frame.blurStrength, frame.backgroundBrightness,
-      frame.backgroundOpacity, frame.showShadow, visible.x, visible.y, visible.width, visible.height].join(':')
+      frame.backgroundOpacity, frame.ambientIntensity, frame.ambientSoftness, frame.ambientBrightness, frame.ambientColorSource,
+      frame.showShadow, visible.x, visible.y, visible.width, visible.height].join(':')
     if (this.raster === raster && this.key === key) return false
 
     const canvas = this.canvas
@@ -123,6 +164,7 @@ export class FrameBackdrop {
     context.fillStyle = frame.style === 'custom' ? (frame.customColor ?? '#000000') : FRAME_COLORS[frame.style]
     context.fillRect(0, 0, size.width, size.height)
     if (frame.style === 'blurred' && (frame.backgroundOpacity ?? 100) > 0) paintBlurredBackground(context, scene)
+    if (frame.style === 'ambientGradient') paintAmbientBackground(context, scene)
     if (frame.showShadow) {
       const unit = canvasUnit(size)
       context.save()
