@@ -2,7 +2,9 @@ use std::sync::Mutex;
 
 use serde::Serialize;
 use tauri::{ipc::Channel, AppHandle, State};
-use tauri_plugin_updater::{Update, UpdaterExt};
+#[cfg(not(debug_assertions))]
+use tauri_plugin_updater::UpdaterExt;
+use tauri_plugin_updater::Update;
 
 const RELEASE_FEED_BASE: &str = "https://raw.githubusercontent.com/arutaka1220/lustra/release-feed";
 // The Rust persistence version must stay aligned with session-snapshot.ts.
@@ -67,6 +69,14 @@ pub(crate) async fn fetch_update(
     pending_update: State<'_, PendingUpdate>,
     channel: String,
 ) -> Result<Option<UpdateMetadata>, String> {
+    // `tauri dev` builds with debug assertions enabled. Skip the network check
+    // before reading the release-only embedded key; release builds still fail
+    // explicitly when their key is missing.
+    #[cfg(debug_assertions)]
+    return Ok(None);
+
+    #[cfg(not(debug_assertions))]
+    {
     let pubkey = option_env!("LUSTRA_UPDATER_PUBKEY")
         .filter(|key| !key.trim().is_empty())
         .ok_or("Updater is not configured: embed LUSTRA_UPDATER_PUBKEY before building.")?;
@@ -105,6 +115,7 @@ pub(crate) async fn fetch_update(
             bytes: Vec::new(),
         });
     Ok(metadata)
+    }
 }
 
 #[tauri::command]
