@@ -43,6 +43,9 @@ i18n.addResources('en', 'translation', {
   'framePreview.opacity': 'Background opacity',
   'framePreview.inset': 'Fine inner border',
   'framePreview.shadow': 'Soft shadow',
+  'crop.mode': 'Crop & Rotate', 'crop.ratio': 'Ratio', 'crop.lock': 'Lock ratio', 'crop.rotation': 'Rotation',
+  'crop.presetName': 'Preset name', 'crop.presets': 'Crop presets', 'crop.save': 'Save', 'crop.update': 'Update',
+  'crop.resetRotation': 'Reset rotation',
 })
 
 i18n.addResources('ja', 'translation', {
@@ -88,4 +91,7 @@ i18n.addResources('ja', 'translation', {
   'framePreview.opacity': '背景の不透明度',
   'framePreview.inset': '細い内枠',
   'framePreview.shadow': '柔らかい影',
+  'crop.mode': 'クロップ・回転', 'crop.ratio': '比率', 'crop.lock': '比率を固定', 'crop.rotation': '回転',
+  'crop.presetName': 'プリセット名', 'crop.presets': 'クロッププリセット', 'crop.save': '保存', 'crop.update': '更新',
+  'crop.resetRotation': '回転をリセット',
 })

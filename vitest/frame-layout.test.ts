@@ -73,6 +73,12 @@ describe('padding based canvas layout', () => {
     expect(layout.overflowY).toBe(0)
   })
 
+  test('keeps the canvas ratio while fitting a differently cropped image for Frame None', () => {
+    const layout = getPhotoLayout({ width: 300, height: 200 }, { width: 100, height: 100 }, frame({ style: 'none' }))
+    expect(layout.image).toEqual({ x: 50, y: 0, width: 200, height: 200 })
+    expect(layout.visible).toEqual(layout.image)
+  })
+
   test('padding changes the completed canvas ratio without changing the photo ratio', () => {
     const source = { width: 900, height: 1600 }
     const settings = frame({ left: 10, bottom: 20 })

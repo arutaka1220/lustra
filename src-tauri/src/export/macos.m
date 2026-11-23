@@ -35,6 +35,11 @@ typedef struct {
     uint32_t edge_mode;
     double edge_blur;
     double edge_fade;
+    double crop_x;
+    double crop_y;
+    double crop_width;
+    double crop_height;
+    double rotation;
 } LustraRenderSettings;
 
 typedef struct {
@@ -163,6 +168,26 @@ static void draw_oriented(
     CGContextRestoreGState(context);
 }
 
+static void draw_cropped(CGContextRef context, const LustraImage *photo, CGRect destination, const LustraRenderSettings *settings) {
+    CGRect full = CGRectMake(
+        destination.origin.x - settings->crop_x * destination.size.width / settings->crop_width,
+        destination.origin.y - (1.0 - settings->crop_y - settings->crop_height) * destination.size.height / settings->crop_height,
+        destination.size.width / settings->crop_width,
+        destination.size.height / settings->crop_height
+    );
+    double radians = -settings->rotation * M_PI / 180.0;
+    double c = fabs(cos(radians)), s = fabs(sin(radians));
+    double cover = fmax(destination.size.width / (destination.size.width * c + destination.size.height * s),
+                        destination.size.height / (destination.size.height * c + destination.size.width * s));
+    CGContextSaveGState(context);
+    CGContextTranslateCTM(context, CGRectGetMidX(destination), CGRectGetMidY(destination));
+    CGContextRotateCTM(context, radians);
+    CGContextScaleCTM(context, cover, cover);
+    CGContextTranslateCTM(context, -CGRectGetMidX(destination), -CGRectGetMidY(destination));
+    draw_oriented(context, photo, full);
+    CGContextRestoreGState(context);
+}
+
 static CGColorRef make_color(CGColorSpaceRef srgb, uint32_t rgba) {
     CGFloat components[] = {
         ((rgba >> 24) & 255) / 255.0, ((rgba >> 16) & 255) / 255.0,
@@ -242,7 +267,7 @@ static bool draw_edge_stretch(CGContextRef context, const LustraImage *photo,
     CGRect visible = canvas_rect(s->visible, s->height);
     image = CGRectMake(image.origin.x*scale, image.origin.y*scale, image.size.width*scale, image.size.height*scale);
     visible = CGRectMake(visible.origin.x*scale, visible.origin.y*scale, visible.size.width*scale, visible.size.height*scale);
-    draw_oriented(layer, photo, image);
+    draw_cropped(layer, photo, image, s);
     uint8_t *pixels = CGBitmapContextGetData(layer);
     size_t bytes = (size_t)w*h*4;
     uint8_t *source = malloc(bytes);
@@ -312,7 +337,7 @@ static bool draw_background(
     if (settings->style == 6) {
         CGContextRef sample = create_context(96, 96, srgb);
         if (sample == NULL) return false;
-        draw_oriented(sample, photo, CGRectMake(0, 0, 96, 96));
+        draw_cropped(sample, photo, CGRectMake(0, 0, 96, 96), settings);
         uint8_t *pixels = CGBitmapContextGetData(sample);
         uint32_t *counts = calloc(9 * 4096, sizeof(uint32_t));
         uint64_t (*sums)[5] = calloc(9 * 4096, sizeof(*sums));
@@ -400,12 +425,11 @@ static bool draw_background(
     uint32_t layer_width = (uint32_t)fmax(1.0, round(width * scale));
     uint32_t layer_height = (uint32_t)fmax(1.0, round(height * scale));
     double blur = settings->blur * fmin(width, height) / 1080.0;
-    double cover = fmax(
-        (width + 4.0 * blur) / source_width,
-        (height + 4.0 * blur) / source_height
-    );
-    double image_width = source_width * cover * layer_width / width;
-    double image_height = source_height * cover * layer_height / height;
+    double cropped_width = source_width * settings->crop_width;
+    double cropped_height = source_height * settings->crop_height;
+    double cover = fmax((width + 4.0 * blur) / cropped_width, (height + 4.0 * blur) / cropped_height);
+    double image_width = cropped_width * cover * layer_width / width;
+    double image_height = cropped_height * cover * layer_height / height;
     CGContextRef layer = create_context(layer_width, layer_height, srgb);
     if (layer == NULL) {
         return false;
@@ -414,10 +438,10 @@ static bool draw_background(
     CGContextSetFillColorWithColor(layer, color);
     CGContextFillRect(layer, CGRectMake(0, 0, layer_width, layer_height));
     CGColorRelease(color);
-    draw_oriented(layer, photo, CGRectMake(
+    draw_cropped(layer, photo, CGRectMake(
         (layer_width - image_width) * 0.5, (layer_height - image_height) * 0.5,
         image_width, image_height
-    ));
+    ), settings);
     size_t byte_count = (size_t)layer_width * layer_height * 4;
     uint8_t *pixels = CGBitmapContextGetData(layer);
     if (blur * scale >= 0.5) {
@@ -670,7 +694,8 @@ uint32_t lustra_render_image(
         }
         CGContextSaveGState(context);
         CGContextClipToRect(context, visible);
-        draw_oriented(context, photo, canvas_rect(settings->image, settings->height));
+        CGRect cropped = canvas_rect(settings->image, settings->height);
+        draw_cropped(context, photo, cropped, settings);
         CGContextRestoreGState(context);
         if (settings->inset) {
             draw_inset(context, srgb, visible, settings->style, unit);

@@ -14,6 +14,47 @@ const activeFrame = () => getEffectiveFrame(session().photos.find(({ id }) => id
 beforeEach(() => useSessionStore.setState(useSessionStore.getInitialState(), true))
 
 describe('session history and recovery', () => {
+  test('crop geometry and rotation are one undoable edit and survive session snapshots', () => {
+    session().addToSession([photo('crop')])
+    session().setScreen('edit')
+    session().setEditMode('this')
+    session().beginFrameEdit()
+    session().setPhotoCrop('crop', { x: 0.1, y: 0.2, width: 0.7, height: 0.6, rotation: 12.75, ratio: '4:3', locked: true })
+    session().setPhotoCrop('crop', { x: 0.12, y: 0.2, width: 0.68, height: 0.6, rotation: 14.25, ratio: '4:3', locked: true })
+    session().endFrameEdit()
+    expect(session().history.photos.crop.undo).toHaveLength(1)
+    session().undo()
+    expect(session().photos[0].cropTransform).toBeUndefined()
+    session().redo()
+    const archive = JSON.parse(JSON.stringify(getSessionSnapshot()))
+    useSessionStore.setState(useSessionStore.getInitialState(), true)
+    restoreSessionSnapshot(archive)
+    expect(session().photos[0].cropTransform).toMatchObject({ x: 0.12, width: 0.68, rotation: 14.25, ratio: '4:3' })
+  })
+
+  test('All Photos crop edits update every photo and undo as one edit', () => {
+    session().addToSession([
+      { ...photo('crop-a'), imageWidth: 1200, imageHeight: 800 },
+      { ...photo('crop-b'), imageWidth: 800, imageHeight: 1200 },
+    ])
+    const crop = { x: 0.1, y: 0.15, width: 0.7, height: 0.65, rotation: 5.5, ratio: '4:3' as const, locked: true }
+    session().beginFrameEdit()
+    session().setPhotoCrop('crop-a', crop)
+    session().setPhotoCrop('crop-a', { ...crop, rotation: 9.25 })
+    session().endFrameEdit()
+    expect(session().photos.map((item) => item.cropTransform?.rotation)).toEqual([9.25, 9.25])
+    for (const item of session().photos) expect((item.cropTransform!.width * item.imageWidth!) / (item.cropTransform!.height * item.imageHeight!)).toBeCloseTo(4 / 3)
+    expect(session().history.common.undo).toHaveLength(2)
+    const snapshot = JSON.parse(JSON.stringify(getSessionSnapshot()))
+    useSessionStore.setState(useSessionStore.getInitialState(), true)
+    restoreSessionSnapshot(snapshot)
+    expect(session().photos.map((item) => item.cropTransform?.rotation)).toEqual([9.25, 9.25])
+    session().undo()
+    expect(session().photos.every((item) => item.cropTransform === undefined)).toBe(true)
+    session().redo()
+    expect(session().photos.map((item) => item.cropTransform?.rotation)).toEqual([9.25, 9.25])
+  })
+
   test('Edge Stretch settings survive per-photo edits, undo/redo, and session restoration', () => {
     session().addToSession([photo('edge')])
     session().setEditMode('this')

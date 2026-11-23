@@ -2,7 +2,7 @@ import { convertFileSrc, isTauri } from '@tauri-apps/api/core'
 import { PHOTO_METADATA_READER_VERSION } from '../types/photo'
 import type { FrameSettings, PhotoSource, SessionPhoto } from '../types/photo'
 import { withoutLegacyCanvasSettings, withoutLegacyCrop } from '../features/editor/frame-migration'
-import type { HistoryEntry, PhotoEdit, RemovedPhoto, SessionChange, SessionHistory, SessionLayout } from './session-history'
+import type { HistoryEntry, PhotoEdit, RemovedPhoto, SessionChange, SessionHistory, SessionLayout, ValueChange } from './session-history'
 
 type StoredSource = { kind: 'path'; path: string }
 type StoredPhoto = Omit<SessionPhoto, 'source'> & { source: StoredSource }
@@ -98,6 +98,15 @@ function serializeEntry(entry: HistoryEntry, validIds: Set<string>): HistoryEntr
   const format = ({ source, ...rest }: Partial<PhotoEdit>): Partial<PhotoEdit<StoredSource>> => (
     source?.kind === 'path' ? { ...rest, source: { kind: 'path', path: source.path } } : rest
   )
+  if (change.kind === 'photoBatch') {
+    const values: Record<string, ValueChange<PhotoEdit<StoredSource>>> = {}
+    for (const [id, value] of Object.entries(change.values)) {
+      const before = format(value.before), after = format(value.after)
+      const keys = before.source && after.source ? value.keys : value.keys.filter((key) => key !== 'source')
+      if (keys.length) values[id] = { keys, before, after }
+    }
+    return Object.keys(values).length ? [{ ...entry, change: { kind: 'photoBatch', values } }] : []
+  }
   const before = format(change.values.before)
   const after = format(change.values.after)
   const keys = before.source && after.source ? change.values.keys : change.values.keys.filter((key) => key !== 'source')
@@ -185,6 +194,14 @@ export function deserializeWorkspace(workspace: StoredWorkspace, initialFrame: F
     if (change.kind === 'common') {
       const normalized = restoreCommonChange(change)
       return normalized ? { ...entry, change: normalized } : null
+    }
+    if (change.kind === 'photoBatch') {
+      const values: Record<string, ValueChange<PhotoEdit>> = {}
+      for (const [id, value] of Object.entries(change.values)) {
+        const normalized = restorePhotoChange({ kind: 'photo', photoId: id, values: value })
+        if (normalized) values[id] = normalized.values
+      }
+      return Object.keys(values).length ? { ...entry, change: { kind: 'photoBatch', values } } : null
     }
     return { ...entry, change }
   }

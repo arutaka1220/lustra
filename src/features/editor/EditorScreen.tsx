@@ -35,6 +35,7 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
   const beginFrameEdit = useSessionStore((state) => state.beginFrameEdit)
   const endFrameEdit = useSessionStore((state) => state.endFrameEdit)
   const setCompleted = useSessionStore((state) => state.setCompleted)
+  const setPhotoCrop = useSessionStore((state) => state.setPhotoCrop)
   const doneNext = useSessionStore((state) => state.doneNext)
   const nextPhoto = useSessionStore((state) => state.nextPhoto)
   const previousPhoto = useSessionStore((state) => state.previousPhoto)
@@ -156,7 +157,7 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
         <div className="preview-stage-wrap">
           <div className="preview-stage-content">
             {photo.source.url
-              ? <FramePreview photo={photo} frame={frame} onImageError={() => markMissing(photo.id, photo.source)} onRevealInspector={onRevealInspector} />
+              ? <FramePreview photo={photo} frame={frame} crop={photo.cropTransform} onCropChange={crop => setPhotoCrop(photo.id, crop)} onCropEditStart={beginFrameEdit} onCropEditEnd={endFrameEdit} onImageError={() => markMissing(photo.id, photo.source)} onRevealInspector={onRevealInspector} />
               : <div className="relink-card">
                 <FileSearch size={26} />
                 <strong>{t('session.sourceMissing')}</strong>

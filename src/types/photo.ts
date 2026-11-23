@@ -75,4 +75,6 @@ export type SessionPhoto = ImportCandidate & {
   completed: boolean
   overrides: Partial<FrameSettings>
   metadataOverrides?: PhotoMetadata
+  /** Non-destructive crop in EXIF-oriented source coordinates, normalized to [0, 1]. */
+  cropTransform?: { x: number; y: number; width: number; height: number; rotation: number; ratio?: 'original' | 'free' | '1:1' | '3:2' | '4:3' | '16:9' | '9:16' | 'custom'; locked?: boolean; customRatio?: number }
 }

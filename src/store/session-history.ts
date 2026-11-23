@@ -8,7 +8,7 @@ type RemovedPosition = {
 
 export type RemovedPhoto<P = SessionPhoto> = RemovedPosition & { photo: P }
 
-export type PhotoEdit<Source = SessionPhoto['source']> = Pick<SessionPhoto, 'overrides' | 'completed' | 'metadataOverrides'> & {
+export type PhotoEdit<Source = SessionPhoto['source']> = Pick<SessionPhoto, 'overrides' | 'completed' | 'metadataOverrides' | 'cropTransform'> & {
   source: Source
 }
 
@@ -27,6 +27,7 @@ export type SessionLayout = {
 export type SessionChange<Source = SessionPhoto['source']> =
   | { kind: 'common'; values: ValueChange<FrameSettings> }
   | { kind: 'photo'; photoId: string; values: ValueChange<PhotoEdit<Source>> }
+  | { kind: 'photoBatch'; values: Record<string, ValueChange<PhotoEdit<Source>>> }
   | { kind: 'layout'; before: SessionLayout; after: SessionLayout }
 
 export type HistoryEntry<Source = SessionPhoto['source']> = {
@@ -110,6 +111,13 @@ export function mergeChanges(previous: SessionChange, next: SessionChange): Sess
   if (previous.kind === 'photo' && next.kind === 'photo' && previous.photoId === next.photoId) {
     return { kind: 'photo', photoId: next.photoId, values: mergeValues(previous.values, next.values) }
   }
+  if (previous.kind === 'photoBatch' && next.kind === 'photoBatch') {
+    const values = { ...previous.values }
+    for (const [id, change] of Object.entries(next.values)) {
+      values[id] = values[id] ? mergeValues(values[id], change) : change
+    }
+    return { kind: 'photoBatch', values }
+  }
   return null
 }
 
@@ -124,7 +132,7 @@ function setSeries(history: SessionHistory, photoId: string | null, series: Hist
 }
 
 export function appendChange(history: SessionHistory, change: SessionChange, limit: number): SessionHistory {
-  if (change.kind !== 'layout' && !change.values.keys.length) return history
+  if (change.kind !== 'layout' && !(change.kind === 'photoBatch' ? Object.values(change.values).some((value) => value.keys.length) : change.values.keys.length)) return history
   const photoId = change.kind === 'photo' ? change.photoId : null
   const series = getSeries(history, photoId)
   const sequence = history.sequence + 1
