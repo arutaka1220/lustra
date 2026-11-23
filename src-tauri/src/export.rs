@@ -129,6 +129,8 @@ enum FrameStyle {
     Custom,
     #[serde(alias = "ambientGradient")]
     AmbientGradient,
+    #[serde(alias = "edgeStretch")]
+    EdgeStretch,
 }
 
 #[derive(Deserialize)]
@@ -155,11 +157,20 @@ struct Frame {
     ambient_brightness: f64,
     #[serde(default = "ambient_source_default")]
     ambient_color_source: String,
+    #[serde(default = "edge_mode_default")]
+    edge_stretch_mode: String,
+    #[serde(default = "edge_blur_default")]
+    edge_stretch_blur: f64,
+    #[serde(default = "edge_fade_default")]
+    edge_stretch_fade: f64,
 }
 
 fn ambient_intensity_default() -> f64 { 85.0 }
 fn ambient_softness_default() -> f64 { 65.0 }
 fn ambient_source_default() -> String { "fullImage".to_owned() }
+fn edge_mode_default() -> String { "extend".to_owned() }
+fn edge_blur_default() -> f64 { 8.0 }
+fn edge_fade_default() -> f64 { 12.0 }
 
 fn full_opacity() -> f64 {
     100.0
@@ -819,6 +830,9 @@ mod tests {
             ambient_softness: 65.0,
             ambient_brightness: 0.0,
             ambient_color_source: "fullImage".into(),
+            edge_stretch_mode: "extend".into(),
+            edge_stretch_blur: 8.0,
+            edge_stretch_fade: 12.0,
         }
     }
 
@@ -881,11 +895,13 @@ mod tests {
             (FrameStyle::SoftWhite, None, [0xFA, 0xFA, 0xF8]),
             (FrameStyle::Custom, Some("#123ABC"), [0x12, 0x3A, 0xBC]),
             (FrameStyle::AmbientGradient, None, [0x45, 0x48, 0x42]),
+            (FrameStyle::EdgeStretch, None, [0x45, 0x48, 0x42]),
         ] {
             let mut export_frame = frame();
             export_frame.style = style;
             export_frame.custom_color = custom_color.map(str::to_owned);
             export_frame.left = 50.0;
+            if matches!(style, FrameStyle::EdgeStretch) { export_frame.edge_stretch_fade = 0.0; }
             let job = ExportJob {
                 path: path.clone(),
                 id: "frame-color-pixel".to_owned(),
@@ -907,8 +923,8 @@ mod tests {
                 png::ColorType::Rgb | png::ColorType::Rgba => &pixels[0..3],
                 other => panic!("Unexpected PNG color type: {other:?}"),
             };
-            if matches!(style, FrameStyle::AmbientGradient) {
-                assert_ne!(pixel, expected, "ambient frame edge should contain extracted photo color");
+            if matches!(style, FrameStyle::AmbientGradient | FrameStyle::EdgeStretch) {
+                assert_ne!(pixel, expected, "generated frame edge should contain photo-derived color");
             } else {
                 assert_eq!(pixel, expected);
             }
@@ -936,6 +952,15 @@ mod tests {
         assert_eq!(parsed.ambient_softness, 65.0);
         assert_eq!(parsed.ambient_brightness, 0.0);
         assert_eq!(parsed.ambient_color_source, "fullImage");
+    }
+
+    #[test]
+    fn edge_stretch_and_legacy_defaults_deserialize() {
+        let frame: Frame = serde_json::from_str(r#"{"style":"edgeStretch","top":0,"bottom":0,"left":0,"right":0,"blurStrength":18,"backgroundBrightness":100,"showInset":false,"showShadow":false}"#).unwrap();
+        assert!(matches!(frame.style, FrameStyle::EdgeStretch));
+        assert_eq!(frame.edge_stretch_mode, "extend");
+        assert_eq!(frame.edge_stretch_blur, 8.0);
+        assert_eq!(frame.edge_stretch_fade, 12.0);
     }
 
     #[test]
@@ -992,7 +1017,10 @@ mod tests {
         fs::write(&path, &source).unwrap();
 
         let mut custom_frame = frame();
-        custom_frame.style = FrameStyle::AmbientGradient;
+        custom_frame.style = FrameStyle::EdgeStretch;
+        custom_frame.edge_stretch_mode = "mirror".into();
+        custom_frame.edge_stretch_blur = 12.0;
+        custom_frame.edge_stretch_fade = 18.0;
         let job = ExportJob {
             path: path.clone(),
             id: "test".to_owned(),

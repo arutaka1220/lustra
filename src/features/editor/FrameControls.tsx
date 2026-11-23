@@ -19,7 +19,7 @@ type FrameControlsProps = {
   children?: ReactNode
 }
 
-export const FRAME_STYLE_ORDER = ['black', 'white', 'blurred', 'softBlack', 'softWhite', 'ambientGradient', 'custom'] as const
+export const FRAME_STYLE_ORDER = ['black', 'white', 'blurred', 'softBlack', 'softWhite', 'ambientGradient', 'edgeStretch', 'custom'] as const
 const sides = ['top', 'bottom', 'left', 'right'] as const
 const oppositeSide = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' } as const
 
@@ -107,6 +107,11 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
           <SliderInput label={t('framePreview.softness')} value={frame.ambientSoftness ?? 65} max={100} unit="%" onChange={value => onChange('ambientSoftness', value)} {...sliderGestures} />
           <SliderInput label={t('framePreview.ambientBrightness')} value={frame.ambientBrightness ?? 0} min={-100} max={100} onChange={value => onChange('ambientBrightness', value)} {...sliderGestures} />
           <label className="field-label">{t('framePreview.colorSource')}<select value={frame.ambientColorSource ?? 'fullImage'} onChange={event => onChange('ambientColorSource', event.target.value as 'fullImage' | 'edges')}><option value="fullImage">{t('framePreview.fullImage')}</option><option value="edges">{t('framePreview.edges')}</option></select></label>
+        </>}
+        {frame.style === 'edgeStretch' && <>
+          <label className="field-label">{t('framePreview.stretchMode')}<select value={frame.edgeStretchMode ?? 'extend'} onChange={event => onChange('edgeStretchMode', event.target.value as 'extend' | 'mirror')}><option value="extend">{t('framePreview.extend')}</option><option value="mirror">{t('framePreview.mirror')}</option></select></label>
+          <SliderInput label={t('framePreview.edgeBlur')} value={frame.edgeStretchBlur ?? 8} max={40} unit="px" onChange={value => onChange('edgeStretchBlur', value)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.fade')} value={frame.edgeStretchFade ?? 12} max={40} unit="px" onChange={value => onChange('edgeStretchFade', value)} {...sliderGestures} />
         </>}
         {(['showInset', 'showShadow'] as const).map((key) => <button className={`check-row ${frame[key] ? 'is-checked' : ''}`} key={key} onClick={() => onChange(key, !frame[key])} aria-pressed={frame[key]}>
           <span className="check-box">{frame[key] && <Check size={13} aria-hidden="true" />}</span>

@@ -2,6 +2,7 @@ import type { FrameSettings } from '../../types/photo'
 import { canvasUnit, FRAME_COLORS, getBackgroundRect, getPhotoLayout } from './frame-layout'
 import type { FrameRect, Size } from './frame-layout'
 import { extractAmbientSamples } from './ambient-colors'
+import { edgeFadeWeight, edgeSampleCoordinate } from './edge-stretch'
 
 export type PhotoRaster = Size & { image: HTMLCanvasElement | HTMLImageElement }
 
@@ -174,6 +175,40 @@ function paintAmbientBackground(context: CanvasRenderingContext2D, scene: FrameS
   context.drawImage(layer, 0, 0, size.width, size.height)
 }
 
+/** Builds a bounded nine-slice edge backdrop; the foreground photo is painted separately. */
+function paintEdgeStretchBackground(context: CanvasRenderingContext2D, scene: FrameScene) {
+  const { size, raster, frame, layout } = scene
+  const scale = Math.min(1, 640 / Math.max(size.width, size.height))
+  const width = Math.max(1, Math.round(size.width * scale)), height = Math.max(1, Math.round(size.height * scale))
+  const layer = document.createElement('canvas'); layer.width = width; layer.height = height
+  const ctx = layer.getContext('2d', { willReadFrequently: true }); if (!ctx) return
+  const sx = width / size.width, sy = height / size.height
+  const { visible, image } = layout
+  ctx.drawImage(raster.image, image.x*sx, image.y*sy, image.width*sx, image.height*sy)
+  const pixels = ctx.getImageData(0, 0, width, height)
+  const input = new Uint8ClampedArray(pixels.data)
+  const left = Math.max(0, Math.floor(visible.x*sx)), right = Math.min(width-1, Math.ceil((visible.x+visible.width)*sx)-1)
+  const top = Math.max(0, Math.floor(visible.y*sy)), bottom = Math.min(height-1, Math.ceil((visible.y+visible.height)*sy)-1)
+  const mode = frame.edgeStretchMode ?? 'extend'
+  const fade = Math.max(0, Math.min(40, frame.edgeStretchFade ?? 12))*canvasUnit(size)*scale
+  for (let y=0; y<height; y++) for (let x=0; x<width; x++) {
+    if (x>=left && x<=right && y>=top && y<=bottom) continue
+    const fx=edgeSampleCoordinate(x,left,right,mode), fy=edgeSampleCoordinate(y,top,bottom,mode)
+    const ix=Math.max(left,Math.min(right,Math.round(fx))), iy=Math.max(top,Math.min(bottom,Math.round(fy)))
+    const dist=Math.max(x<left?left-x:x>right?x-right:0,y<top?top-y:y>bottom?y-bottom:0)
+    const weight=edgeFadeWeight(dist,fade)
+    const fadeDepth=Math.max(1,Math.round(fade))
+    const inwardX=Math.max(left,Math.min(right,Math.round(x<left?left+fadeDepth:x>right?right-fadeDepth:fx)))
+    const inwardY=Math.max(top,Math.min(bottom,Math.round(y<top?top+fadeDepth:y>bottom?bottom-fadeDepth:fy)))
+    const from=(iy*width+ix)*4, toward=(inwardY*width+inwardX)*4, to=(y*width+x)*4
+    for(let c=0;c<4;c++) pixels.data[to+c]=input[from+c]*(1-weight)+input[toward+c]*weight
+  }
+  ctx.putImageData(pixels,0,0)
+  const blur = Math.max(0, Math.min(40, frame.edgeStretchBlur ?? 8)) * canvasUnit(size) * scale
+  blurAndBrighten(ctx, width, height, blur, 100)
+  context.drawImage(layer, 0, 0, size.width, size.height)
+}
+
 /** Shared backdrop keeps both preview paths identical without rerendering blur on image movement. */
 export class FrameBackdrop {
   readonly canvas = document.createElement('canvas')
@@ -185,6 +220,7 @@ export class FrameBackdrop {
     const { visible } = layout
     const key = [size.width, size.height, dpr, frame.style, frame.customColor, frame.blurStrength, frame.backgroundBrightness,
       frame.backgroundOpacity, frame.ambientIntensity, frame.ambientSoftness, frame.ambientBrightness, frame.ambientColorSource,
+      frame.edgeStretchMode, frame.edgeStretchBlur, frame.edgeStretchFade,
       frame.showShadow, visible.x, visible.y, visible.width, visible.height].join(':')
     if (this.raster === raster && this.key === key) return false
 
@@ -201,6 +237,7 @@ export class FrameBackdrop {
     context.fillRect(0, 0, size.width, size.height)
     if (frame.style === 'blurred' && (frame.backgroundOpacity ?? 100) > 0) paintBlurredBackground(context, scene)
     if (frame.style === 'ambientGradient') paintAmbientBackground(context, scene)
+    if (frame.style === 'edgeStretch') paintEdgeStretchBackground(context, scene)
     if (frame.showShadow) {
       const unit = canvasUnit(size)
       context.save()
