@@ -42,6 +42,7 @@ const CHANNEL_KEY = 'updates.channel'
 const AUTOMATIC_KEY = 'updates.automatic'
 const LAST_CHECK_KEY = 'updates.last-check'
 const CHECK_INTERVAL = 6 * 60 * 60 * 1000
+const IS_DEV_SERVER = import.meta.env.DEV && import.meta.env.MODE !== 'test'
 
 let periodicCheck: ReturnType<typeof setInterval> | undefined
 let initialization: Promise<void> | undefined
@@ -72,7 +73,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
       const automaticEnabled = automatic !== false
       set({ channel: normalizedChannel, automatic: automaticEnabled, lastChecked, version, initialized: true })
 
-      if (isTauri() && automaticEnabled) {
+      if (!IS_DEV_SERVER && isTauri() && automaticEnabled) {
         await get().check(true)
         periodicCheck = setInterval(() => {
           if (get().automatic) void get().check(true)
@@ -95,7 +96,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
     })
     try {
       await writeAppPreference(CHANNEL_KEY, channel)
-      if (get().automatic && isTauri()) await get().check(true)
+      if (!IS_DEV_SERVER && get().automatic && isTauri()) await get().check(true)
     } catch (error) {
       set({ status: 'failed', error: explain(error) })
     }
@@ -113,7 +114,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
       clearInterval(periodicCheck)
       periodicCheck = undefined
     }
-    if (automatic && isTauri()) {
+    if (automatic && !IS_DEV_SERVER && isTauri()) {
       await get().check(true)
       if (!periodicCheck) periodicCheck = setInterval(() => {
         if (get().automatic) void get().check(true)
@@ -122,6 +123,10 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
   },
 
   check: async (automaticDownload = false) => {
+    if (IS_DEV_SERVER) {
+      set({ status: 'idle', error: null, update: null })
+      return
+    }
     if (!isTauri()) {
       set({ status: 'failed', error: 'Updates are available in the Lustra desktop app.' })
       return
