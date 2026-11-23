@@ -27,6 +27,10 @@ typedef struct {
     double blur;
     double brightness;
     double opacity;
+    double ambient_intensity;
+    double ambient_softness;
+    double ambient_brightness;
+    uint32_t ambient_edges;
 } LustraRenderSettings;
 
 typedef struct {
@@ -162,6 +166,31 @@ static CGColorRef make_color(CGColorSpaceRef srgb, uint32_t rgba) {
     return CGColorCreate(srgb, components);
 }
 
+static void rgb_to_hsv(double r, double g, double b, double *h, double *s, double *v) {
+    r /= 255.0; g /= 255.0; b /= 255.0;
+    double maximum = fmax(r, fmax(g, b)), minimum = fmin(r, fmin(g, b)), delta = maximum - minimum;
+    double hue = 0;
+    if (delta > 0) {
+        if (maximum == r) hue = fmod((g - b) / delta, 6.0);
+        else if (maximum == g) hue = (b - r) / delta + 2.0;
+        else hue = (r - g) / delta + 4.0;
+        hue *= 60.0; if (hue < 0) hue += 360.0;
+    }
+    *h = hue; *s = maximum == 0 ? 0 : delta / maximum; *v = maximum;
+}
+
+static void hsv_to_rgb(double h, double s, double v, double *r, double *g, double *b) {
+    double c = v * s, x = c * (1.0 - fabs(fmod(h / 60.0, 2.0) - 1.0)), m = v - c;
+    double rp, gp, bp;
+    if (h < 60) { rp = c; gp = x; bp = 0; }
+    else if (h < 120) { rp = x; gp = c; bp = 0; }
+    else if (h < 180) { rp = 0; gp = c; bp = x; }
+    else if (h < 240) { rp = 0; gp = x; bp = c; }
+    else if (h < 300) { rp = x; gp = 0; bp = c; }
+    else { rp = c; gp = 0; bp = x; }
+    *r = (rp + m) * 255.0; *g = (gp + m) * 255.0; *b = (bp + m) * 255.0;
+}
+
 static CGContextRef create_context(uint32_t width, uint32_t height, CGColorSpaceRef color_space) {
     CGContextRef context = CGBitmapContextCreate(
         NULL, width, height, 8, (size_t)width * 4, color_space,
@@ -208,11 +237,92 @@ static bool draw_background(
     const double width = settings->width;
     const double height = settings->height;
     CGRect full = CGRectMake(0, 0, width, height);
-    uint32_t matte = settings->style == 0 ? 0x000000ff : settings->style == 1 ? 0xffffffff : settings->style == 3 ? 0xfafaf8ff : settings->style == 4 ? (settings->custom_color << 8) | 0xff : settings->style == 5 ? 0x242424ff : 0x454842ff;
+    uint32_t matte = settings->style == 0 ? 0x000000ff : settings->style == 1 ? 0xffffffff : settings->style == 3 ? 0xfafaf8ff : settings->style == 4 ? (settings->custom_color << 8) | 0xff : settings->style == 5 ? 0x242424ff : settings->style == 6 ? 0x777777ff : 0x454842ff;
     CGColorRef color = make_color(srgb, matte);
     CGContextSetFillColorWithColor(context, color);
     CGContextFillRect(context, full);
     CGColorRelease(color);
+    if (settings->style == 6) {
+        CGContextRef sample = create_context(96, 96, srgb);
+        if (sample == NULL) return false;
+        draw_oriented(sample, photo, CGRectMake(0, 0, 96, 96));
+        uint8_t *pixels = CGBitmapContextGetData(sample);
+        uint32_t *counts = calloc(9 * 4096, sizeof(uint32_t));
+        uint64_t (*sums)[5] = calloc(9 * 4096, sizeof(*sums));
+        if (counts == NULL || sums == NULL) { free(counts); free(sums); CGContextRelease(sample); return false; }
+        for (int y = 0; y < 96; y++) for (int x = 0; x < 96; x++) {
+            if (settings->ambient_edges && x > 16 && x < 79 && y > 16 && y < 79) continue;
+            size_t p = ((size_t)y * 96 + x) * 4;
+            int tile = (y / 32) * 3 + (x / 32);
+            uint32_t key = tile * 4096 + ((pixels[p] >> 4) << 8) + ((pixels[p + 1] >> 4) << 4) + (pixels[p + 2] >> 4);
+            counts[key]++; for (int c = 0; c < 3; c++) sums[key][c] += pixels[p + c];
+            sums[key][3] += x; sums[key][4] += y;
+        }
+        CGContextRelease(sample);
+        double sr[5], sg[5], sb[5], sh[5], ss[5], sv[5], sx[5], sy[5], sw[5]; int sample_count = 0;
+        bool selected[9 * 4096] = {false}; int max_per_tile[9] = {1};
+        for (int i = 0; i < 9 * 4096; i++) if ((int)counts[i] > max_per_tile[i / 4096]) max_per_tile[i / 4096] = (int)counts[i];
+        for (int n = 0; n < 5; n++) {
+            int best = -1; double best_score = -1;
+            for (int i = 0; i < 9 * 4096; i++) {
+                if (!counts[i] || selected[i]) continue;
+                if (counts[i] < fmax(3, max_per_tile[i / 4096] * 0.0125)) continue;
+                double r = sums[i][0] / (double)counts[i], g = sums[i][1] / (double)counts[i], b = sums[i][2] / (double)counts[i];
+                bool similar = false;
+                for (int k = 0; k < sample_count; k++) if (hypot(hypot(r - sr[k], g - sg[k]), b - sb[k]) < 48) similar = true;
+                if (similar) continue;
+                double chroma = (fmax(r, fmax(g, b)) - fmin(r, fmin(g, b))) / 255.0;
+                double light = (r + g + b) / 765.0;
+                double score = sqrt((double)counts[i] / max_per_tile[i / 4096]) * (0.35 + fmin(0.9, chroma * 2.0) + fmin(0.06, light * 0.06));
+                if (score > best_score) { best = i; best_score = score; }
+            }
+            if (best < 0) break;
+            selected[best] = true;
+            double cr = sums[best][0] / (double)counts[best], cg = sums[best][1] / (double)counts[best], cb = sums[best][2] / (double)counts[best];
+            sr[sample_count] = cr; sg[sample_count] = cg; sb[sample_count] = cb;
+            rgb_to_hsv(cr, cg, cb, &sh[sample_count], &ss[sample_count], &sv[sample_count]);
+            sx[sample_count] = sums[best][3] / (double)counts[best] / 95.0;
+            sy[sample_count] = sums[best][4] / (double)counts[best] / 95.0;
+            sw[sample_count] = sqrt((double)counts[best] / 9216.0);
+            sample_count++;
+        }
+        free(counts); free(sums);
+        if (sample_count) {
+            CGContextRef mesh = create_context(256, 256, srgb);
+            if (mesh == NULL) return false;
+            uint8_t *out = CGBitmapContextGetData(mesh);
+            double intensity = settings->ambient_intensity, softness = settings->ambient_softness;
+            double brightness = settings->ambient_brightness * 100.0;
+            double sigma = 0.16 + softness * 0.28;
+            double factor = brightness < 0 ? fmax(0, 1 + brightness / 120.0) : 1;
+            double lift = brightness > 0 ? brightness * 1.36 : 0;
+            for (int py = 0; py < 256; py++) for (int px = 0; px < 256; px++) {
+                double nx = px / 255.0, ny = 1.0 - py / 255.0;
+                double total = 0, value = 0, saturation = 0, hue_total = 0, hue_x = 0, hue_y = 0;
+                double fallback_hue = 0, fallback_strength = -1;
+                for (int k = 0; k < sample_count; k++) {
+                    double dx = nx - sx[k], dy = ny - sy[k];
+                    double w = sw[k] * exp(-(dx * dx + dy * dy) / (2 * sigma * sigma));
+                    double hw = ss[k] * w * w, radians = sh[k] * M_PI / 180.0;
+                    total += w; value += sv[k] * w; saturation += ss[k] * w;
+                    hue_total += hw; hue_x += cos(radians) * hw; hue_y += sin(radians) * hw;
+                    if (hw > fallback_strength) { fallback_strength = hw; fallback_hue = sh[k]; }
+                }
+                size_t p = ((size_t)py * 256 + px) * 4;
+                double vector_length = hypot(hue_x, hue_y);
+                double hue = vector_length / fmax(1e-9, hue_total) < 0.12 ? fallback_hue : fmod(atan2(hue_y, hue_x) * 180.0 / M_PI + 360.0, 360.0);
+                double v = fmax(0, fmin(1, (0.47 + (value / total - 0.47) * intensity) * factor + lift / 255.0));
+                double sat = fmax(0, fmin(0.96, saturation / total * intensity * (1 + intensity * 0.35)));
+                double rr, gg, bb; hsv_to_rgb(hue, sat, v, &rr, &gg, &bb);
+                out[p] = (uint8_t)rr; out[p + 1] = (uint8_t)gg; out[p + 2] = (uint8_t)bb;
+                out[p + 3] = 255;
+            }
+            CGImageRef mesh_image = CGBitmapContextCreateImage(mesh);
+            CGContextDrawImage(context, full, mesh_image);
+            CGImageRelease(mesh_image); CGContextRelease(mesh);
+        }
+        return true;
+    }
     if (settings->style != 2 || settings->opacity <= 0) {
         return true;
     }

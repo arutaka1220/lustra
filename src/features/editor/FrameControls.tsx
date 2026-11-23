@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Check, Link2, Link2Off } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { SliderInput } from './SliderInput'
@@ -19,13 +19,22 @@ type FrameControlsProps = {
   children?: ReactNode
 }
 
-export const FRAME_STYLE_ORDER = ['black', 'white', 'blurred', 'softBlack', 'softWhite', 'custom'] as const
+export const FRAME_STYLE_ORDER = ['black', 'white', 'blurred', 'softBlack', 'softWhite', 'ambientGradient', 'custom'] as const
 const sides = ['top', 'bottom', 'left', 'right'] as const
 const oppositeSide = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' } as const
 
 export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFrameEditEnd, children }: FrameControlsProps) {
   const { t } = useTranslation()
   const { isOpen, toggle } = useInspectorSections()
+  const [presets, setPresets] = useState<Record<string, FrameSettings>>(() => {
+    try { return JSON.parse(localStorage.getItem('lustra.frame-presets.v1') ?? '{}') as Record<string, FrameSettings> } catch { return {} }
+  })
+  const [presetName, setPresetName] = useState('')
+  const [selectedPreset, setSelectedPreset] = useState('')
+  const persistPresets = (next: Record<string, FrameSettings>) => {
+    setPresets(next)
+    try { localStorage.setItem('lustra.frame-presets.v1', JSON.stringify(next)) } catch (error) { console.warn('Could not save frame presets', error) }
+  }
   const sliderGestures = { onChangeStart: onFrameEditStart, onChangeEnd: onFrameEditEnd }
   const patch = (changes: Partial<FrameSettings>) => {
     if (onPatch) {
@@ -76,10 +85,28 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
       </InspectorSection>
 
       <InspectorSection title={t('edit.appearance')} open={isOpen('effects')} onToggle={() => toggle('effects')}>
+        <section className="frame-presets" aria-label="Frame presets">
+          <label className="field-label">Preset name<input value={presetName} onChange={event => setPresetName(event.target.value)} /></label>
+          <div className="frame-presets__actions">
+            <button type="button" className="button button--quiet" disabled={!presetName.trim()} onClick={() => {
+              const name = presetName.trim(); persistPresets({ ...presets, [name]: structuredClone(frame) }); setSelectedPreset(name)
+            }}>Save preset</button>
+            <select aria-label="Saved frame presets" value={selectedPreset} onChange={event => {
+              const name = event.target.value; setSelectedPreset(name); if (name && presets[name]) { setPresetName(name); patch(structuredClone(presets[name])) }
+            }}><option value="">Load preset…</option>{Object.keys(presets).map(name => <option key={name} value={name}>{name}</option>)}</select>
+            <button type="button" className="button button--quiet" disabled={!selectedPreset || !presets[selectedPreset]} onClick={() => persistPresets({ ...presets, [selectedPreset]: structuredClone(frame) })}>Update preset</button>
+          </div>
+        </section>
         {frame.style === 'blurred' && <>
           <SliderInput label={t('framePreview.blur')} value={frame.blurStrength} max={40} unit="px" onChange={(value) => onChange('blurStrength', value)} {...sliderGestures} />
           <SliderInput label={t('framePreview.brightness')} value={frame.backgroundBrightness} min={60} max={140} onChange={(value) => onChange('backgroundBrightness', value)} {...sliderGestures} />
           <SliderInput label={t('framePreview.opacity')} value={frame.backgroundOpacity ?? 100} max={100} onChange={(value) => onChange('backgroundOpacity', value)} {...sliderGestures} />
+        </>}
+        {frame.style === 'ambientGradient' && <>
+          <SliderInput label={t('framePreview.intensity')} value={frame.ambientIntensity ?? 85} max={100} unit="%" onChange={value => onChange('ambientIntensity', value)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.softness')} value={frame.ambientSoftness ?? 65} max={100} unit="%" onChange={value => onChange('ambientSoftness', value)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.ambientBrightness')} value={frame.ambientBrightness ?? 0} min={-100} max={100} onChange={value => onChange('ambientBrightness', value)} {...sliderGestures} />
+          <label className="field-label">{t('framePreview.colorSource')}<select value={frame.ambientColorSource ?? 'fullImage'} onChange={event => onChange('ambientColorSource', event.target.value as 'fullImage' | 'edges')}><option value="fullImage">{t('framePreview.fullImage')}</option><option value="edges">{t('framePreview.edges')}</option></select></label>
         </>}
         {(['showInset', 'showShadow'] as const).map((key) => <button className={`check-row ${frame[key] ? 'is-checked' : ''}`} key={key} onClick={() => onChange(key, !frame[key])} aria-pressed={frame[key]}>
           <span className="check-box">{frame[key] && <Check size={13} aria-hidden="true" />}</span>

@@ -25,6 +25,10 @@ struct NativeRenderSettings {
     blur: f64,
     brightness: f64,
     opacity: f64,
+    ambient_intensity: f64,
+    ambient_softness: f64,
+    ambient_brightness: f64,
+    ambient_edges: u32,
 }
 
 #[repr(C)]
@@ -150,6 +154,7 @@ pub fn render(path: &Path, job: &ExportJob, settings: &ExportSettings) -> Result
             FrameStyle::SoftWhite => 3,
             FrameStyle::Custom => 4,
             FrameStyle::SoftBlack => 5,
+            FrameStyle::AmbientGradient => 6,
         },
         custom_color: parse_hex_color(job.frame.custom_color.as_deref().unwrap_or("#000000")),
         inset: u32::from(job.frame.show_inset),
@@ -159,6 +164,10 @@ pub fn render(path: &Path, job: &ExportJob, settings: &ExportSettings) -> Result
         blur: job.frame.blur_strength.clamp(0.0, 120.0),
         brightness: job.frame.background_brightness.clamp(0.0, 200.0) / 100.0,
         opacity: job.frame.background_opacity.clamp(0.0, 100.0) / 100.0,
+        ambient_intensity: job.frame.ambient_intensity.clamp(0.0, 100.0) / 100.0,
+        ambient_softness: job.frame.ambient_softness.clamp(0.0, 100.0) / 100.0,
+        ambient_brightness: job.frame.ambient_brightness.clamp(-100.0, 100.0) / 100.0,
+        ambient_edges: u32::from(job.frame.ambient_color_source == "edges"),
     };
 
     let text_data = job

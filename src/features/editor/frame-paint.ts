@@ -1,6 +1,7 @@
 import type { FrameSettings } from '../../types/photo'
 import { canvasUnit, FRAME_COLORS, getBackgroundRect, getPhotoLayout } from './frame-layout'
 import type { FrameRect, Size } from './frame-layout'
+import { extractAmbientSamples } from './ambient-colors'
 
 export type PhotoRaster = Size & { image: HTMLCanvasElement | HTMLImageElement }
 
@@ -98,6 +99,81 @@ function paintBlurredBackground(context: CanvasRenderingContext2D, scene: FrameS
   context.restore()
 }
 
+const ambientColorCache = new WeakMap<PhotoRaster, { source: string; samples: ReturnType<typeof extractAmbientSamples> }>()
+function ambientColors(raster: PhotoRaster, source: 'fullImage' | 'edges') {
+  const cached = ambientColorCache.get(raster)
+  if (cached?.source === source) return cached.samples
+  const sample = document.createElement('canvas')
+  sample.width = sample.height = 96
+  const ctx = sample.getContext('2d', { willReadFrequently: true })
+  if (!ctx) return []
+  ctx.drawImage(raster.image, 0, 0, 96, 96)
+  const { data } = ctx.getImageData(0, 0, 96, 96)
+  const samples = extractAmbientSamples(data, 96, 96, source)
+  ambientColorCache.set(raster, { source, samples })
+  return samples
+}
+
+function rgbToHsv(r: number, g: number, b: number) {
+  r /= 255; g /= 255; b /= 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), delta = max - min
+  let h = 0
+  if (delta) h = max === r ? ((g - b) / delta) % 6 : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4
+  return { h: (h * 60 + 360) % 360, s: max === 0 ? 0 : delta / max, v: max }
+}
+
+function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
+  const c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c
+  const rgb = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x]
+  return rgb.map(value => (value + m) * 255) as [number, number, number]
+}
+
+function paintAmbientBackground(context: CanvasRenderingContext2D, scene: FrameScene) {
+  const { raster, frame, size } = scene
+  const source = frame.ambientColorSource ?? 'fullImage'
+  const samples = ambientColors(raster, source)
+  const intensity = Math.max(0, Math.min(100, frame.ambientIntensity ?? 85)) / 100
+  const softness = Math.max(0, Math.min(100, frame.ambientSoftness ?? 65)) / 100
+  const brightness = Math.max(-100, Math.min(100, frame.ambientBrightness ?? 0))
+  const layer = document.createElement('canvas')
+  layer.width = layer.height = 256
+  const ctx = layer.getContext('2d', { willReadFrequently: true })
+  if (!ctx || !samples.length) return
+  const image = ctx.createImageData(256, 256)
+  const colors = samples.map(({ color, x, y, weight }) => {
+    const m = color.match(/\d+/g)!.map(Number)
+    return { ...rgbToHsv(m[0], m[1], m[2]), x, y, weight: Math.sqrt(Math.max(weight, 1 / 9216)) }
+  })
+  // Gaussian spatial interpolation preserves where each color belongs. Hue
+  // vectors are blended separately from value/chroma to avoid RGB gray-out.
+  const sigma = 0.16 + softness * 0.28
+  for (let py = 0; py < 256; py++) for (let px = 0; px < 256; px++) {
+    const nx = px / 255, ny = py / 255
+    let total = 0, value = 0, saturation = 0, hueTotal = 0, hueX = 0, hueY = 0
+    let fallbackHue = 0, fallbackStrength = -1
+    for (const sample of colors) {
+      const dx = nx - sample.x, dy = ny - sample.y
+      const w = sample.weight * Math.exp(-(dx * dx + dy * dy) / (2 * sigma * sigma))
+      total += w; value += sample.v * w; saturation += sample.s * w
+      const hueWeight = sample.s * w * w, radians = sample.h * Math.PI / 180
+      hueTotal += hueWeight; hueX += Math.cos(radians) * hueWeight; hueY += Math.sin(radians) * hueWeight
+      if (hueWeight > fallbackStrength) { fallbackStrength = hueWeight; fallbackHue = sample.h }
+    }
+    const i = (py * 256 + px) * 4
+    const factor = brightness < 0 ? Math.max(0, 1 + brightness / 120) : 1
+    const lift = brightness > 0 ? brightness * 1.36 : 0
+    const vectorLength = Math.hypot(hueX, hueY)
+    const hue = vectorLength / Math.max(1e-9, hueTotal) < 0.12 ? fallbackHue : (Math.atan2(hueY, hueX) * 180 / Math.PI + 360) % 360
+    const v = Math.max(0, Math.min(1, (0.47 + (value / total - 0.47) * intensity) * factor + lift / 255))
+    const s = Math.max(0, Math.min(0.96, saturation / total * intensity * (1 + intensity * 0.35)))
+    const [r, g, b] = hsvToRgb(hue, s, v)
+    image.data[i] = r; image.data[i + 1] = g; image.data[i + 2] = b
+    image.data[i + 3] = 255
+  }
+  ctx.putImageData(image, 0, 0)
+  context.drawImage(layer, 0, 0, size.width, size.height)
+}
+
 /** Shared backdrop keeps both preview paths identical without rerendering blur on image movement. */
 export class FrameBackdrop {
   readonly canvas = document.createElement('canvas')
@@ -108,7 +184,8 @@ export class FrameBackdrop {
     const { size, raster, frame, layout, dpr } = scene
     const { visible } = layout
     const key = [size.width, size.height, dpr, frame.style, frame.customColor, frame.blurStrength, frame.backgroundBrightness,
-      frame.backgroundOpacity, frame.showShadow, visible.x, visible.y, visible.width, visible.height].join(':')
+      frame.backgroundOpacity, frame.ambientIntensity, frame.ambientSoftness, frame.ambientBrightness, frame.ambientColorSource,
+      frame.showShadow, visible.x, visible.y, visible.width, visible.height].join(':')
     if (this.raster === raster && this.key === key) return false
 
     const canvas = this.canvas
@@ -123,6 +200,7 @@ export class FrameBackdrop {
     context.fillStyle = frame.style === 'custom' ? (frame.customColor ?? '#000000') : FRAME_COLORS[frame.style]
     context.fillRect(0, 0, size.width, size.height)
     if (frame.style === 'blurred' && (frame.backgroundOpacity ?? 100) > 0) paintBlurredBackground(context, scene)
+    if (frame.style === 'ambientGradient') paintAmbientBackground(context, scene)
     if (frame.showShadow) {
       const unit = canvasUnit(size)
       context.save()

@@ -47,6 +47,7 @@
 .padding-group > header { display: flex; align-items: center; justify-content: space-between; }
 .style-preview--white > span { border-color: #fff; }
 .style-preview--blur { background: linear-gradient(125deg, #768072, #999085 48%, #5c5b59); }
+.style-preview--ambientGradient { background: radial-gradient(ellipse at 30% 32%, #a78b72, transparent 52%), radial-gradient(ellipse at 74% 66%, #647a7b, #41464a 68%); }
 .slider-field { min-width: 0; margin: 12px 0 14px; }
 .slider-field__label { display: block; margin-bottom: 7px; color: var(--text-secondary); font-size: 12px; line-height: 18px; }
 .slider-field__control { display: flex; align-items: center; gap: 12px; }

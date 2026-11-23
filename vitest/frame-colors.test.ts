@@ -9,7 +9,7 @@ describe('frame color defaults', () => {
     expect(FRAME_COLORS.softWhite).toBe('#fafaf8')
     expect(FRAME_COLORS.softBlack).toBe('#242424')
   })
-  it('orders six styles in the specified three-column rows', () => {
-    expect(FRAME_STYLE_ORDER).toEqual(['black', 'white', 'blurred', 'softBlack', 'softWhite', 'custom'])
+  it('keeps the established styles and adds Ambient Gradient in the same picker', () => {
+    expect(FRAME_STYLE_ORDER).toEqual(['black', 'white', 'blurred', 'softBlack', 'softWhite', 'ambientGradient', 'custom'])
   })
 })

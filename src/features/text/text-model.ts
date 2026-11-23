@@ -141,7 +141,7 @@ export function textColor(color: TextElement['color'], style: FrameSettings['sty
     : style === 'softWhite' ? '#FAFAF8'
       : style === 'softBlack' ? '#242424'
         : style === 'custom' ? customFrameColor ?? '#000000'
-          : style === 'black' ? '#000000' : blurredColor ?? '#454842'
+          : style === 'black' ? '#000000' : style === 'ambientGradient' ? '#777777' : blurredColor ?? '#454842'
   return bestContrastingTextColor(background)
 }
 

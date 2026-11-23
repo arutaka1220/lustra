@@ -127,6 +127,8 @@ enum FrameStyle {
     #[serde(alias = "softBlack")]
     SoftBlack,
     Custom,
+    #[serde(alias = "ambientGradient")]
+    AmbientGradient,
 }
 
 #[derive(Deserialize)]
@@ -145,7 +147,19 @@ struct Frame {
     background_opacity: f64,
     show_inset: bool,
     show_shadow: bool,
+    #[serde(default = "ambient_intensity_default")]
+    ambient_intensity: f64,
+    #[serde(default = "ambient_softness_default")]
+    ambient_softness: f64,
+    #[serde(default)]
+    ambient_brightness: f64,
+    #[serde(default = "ambient_source_default")]
+    ambient_color_source: String,
 }
+
+fn ambient_intensity_default() -> f64 { 85.0 }
+fn ambient_softness_default() -> f64 { 65.0 }
+fn ambient_source_default() -> String { "fullImage".to_owned() }
 
 fn full_opacity() -> f64 {
     100.0
@@ -801,6 +815,10 @@ mod tests {
             background_opacity: 70.0,
             show_inset: true,
             show_shadow: true,
+            ambient_intensity: 85.0,
+            ambient_softness: 65.0,
+            ambient_brightness: 0.0,
+            ambient_color_source: "fullImage".into(),
         }
     }
 
@@ -862,6 +880,7 @@ mod tests {
             (FrameStyle::White, None, [0xFF, 0xFF, 0xFF]),
             (FrameStyle::SoftWhite, None, [0xFA, 0xFA, 0xF8]),
             (FrameStyle::Custom, Some("#123ABC"), [0x12, 0x3A, 0xBC]),
+            (FrameStyle::AmbientGradient, None, [0x45, 0x48, 0x42]),
         ] {
             let mut export_frame = frame();
             export_frame.style = style;
@@ -888,7 +907,11 @@ mod tests {
                 png::ColorType::Rgb | png::ColorType::Rgba => &pixels[0..3],
                 other => panic!("Unexpected PNG color type: {other:?}"),
             };
-            assert_eq!(pixel, expected);
+            if matches!(style, FrameStyle::AmbientGradient) {
+                assert_ne!(pixel, expected, "ambient frame edge should contain extracted photo color");
+            } else {
+                assert_eq!(pixel, expected);
+            }
         }
         assert_eq!(fs::read(path).unwrap(), SOURCE_PNG);
     }
@@ -899,6 +922,20 @@ mod tests {
             serde_json::from_str::<FrameStyle>("\"softBlack\""),
             Ok(FrameStyle::SoftBlack)
         ));
+    }
+
+    #[test]
+    fn ambient_gradient_style_and_old_frame_settings_deserialize_safely() {
+        let value = serde_json::json!({
+            "style":"ambientGradient", "top":0, "bottom":0, "left":0, "right":0,
+            "blurStrength":0, "backgroundBrightness":100, "showInset":false, "showShadow":false
+        });
+        let parsed: Frame = serde_json::from_value(value).unwrap();
+        assert!(matches!(parsed.style, FrameStyle::AmbientGradient));
+        assert_eq!(parsed.ambient_intensity, 85.0);
+        assert_eq!(parsed.ambient_softness, 65.0);
+        assert_eq!(parsed.ambient_brightness, 0.0);
+        assert_eq!(parsed.ambient_color_source, "fullImage");
     }
 
     #[test]
@@ -955,8 +992,7 @@ mod tests {
         fs::write(&path, &source).unwrap();
 
         let mut custom_frame = frame();
-        custom_frame.style = FrameStyle::Custom;
-        custom_frame.custom_color = Some("#123ABC".to_owned());
+        custom_frame.style = FrameStyle::AmbientGradient;
         let job = ExportJob {
             path: path.clone(),
             id: "test".to_owned(),

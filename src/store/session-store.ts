@@ -78,6 +78,10 @@ export type SessionState = {
 
 export const initialFrame: FrameSettings = {
   style: 'black',
+  ambientIntensity: 85,
+  ambientSoftness: 65,
+  ambientBrightness: 0,
+  ambientColorSource: 'fullImage',
   top: 8,
   bottom: 15,
   left: 8,
