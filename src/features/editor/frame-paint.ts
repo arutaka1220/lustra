@@ -123,18 +123,34 @@ function paintAmbientBackground(context: CanvasRenderingContext2D, scene: FrameS
   const brightness = Math.max(-100, Math.min(100, frame.ambientBrightness ?? 0))
   const layer = document.createElement('canvas')
   layer.width = layer.height = 256
-  const ctx = layer.getContext('2d')
-  if (!ctx) return
-  ctx.fillStyle = '#777777'; ctx.fillRect(0, 0, 256, 256)
-  samples.forEach(({ color, x: sx, y: sy, weight }) => {
-    const x = 16 + sx * 224, y = 16 + sy * 224
-    const radius = 62 + softness * 140
-    const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius)
-    gradient.addColorStop(0, color); gradient.addColorStop(1, 'rgba(120,120,120,0)')
-    ctx.globalAlpha = intensity * Math.min(0.82, 0.42 + Math.sqrt(weight) * 0.7); ctx.fillStyle = gradient; ctx.fillRect(0, 0, 256, 256)
+  const ctx = layer.getContext('2d', { willReadFrequently: true })
+  if (!ctx || !samples.length) return
+  const image = ctx.createImageData(256, 256)
+  const colors = samples.map(({ color, x, y, weight }) => {
+    const m = color.match(/\d+/g)!.map(Number)
+    return { r: m[0], g: m[1], b: m[2], x, y, weight: Math.sqrt(Math.max(weight, 1 / 2304)) }
   })
-  ctx.globalAlpha = 1
-  if (brightness) { ctx.fillStyle = brightness > 0 ? `rgba(255,255,255,${brightness / 240})` : `rgba(0,0,0,${-brightness / 330})`; ctx.fillRect(0, 0, 256, 256) }
+  // Gaussian spatial interpolation avoids source-over layering, whose repeated
+  // blending against the gray matte was washing out overlapping color fields.
+  const sigma = 0.16 + softness * 0.28
+  for (let py = 0; py < 256; py++) for (let px = 0; px < 256; px++) {
+    const nx = px / 255, ny = py / 255
+    let total = 0, r = 0, g = 0, b = 0
+    for (const sample of colors) {
+      const dx = nx - sample.x, dy = ny - sample.y
+      const w = sample.weight * Math.exp(-(dx * dx + dy * dy) / (2 * sigma * sigma))
+      total += w; r += sample.r * w; g += sample.g * w; b += sample.b * w
+    }
+    const i = (py * 256 + px) * 4
+    const neutral = 119
+    const factor = brightness < 0 ? Math.max(0, 1 + brightness / 120) : 1
+    const lift = brightness > 0 ? brightness * 1.36 : 0
+    image.data[i] = Math.max(0, Math.min(255, (neutral + ((r / total) - neutral) * intensity) * factor + lift))
+    image.data[i + 1] = Math.max(0, Math.min(255, (neutral + ((g / total) - neutral) * intensity) * factor + lift))
+    image.data[i + 2] = Math.max(0, Math.min(255, (neutral + ((b / total) - neutral) * intensity) * factor + lift))
+    image.data[i + 3] = 255
+  }
+  ctx.putImageData(image, 0, 0)
   context.drawImage(layer, 0, 0, size.width, size.height)
 }
 
