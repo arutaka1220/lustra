@@ -547,7 +547,7 @@ RAW現像や明るさ調整・色調整などの編集機能は搭載しない�
 
 - 本PRでは従来のPreset廃止方針を変更し、Ambient Gradientを含むFrameSettingsの保存・適用・更新を提供する。
 - Frame選択欄の既存スタイルと同じ階層にAmbient Gradientを追加する。写真中央は通常の描画経路を維持し、フレーム背景だけに効果を適用する。
-- 元写真を48×48へ縮小し、Full ImageまたはEdges（内側31×31領域を除外）から量子化色を抽出する。頻度と彩度を抑制的に評価し、各色の画面上の重心を保持する。色抽出はプレビューで写真ラスタごとにキャッシュする。
+- 元写真を96×96へ縮小し、3×3の空間領域ごとにFull ImageまたはEdgesから4bit/channel量子化色を抽出する。局所頻度と彩度を評価して最大5色を選び、各色の画面上の重心を保持する。色抽出はプレビューで写真ラスタごとにキャッシュする。
 - 重心位置に応じて背景色を空間補間し、Intensity（初期85%）、Softness（65%）、Brightness（0）、Color Source（Full Image）を適用する。Intensityに応じて抽出色の彩度を穏やかに強調し、Brightness補正では色相を維持する。保存済み設定は維持し、欠損値にのみ新しい初期値を使う。範囲はIntensity/Softness 0–100、Brightness -100–100。
 - 設定値は既存FrameSettingsに含め、All Photos / This Photo、履歴、セッションsnapshotの共通経路を使う。旧書き出しデータのAmbient設定は初期値で読み込む。
 - Preset name、Save preset、選択して適用、Update presetでFrameSettings全体をアプリ内へ保存し、再起動後も再利用できる。

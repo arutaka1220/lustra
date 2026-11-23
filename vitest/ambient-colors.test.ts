@@ -45,4 +45,10 @@ describe('Ambient Gradient color extraction', () => {
     expect(samples.length).toBeLessThanOrEqual(2)
     expect(extractAmbientColors(image, 48, 48, 'fullImage')).toEqual(extractAmbientColors(image, 48, 48, 'fullImage'))
   })
+
+  it('keeps a localized warm accent when most of the image is dark blue', () => {
+    const image = rgba(48, 48, (x, y) => x >= 41 && x < 47 && y < 6 ? [248, 148, 58] : [5, 14, 52])
+    const samples = extractAmbientSamples(image, 48, 48, 'fullImage')
+    expect(samples.some(({ color, x, y }) => color === 'rgb(248,148,58)' && x > 0.8 && y < 0.2)).toBe(true)
+  })
 })

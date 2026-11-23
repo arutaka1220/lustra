@@ -2,20 +2,24 @@ export type AmbientColorSource = 'fullImage' | 'edges'
 
 export type AmbientSample = { color: string; x: number; y: number; weight: number }
 
-/** Dominant 3-bit RGB bins from a bounded RGBA sample. */
+/** Spatially ranked 4-bit RGB bins from a bounded RGBA sample. */
 export function extractAmbientColors(data: Uint8ClampedArray | Uint8Array, width: number, height: number, source: AmbientColorSource): string[] {
   return extractAmbientSamples(data, width, height, source).map(sample => sample.color)
 }
 
 /** Bounded histogram with spatial centroids; output order is deterministic. */
 export function extractAmbientSamples(data: Uint8ClampedArray | Uint8Array, width: number, height: number, source: AmbientColorSource): AmbientSample[] {
-  const bins = new Map<number, { count: number; r: number; g: number; b: number; x: number; y: number; vivid: number }>()
+  const bins = new Map<number, { count: number; r: number; g: number; b: number; x: number; y: number; vivid: number; tile: number }>()
+  const tileSize = Math.max(1, Math.ceil(Math.min(width, height) / 3))
   const marginX = Math.floor(width * 8 / 48), marginY = Math.floor(height * 8 / 48)
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
     if (source === 'edges' && x > marginX && x < width - marginX - 1 && y > marginY && y < height - marginY - 1) continue
     const i = (y * width + x) * 4
-    const key = ((data[i] >> 5) << 6) | ((data[i + 1] >> 5) << 3) | (data[i + 2] >> 5)
-    const bin = bins.get(key) ?? { count: 0, r: 0, g: 0, b: 0, x: 0, y: 0, vivid: 0 }
+    const tileX = Math.min(2, Math.floor(x / tileSize)), tileY = Math.min(2, Math.floor(y / tileSize))
+    const tile = tileY * 3 + tileX
+    const colorKey = ((data[i] >> 4) << 8) | ((data[i + 1] >> 4) << 4) | (data[i + 2] >> 4)
+    const key = tile * 4096 + colorKey
+    const bin = bins.get(key) ?? { count: 0, r: 0, g: 0, b: 0, x: 0, y: 0, vivid: 0, tile }
     const r = data[i], g = data[i + 1], b = data[i + 2]
     bin.count++; bin.r += r; bin.g += g; bin.b += b; bin.x += x; bin.y += y
     bin.vivid += Math.max(r, g, b) - Math.min(r, g, b)
@@ -23,15 +27,17 @@ export function extractAmbientSamples(data: Uint8ClampedArray | Uint8Array, widt
   }
   const all = [...bins.values()].filter(bin => bin.count)
   if (!all.length) return []
-  const maxCount = Math.max(...all.map(bin => bin.count))
-  // Rank by prevalence with a restrained chroma bonus so tiny highlights/noise
-  // cannot dominate while characteristic colors survive large dark regions.
+  const maxPerTile = new Array(9).fill(1)
+  for (const bin of all) maxPerTile[bin.tile] = Math.max(maxPerTile[bin.tile], bin.count)
+  // Local prevalence prevents a large dark region from erasing a small but
+  // meaningful light elsewhere; the floor rejects isolated pixel noise.
   const ranked = all.sort((a, b) => score(b) - score(a))
   function score(bin: typeof all[number]) {
-    const prevalence = Math.sqrt(bin.count / maxCount)
+    if (bin.count < Math.max(3, maxPerTile[bin.tile] * 0.0125)) return 0
+    const prevalence = Math.sqrt(bin.count / maxPerTile[bin.tile])
     const chroma = bin.vivid / (bin.count * 255)
     const lightness = (bin.r + bin.g + bin.b) / (bin.count * 765)
-    return prevalence * (0.78 + Math.min(0.22, chroma * 0.55) + Math.min(0.06, lightness * 0.06))
+    return prevalence * (0.35 + Math.min(0.9, chroma * 2) + Math.min(0.06, lightness * 0.06))
   }
   const selected: typeof all = []
   for (const bin of ranked) {

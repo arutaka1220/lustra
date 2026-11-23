@@ -104,14 +104,28 @@ function ambientColors(raster: PhotoRaster, source: 'fullImage' | 'edges') {
   const cached = ambientColorCache.get(raster)
   if (cached?.source === source) return cached.samples
   const sample = document.createElement('canvas')
-  sample.width = sample.height = 48
+  sample.width = sample.height = 96
   const ctx = sample.getContext('2d', { willReadFrequently: true })
   if (!ctx) return []
-  ctx.drawImage(raster.image, 0, 0, 48, 48)
-  const { data } = ctx.getImageData(0, 0, 48, 48)
-  const samples = extractAmbientSamples(data, 48, 48, source)
+  ctx.drawImage(raster.image, 0, 0, 96, 96)
+  const { data } = ctx.getImageData(0, 0, 96, 96)
+  const samples = extractAmbientSamples(data, 96, 96, source)
   ambientColorCache.set(raster, { source, samples })
   return samples
+}
+
+function rgbToHsv(r: number, g: number, b: number) {
+  r /= 255; g /= 255; b /= 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), delta = max - min
+  let h = 0
+  if (delta) h = max === r ? ((g - b) / delta) % 6 : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4
+  return { h: (h * 60 + 360) % 360, s: max === 0 ? 0 : delta / max, v: max }
+}
+
+function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
+  const c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c
+  const rgb = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x]
+  return rgb.map(value => (value + m) * 255) as [number, number, number]
 }
 
 function paintAmbientBackground(context: CanvasRenderingContext2D, scene: FrameScene) {
@@ -128,31 +142,32 @@ function paintAmbientBackground(context: CanvasRenderingContext2D, scene: FrameS
   const image = ctx.createImageData(256, 256)
   const colors = samples.map(({ color, x, y, weight }) => {
     const m = color.match(/\d+/g)!.map(Number)
-    return { r: m[0], g: m[1], b: m[2], x, y, weight: Math.sqrt(Math.max(weight, 1 / 2304)) }
+    return { ...rgbToHsv(m[0], m[1], m[2]), x, y, weight: Math.sqrt(Math.max(weight, 1 / 9216)) }
   })
-  // Gaussian spatial interpolation avoids source-over layering, whose repeated
-  // blending against the gray matte was washing out overlapping color fields.
+  // Gaussian spatial interpolation preserves where each color belongs. Hue
+  // vectors are blended separately from value/chroma to avoid RGB gray-out.
   const sigma = 0.16 + softness * 0.28
   for (let py = 0; py < 256; py++) for (let px = 0; px < 256; px++) {
     const nx = px / 255, ny = py / 255
-    let total = 0, r = 0, g = 0, b = 0
+    let total = 0, value = 0, saturation = 0, hueTotal = 0, hueX = 0, hueY = 0
+    let fallbackHue = 0, fallbackStrength = -1
     for (const sample of colors) {
       const dx = nx - sample.x, dy = ny - sample.y
       const w = sample.weight * Math.exp(-(dx * dx + dy * dy) / (2 * sigma * sigma))
-      total += w; r += sample.r * w; g += sample.g * w; b += sample.b * w
+      total += w; value += sample.v * w; saturation += sample.s * w
+      const hueWeight = sample.s * w * w, radians = sample.h * Math.PI / 180
+      hueTotal += hueWeight; hueX += Math.cos(radians) * hueWeight; hueY += Math.sin(radians) * hueWeight
+      if (hueWeight > fallbackStrength) { fallbackStrength = hueWeight; fallbackHue = sample.h }
     }
     const i = (py * 256 + px) * 4
-    const neutral = 119
     const factor = brightness < 0 ? Math.max(0, 1 + brightness / 120) : 1
     const lift = brightness > 0 ? brightness * 1.36 : 0
-    const rr = neutral + ((r / total) - neutral) * intensity
-    const gg = neutral + ((g / total) - neutral) * intensity
-    const bb = neutral + ((b / total) - neutral) * intensity
-    const luma = rr * 0.2126 + gg * 0.7152 + bb * 0.0722
-    const saturation = 1 + intensity * 0.35
-    image.data[i] = Math.max(0, Math.min(255, (luma + (rr - luma) * saturation) * factor + lift))
-    image.data[i + 1] = Math.max(0, Math.min(255, (luma + (gg - luma) * saturation) * factor + lift))
-    image.data[i + 2] = Math.max(0, Math.min(255, (luma + (bb - luma) * saturation) * factor + lift))
+    const vectorLength = Math.hypot(hueX, hueY)
+    const hue = vectorLength / Math.max(1e-9, hueTotal) < 0.12 ? fallbackHue : (Math.atan2(hueY, hueX) * 180 / Math.PI + 360) % 360
+    const v = Math.max(0, Math.min(1, (0.47 + (value / total - 0.47) * intensity) * factor + lift / 255))
+    const s = Math.max(0, Math.min(0.96, saturation / total * intensity * (1 + intensity * 0.35)))
+    const [r, g, b] = hsvToRgb(hue, s, v)
+    image.data[i] = r; image.data[i + 1] = g; image.data[i + 2] = b
     image.data[i + 3] = 255
   }
   ctx.putImageData(image, 0, 0)
