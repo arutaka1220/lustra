@@ -101,6 +101,28 @@ describe('session history and recovery', () => {
     expect(session().commonFrame).toMatchObject({ style: 'ambientGradient', ambientIntensity: 42, ambientSoftness: 31, ambientBrightness: -18, ambientColorSource: 'edges' })
   })
 
+  test('Portrait Card settings remain independent, undoable, and restorable', () => {
+    session().addToSession([photo('portrait')])
+    session().patchFrame({ style: 'black', blurStrength: 10, backgroundBrightness: 100 })
+    session().beginFrameEdit()
+    session().patchFrame({ canvasLayout: 'portraitCard', portraitRatio: 4 / 5, portraitPhotoSize: 80, portraitVerticalPosition: 0, portraitBackgroundStyle: 'blurred', portraitBackgroundBlur: 40, portraitBackgroundBrightness: 90 })
+    session().endFrameEdit()
+    session().beginFrameEdit()
+    session().patchFrame({ portraitPhotoSize: 65, portraitVerticalPosition: -0.15 })
+    session().endFrameEdit()
+    session().undo()
+    expect(session().commonFrame).toMatchObject({ portraitPhotoSize: 80, portraitVerticalPosition: 0 })
+    session().redo()
+    session().patchFrame({ canvasLayout: 'standard' })
+    expect(session().commonFrame).toMatchObject({ style: 'black', blurStrength: 10, portraitBackgroundStyle: 'blurred', portraitBackgroundBlur: 40, portraitBackgroundBrightness: 90 })
+    session().patchFrame({ canvasLayout: 'portraitCard' })
+    expect(session().commonFrame).toMatchObject({ portraitPhotoSize: 65, portraitVerticalPosition: -0.15 })
+    const archive = JSON.parse(JSON.stringify(getSessionSnapshot()))
+    useSessionStore.setState(useSessionStore.getInitialState(), true)
+    restoreSessionSnapshot(archive)
+    expect(session().commonFrame).toMatchObject({ portraitRatio: 4 / 5, portraitPhotoSize: 65, portraitVerticalPosition: -0.15, portraitBackgroundBlur: 40, portraitBackgroundBrightness: 90 })
+  })
+
   test('undo prioritizes a reorder and a new shared edit leaves photo redo available', () => {
     session().addToSession([photo('a'), photo('b')])
     session().setEditMode('this')

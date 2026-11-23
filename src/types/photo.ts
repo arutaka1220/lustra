@@ -29,6 +29,15 @@ export type AspectPadding = Pick<FrameSettings, 'top' | 'bottom' | 'left' | 'rig
 export type AspectPaddingMap = Record<string, AspectPadding>
 
 export type FrameSettings = {
+  /** Canvas composition mode. Omitted in legacy sessions and interpreted as standard. */
+  canvasLayout?: 'standard' | 'portraitCard'
+  portraitRatio?: number
+  portraitPhotoSize?: number
+  portraitVerticalPosition?: number
+  portraitBackgroundStyle?: FrameStyle
+  portraitBackgroundCustomColor?: string
+  portraitBackgroundBlur?: number
+  portraitBackgroundBrightness?: number
   style: FrameStyle
   customColor?: string
   top: number

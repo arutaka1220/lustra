@@ -4,7 +4,7 @@ import { ImageOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { FrameSettings, SessionPhoto } from '../../types/photo'
 import { TextOverlay } from '../text/TextOverlay'
-import { canvasAspectRatio, fitCanvasToBounds, getPhotoLayout } from './frame-layout'
+import { canvasAspectRatio, effectiveFrameSettings, fitCanvasToBounds, getPhotoLayout } from './frame-layout'
 import type { Size } from './frame-layout'
 import { createCanvasRenderer, createFrameScene } from './frame-paint'
 import type { PhotoRaster, PreviewRenderer } from './frame-paint'
@@ -30,6 +30,9 @@ type FramePreviewProps = {
   onCropChange?: (crop: SessionPhoto['cropTransform']) => void
   onCropEditStart?: () => void
   onCropEditEnd?: () => void
+  onPortraitPositionChange?: (position: number) => void
+  onPortraitPositionEditStart?: () => void
+  onPortraitPositionEditEnd?: () => void
 }
 
 type LoadedPhoto = { url: string; raster?: PhotoRaster; error?: boolean }
@@ -50,7 +53,7 @@ function rasterizeImage(image: HTMLImageElement, maxEdge: number): PhotoRaster {
   return { image: canvas, width: canvas.width, height: canvas.height }
 }
 
-export function FramePreview({ photo, frame, compact = false, readOnly = false, onImageError, onRevealInspector, fallbackPreview, crop, cropMode: controlledCropMode, onCropModeChange, onCropChange, onCropEditStart, onCropEditEnd }: FramePreviewProps) {
+export function FramePreview({ photo, frame, compact = false, readOnly = false, onImageError, onRevealInspector, fallbackPreview, crop, cropMode: controlledCropMode, onCropModeChange, onCropChange, onCropEditStart, onCropEditEnd, onPortraitPositionChange, onPortraitPositionEditStart, onPortraitPositionEditEnd }: FramePreviewProps) {
   const { t } = useTranslation()
   const viewport = useRef<HTMLDivElement>(null)
   const surface = useRef<HTMLDivElement>(null)
@@ -97,6 +100,7 @@ export function FramePreview({ photo, frame, compact = false, readOnly = false, 
   const photoLayout = raster && getPhotoLayout(size, raster, frame)
   const paintRef = useRef<() => void>(() => {})
   const imageErrorRef = useRef(onImageError)
+  const portraitDrag = useRef<{ pointerId: number; startY: number; position: number; height: number } | null>(null)
 
   const scheduleDraw = useCallback(() => {
     if (animation.current) return
@@ -218,13 +222,38 @@ export function FramePreview({ photo, frame, compact = false, readOnly = false, 
 
   return (
     <div className={`framed-preview-viewport${compact ? ' framed-preview-viewport--compact' : ''}`} ref={viewport}>
-      <div className={`preview-board preview-board--${frame.style}${cropMode ? ' is-cropping' : ''}`} onDoubleClick={event => { const bounds = visible; const rect = event.currentTarget.getBoundingClientRect(); const x = event.clientX - rect.left, y = event.clientY - rect.top; const onPhoto = !!bounds && x >= bounds.x && x <= bounds.x + bounds.width && y >= bounds.y && y <= bounds.y + bounds.height; if (!interactive || !onPhoto || (event.target as HTMLElement).closest('.canvas-text, input, button, select')) return; if (document.documentElement.dataset.lustraPreviewDrag) return; initialCrop.current = crop; if (cropMode) onCropEditEnd?.(); else onCropEditStart?.(); changeCropMode(!cropMode) }} style={{ ...size, '--custom-frame-color': frame.customColor ?? '#000000' } as React.CSSProperties}>
-        <div className="framed-preview-surface" ref={surface} hidden={!raster || !seen || sourceMissing} role="img" aria-label={compact ? undefined : photo.name} aria-hidden={compact || undefined} />
+      <div className={`preview-board preview-board--${frame.style}${cropMode ? ' is-cropping' : ''}`} onPointerDown={event => {
+        const bounds = photoLayout?.visible
+        const rect = event.currentTarget.getBoundingClientRect()
+        const localX = event.clientX - rect.left, localY = event.clientY - rect.top
+        const onPhoto = !!bounds && localX >= bounds.x && localX <= bounds.x + bounds.width && localY >= bounds.y && localY <= bounds.y + bounds.height
+        if (!interactive || cropMode || frame.canvasLayout !== 'portraitCard' || !event.target || !(event.target as HTMLElement).closest('.framed-preview-surface') || !onPhoto || (event.target as HTMLElement).closest('.canvas-text, input, button, select')) return
+        portraitDrag.current = { pointerId: event.pointerId, startY: event.clientY, position: frame.portraitVerticalPosition ?? 0, height: size.height }
+        event.currentTarget.setPointerCapture(event.pointerId)
+        document.documentElement.dataset.lustraPreviewDrag = '1'
+        onPortraitPositionEditStart?.()
+      }} onPointerMove={event => {
+        const drag = portraitDrag.current
+        if (!drag || drag.pointerId !== event.pointerId || !drag.height) return
+        const next = Math.max(-0.5, Math.min(0.5, drag.position + (event.clientY - drag.startY) / drag.height))
+        onPortraitPositionChange?.(Number(next.toFixed(4)))
+      }} onPointerUp={event => {
+        if (portraitDrag.current?.pointerId !== event.pointerId) return
+        portraitDrag.current = null
+        delete document.documentElement.dataset.lustraPreviewDrag
+        onPortraitPositionEditEnd?.()
+      }} onPointerCancel={event => {
+        if (portraitDrag.current?.pointerId !== event.pointerId) return
+        portraitDrag.current = null
+        delete document.documentElement.dataset.lustraPreviewDrag
+        onPortraitPositionEditEnd?.()
+      }} onDoubleClick={event => { const bounds = visible; const rect = event.currentTarget.getBoundingClientRect(); const x = event.clientX - rect.left, y = event.clientY - rect.top; const onPhoto = !!bounds && x >= bounds.x && x <= bounds.x + bounds.width && y >= bounds.y && y <= bounds.y + bounds.height; if (!interactive || !onPhoto || (event.target as HTMLElement).closest('.canvas-text, input, button, select')) return; if (document.documentElement.dataset.lustraPreviewDrag) return; initialCrop.current = crop; if (cropMode) onCropEditEnd?.(); else onCropEditStart?.(); changeCropMode(!cropMode) }} style={{ ...size, '--custom-frame-color': frame.customColor ?? '#000000' } as React.CSSProperties}>
+        <div className="framed-preview-surface" ref={surface} hidden={!raster || !seen || sourceMissing} style={{ pointerEvents: frame.canvasLayout === 'portraitCard' && interactive && !cropMode ? 'auto' : 'none' }} role="img" aria-label={compact ? undefined : photo.name} aria-hidden={compact || undefined} />
         {!raster && fallbackPreview}
         {!raster && !fallbackPreview && smallPreview?.raster && !missing && <div className="preview-loading-thumb" aria-hidden="true"><PhotoThumbnailCanvas url={sourceUrl} fit="contain" /></div>}
         {sourceMissing || status?.error ? <span className="framed-preview-message"><ImageOff size={18} />{t('framePreview.unavailable')}</span> : highResolution?.error ? <span className="framed-preview-message preview-error" role="alert">{t('framePreview.previewError')}<button type="button" onClick={() => { setLoaded(undefined); setRetryKey(value => value + 1) }}>{t('framePreview.retry')}</button></span> : !raster && !smallPreview?.raster && !fallbackPreview && !compact && <span className="framed-preview-message" role="status">{t('framePreview.loading')}</span>}
-        {raster && !sourceMissing && seen && <TextOverlay photo={photo} frame={frame} interactive={interactive && !cropMode} imageBounds={visible} canvasSize={size} raster={raster} onRevealInspector={onRevealInspector} />}
-        {cropMode && interactive && visible && sourceRaster && <CropOverlay bounds={visible} crop={crop} source={sourceRaster.image} sourceWidth={sourceRaster.width} sourceHeight={sourceRaster.height} onChange={value => onCropChange?.({ ...value, rotation: value.rotation ?? crop?.rotation ?? 0 })} />}
+        {raster && !sourceMissing && seen && <TextOverlay photo={photo} frame={effectiveFrameSettings(frame)} interactive={interactive && !cropMode} imageBounds={visible} canvasSize={size} raster={raster} onRevealInspector={onRevealInspector} />}
+        {cropMode && interactive && photoLayout?.image && sourceRaster && <CropOverlay bounds={photoLayout.image} crop={crop} source={sourceRaster.image} sourceWidth={sourceRaster.width} sourceHeight={sourceRaster.height} onChange={value => onCropChange?.({ ...value, rotation: value.rotation ?? crop?.rotation ?? 0 })} />}
       </div>
     </div>
   )

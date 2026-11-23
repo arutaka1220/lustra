@@ -7,6 +7,7 @@ import { useInspectorSections } from './useInspectorSections'
 import type { FrameSettings } from '../../types/photo'
 import './frame-i18n'
 import { CustomColorPicker } from './CustomColorPicker'
+import { SelectField } from '../../components/ui/SelectField'
 import { writeAppPreference } from '../../store/session-persistence'
 import { setGlobalPaddingDefaults } from '../../store/session-store'
 
@@ -26,6 +27,7 @@ const oppositeSide = { top: 'bottom', bottom: 'top', left: 'right', right: 'left
 export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFrameEditEnd, children }: FrameControlsProps) {
   const { t } = useTranslation()
   const { isOpen, toggle } = useInspectorSections()
+  const isPortraitCard = frame.canvasLayout === 'portraitCard'
   const sliderGestures = { onChangeStart: onFrameEditStart, onChangeEnd: onFrameEditEnd }
   const patch = (changes: Partial<FrameSettings>) => {
     if (onPatch) {
@@ -47,6 +49,40 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
   }
   return (
     <div className="controls-scroll">
+      <InspectorSection title={t('framePreview.canvas')} open={isOpen('canvas')} onToggle={() => toggle('canvas')}>
+        <label className="portrait-canvas-field">
+          <span>{t('framePreview.canvasLayout')}</span>
+          <SelectField aria-label={t('framePreview.canvasLayout')} value={frame.canvasLayout ?? 'standard'} options={[
+            { value: 'standard', label: t('framePreview.standardLayout') },
+            { value: 'portraitCard', label: t('framePreview.portraitCardLayout') },
+          ]} onValueChange={value => {
+            const layout = value as 'standard' | 'portraitCard'
+            if (layout === 'portraitCard') {
+              patch({
+                canvasLayout: layout,
+                portraitRatio: frame.portraitRatio ?? 4 / 5,
+                portraitPhotoSize: frame.portraitPhotoSize ?? 80,
+                portraitVerticalPosition: frame.portraitVerticalPosition ?? 0,
+                portraitBackgroundStyle: frame.portraitBackgroundStyle ?? 'blurred',
+                portraitBackgroundCustomColor: frame.portraitBackgroundCustomColor ?? '#000000',
+                portraitBackgroundBlur: frame.portraitBackgroundBlur ?? 32,
+                portraitBackgroundBrightness: frame.portraitBackgroundBrightness ?? 90,
+              })
+            } else {
+              patch({ canvasLayout: layout })
+            }
+          }} />
+        </label>
+        {isPortraitCard && <label className="portrait-canvas-field">
+          <span>{t('framePreview.canvasRatio')}</span>
+          <SelectField aria-label={t('framePreview.canvasRatio')} value={String(frame.portraitRatio ?? 4 / 5)} options={[
+            { value: String(4 / 5), label: '4:5' },
+            { value: String(3 / 4), label: '3:4' },
+            { value: String(9 / 16), label: '9:16' },
+            { value: '1', label: '1:1' },
+          ]} onValueChange={value => onChange('portraitRatio', Number(value))} />
+        </label>}
+      </InspectorSection>
       <InspectorSection title={t('edit.frame')} open={isOpen('frame')} onToggle={() => toggle('frame')}>
         <div className="style-picker">
           {FRAME_STYLE_ORDER.map((style) => style === 'custom'
@@ -59,7 +95,7 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
         </div>
       </InspectorSection>
 
-      <InspectorSection title={t('edit.padding')} open={isOpen('padding')} onToggle={() => toggle('padding')}>
+      {frame.canvasLayout !== 'portraitCard' && <InspectorSection title={t('edit.padding')} open={isOpen('padding')} onToggle={() => toggle('padding')}>
         <p className="padding-help">{t('framePreview.paddingHelp')}</p>
         <p className="padding-help">{t('framePreview.paddingSameAspect')}</p>
         <button className="button button--quiet" type="button" onClick={() => {
@@ -73,10 +109,19 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
             <span>{t(`framePreview.${key}`)}</span><span className="toggle-state">{t(frame[key] ? 'framePreview.on' : 'framePreview.off')}</span>
           </button></header><div className="margin-control-grid">{(key === 'linkVertical' ? sides.slice(0, 2) : sides.slice(2)).map((side) => <SliderInput key={side} label={t(`framePreview.${side}`)} value={frame[side]} max={32} onChange={(value) => setPadding(side, value)} {...sliderGestures} />)}</div>
         </section>)}
-      </InspectorSection>
+      </InspectorSection>}
 
       <InspectorSection title={t('edit.appearance')} open={isOpen('effects')} onToggle={() => toggle('effects')}>
-        {frame.style === 'blurred' && <>
+        {isPortraitCard && <>
+          <SliderInput label={t('framePreview.photoSize')} value={frame.portraitPhotoSize ?? 80} min={40} max={90} unit="%" onChange={value => onChange('portraitPhotoSize', value)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.verticalPosition')} value={frame.portraitVerticalPosition ?? 0} min={-0.5} max={0.5} step={0.01} unit="" onChange={value => onChange('portraitVerticalPosition', value)} {...sliderGestures} />
+          <button className="button button--quiet portrait-reset-position" type="button" onClick={() => onChange('portraitVerticalPosition', 0)}>{t('framePreview.resetPosition')}</button>
+        </>}
+        {isPortraitCard && frame.style === 'blurred' && <>
+          <SliderInput label={t('framePreview.backgroundBlur')} value={frame.portraitBackgroundBlur ?? 32} max={40} unit="px" onChange={value => onChange('portraitBackgroundBlur', value)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.backgroundBrightness')} value={frame.portraitBackgroundBrightness ?? 90} min={60} max={140} onChange={value => onChange('portraitBackgroundBrightness', value)} {...sliderGestures} />
+        </>}
+        {frame.style === 'blurred' && !isPortraitCard && <>
           <SliderInput label={t('framePreview.blur')} value={frame.blurStrength} max={40} unit="px" onChange={(value) => onChange('blurStrength', value)} {...sliderGestures} />
           <SliderInput label={t('framePreview.brightness')} value={frame.backgroundBrightness} min={60} max={140} onChange={(value) => onChange('backgroundBrightness', value)} {...sliderGestures} />
           <SliderInput label={t('framePreview.opacity')} value={frame.backgroundOpacity ?? 100} max={100} onChange={(value) => onChange('backgroundOpacity', value)} {...sliderGestures} />
@@ -92,7 +137,7 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
           <SliderInput label={t('framePreview.edgeBlur')} value={frame.edgeStretchBlur ?? 8} max={40} unit="px" onChange={value => onChange('edgeStretchBlur', value)} {...sliderGestures} />
           <SliderInput label={t('framePreview.fade')} value={frame.edgeStretchFade ?? 12} max={40} unit="px" onChange={value => onChange('edgeStretchFade', value)} {...sliderGestures} />
         </>}
-        {(['showInset', 'showShadow'] as const).map((key) => <button className={`check-row ${frame[key] ? 'is-checked' : ''}`} key={key} onClick={() => onChange(key, !frame[key])} aria-pressed={frame[key]}>
+        {frame.canvasLayout !== 'portraitCard' && (['showInset', 'showShadow'] as const).map((key) => <button className={`check-row ${frame[key] ? 'is-checked' : ''}`} key={key} onClick={() => onChange(key, !frame[key])} aria-pressed={frame[key]}>
           <span className="check-box">{frame[key] && <Check size={13} aria-hidden="true" />}</span>
           <span><strong>{t(key === 'showInset' ? 'framePreview.inset' : 'framePreview.shadow')}</strong></span>
         </button>)}

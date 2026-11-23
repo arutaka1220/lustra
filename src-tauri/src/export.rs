@@ -170,6 +170,14 @@ enum FrameStyle {
 struct Frame {
     style: FrameStyle,
     #[serde(default)]
+    canvas_layout: String,
+    #[serde(default = "portrait_ratio_default")]
+    portrait_ratio: f64,
+    #[serde(default = "portrait_size_default")]
+    portrait_photo_size: f64,
+    #[serde(default)]
+    portrait_vertical_position: f64,
+    #[serde(default)]
     custom_color: Option<String>,
     top: f64,
     bottom: f64,
@@ -195,6 +203,13 @@ struct Frame {
     edge_stretch_blur: f64,
     #[serde(default = "edge_fade_default")]
     edge_stretch_fade: f64,
+}
+
+fn portrait_ratio_default() -> f64 {
+    0.8
+}
+fn portrait_size_default() -> f64 {
+    80.0
 }
 
 fn ambient_intensity_default() -> f64 {
@@ -266,6 +281,57 @@ fn layout(
 ) -> Result<Layout, String> {
     if source_width == 0 || source_height == 0 {
         return Err("Invalid image or canvas dimensions.".to_owned());
+    }
+
+    if frame.canvas_layout == "portraitCard" {
+        let ratio = if frame.portrait_ratio.is_finite() {
+            frame.portrait_ratio.clamp(0.2, 5.0)
+        } else {
+            0.8
+        };
+        let source_width = f64::from(source_width);
+        let source_height = f64::from(source_height);
+        let base_width = source_width;
+        let base_height = base_width / ratio;
+        let scale = match size {
+            ExportSize::Original(OriginalSize::Original) => 1.0,
+            ExportSize::ShortEdge(edge) if edge > 0 => {
+                f64::from(edge) / base_height.min(base_width)
+            }
+            ExportSize::ShortEdge(_) => return Err("Invalid export size.".to_owned()),
+        };
+        let width = (base_width * scale).round().max(1.0) as u32;
+        let height = (f64::from(width) / ratio).round().max(1.0) as u32;
+        if u64::from(width) * u64::from(height) > 90_000_000 || width > 32_768 || height > 32_768 {
+            return Err(
+                "The output dimensions are too large. Choose a smaller export size.".to_owned(),
+            );
+        }
+        let photo_width = f64::from(width) * frame.portrait_photo_size.clamp(40.0, 90.0) / 100.0;
+        let photo_height = photo_width * source_height / source_width;
+        let position = if frame.portrait_vertical_position.is_finite() {
+            frame.portrait_vertical_position.clamp(-0.5, 0.5)
+        } else {
+            0.0
+        };
+        let max_offset = (f64::from(height) + photo_height) / 2.0;
+        let image = Rect {
+            x: (f64::from(width) - photo_width) / 2.0,
+            y: (f64::from(height) - photo_height) / 2.0 + position * max_offset,
+            width: photo_width,
+            height: photo_height,
+        };
+        return Ok(Layout {
+            width,
+            height,
+            image,
+            visible_image: Rect {
+                x: 0.0,
+                y: 0.0,
+                width: f64::from(width),
+                height: f64::from(height),
+            },
+        });
     }
 
     if matches!(frame.style, FrameStyle::None) {
@@ -894,6 +960,10 @@ mod tests {
     fn frame() -> Frame {
         Frame {
             style: FrameStyle::Blurred,
+            canvas_layout: "standard".into(),
+            portrait_ratio: 0.8,
+            portrait_photo_size: 80.0,
+            portrait_vertical_position: 0.0,
             custom_color: None,
             top: 0.0,
             bottom: 0.0,
@@ -933,6 +1003,40 @@ mod tests {
         assert_eq!(output.image.y, f64::from(output.height) * 0.0);
         assert_eq!(output.visible_image.width, output.image.width);
         assert_eq!(output.visible_image.height, output.image.height);
+    }
+
+    #[test]
+    fn portrait_card_uses_canvas_ratio_photo_size_and_vertical_position() {
+        let mut frame = frame();
+        frame.canvas_layout = "portraitCard".into();
+        frame.portrait_ratio = 0.8;
+        frame.portrait_photo_size = 80.0;
+        frame.portrait_vertical_position = 0.0;
+        let result = layout(
+            &frame,
+            1600,
+            900,
+            ExportSize::Original(OriginalSize::Original),
+        )
+        .unwrap();
+        assert_eq!((result.width, result.height), (1600, 2000));
+        assert!((result.image.width - 1280.0).abs() < 0.01);
+        assert!((result.image.height - 720.0).abs() < 0.01);
+        assert!((result.image.x - 160.0).abs() < 0.01);
+        assert!((result.image.y - 640.0).abs() < 0.01);
+        frame.portrait_vertical_position = 0.5;
+        let moved = layout(
+            &frame,
+            1600,
+            900,
+            ExportSize::Original(OriginalSize::Original),
+        )
+        .unwrap();
+        assert!(moved.image.y > result.image.y);
+        assert!((moved.image.x - result.image.x).abs() < 0.01);
+        let scaled = layout(&frame, 1600, 900, ExportSize::ShortEdge(720)).unwrap();
+        assert_eq!((scaled.width, scaled.height), (720, 900));
+        assert!((scaled.image.width - 576.0).abs() < 0.01);
     }
 
     #[test]
@@ -1036,6 +1140,83 @@ mod tests {
                 );
             } else {
                 assert_eq!(pixel, expected);
+            }
+        }
+        assert_eq!(fs::read(path).unwrap(), SOURCE_PNG);
+    }
+
+    #[test]
+    fn portrait_card_native_export_has_a_vertical_canvas_and_background() {
+        let directory = ScratchDirectory::new();
+        let path = directory.0.join("portrait-source.png");
+        fs::write(&path, SOURCE_PNG).unwrap();
+        let mut export_frame = frame();
+        export_frame.canvas_layout = "portraitCard".into();
+        export_frame.portrait_ratio = 0.8;
+        export_frame.portrait_photo_size = 80.0;
+        export_frame.style = FrameStyle::Black;
+        let job = ExportJob {
+            path: path.clone(),
+            id: "portrait-native-export".to_owned(),
+            frame: export_frame,
+            crop: Crop::default(),
+            text: vec![],
+            metadata: MetadataCorrections {
+                camera: None,
+                lens: None,
+            },
+        };
+        let settings = ExportSettings {
+            format: ExportFormat::Png,
+            size: ExportSize::Original(OriginalSize::Original),
+            quality: 90,
+            keep_camera: false,
+            keep_lens: false,
+            keep_exposure: false,
+            keep_date: false,
+            keep_gps: false,
+            keep_serial: false,
+            apply_metadata_corrections: false,
+            color_space: ColorSpace::Srgb,
+        };
+        let bytes = platform::render(&path, &job, &settings).unwrap();
+        let mut decoder = png::Decoder::new(Cursor::new(bytes));
+        decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
+        let mut reader = decoder.read_info().unwrap();
+        let mut pixels = vec![0; reader.output_buffer_size().unwrap()];
+        let info = reader.next_frame(&mut pixels).unwrap();
+        assert!(
+            (f64::from(info.width) / f64::from(info.height) - 0.8).abs() < 0.1,
+            "unexpected rendered dimensions: {}x{}",
+            info.width,
+            info.height
+        );
+        assert_eq!(&pixels[0..3], &[0, 0, 0]);
+        for format in [ExportFormat::Jpeg, ExportFormat::Webp] {
+            if !platform::available(format) {
+                continue;
+            }
+            let settings = ExportSettings {
+                format,
+                size: ExportSize::ShortEdge(720),
+                quality: 90,
+                keep_camera: false,
+                keep_lens: false,
+                keep_exposure: false,
+                keep_date: false,
+                keep_gps: false,
+                keep_serial: false,
+                apply_metadata_corrections: false,
+                color_space: ColorSpace::Srgb,
+            };
+            let encoded = platform::render(&path, &job, &settings).unwrap();
+            match format {
+                ExportFormat::Jpeg => assert!(encoded.starts_with(&[0xff, 0xd8])),
+                ExportFormat::Webp => {
+                    assert!(encoded.starts_with(b"RIFF"));
+                    assert_eq!(&encoded[8..12], b"WEBP");
+                }
+                ExportFormat::Png => unreachable!(),
             }
         }
         assert_eq!(fs::read(path).unwrap(), SOURCE_PNG);
