@@ -14,6 +14,23 @@ const activeFrame = () => getEffectiveFrame(session().photos.find(({ id }) => id
 beforeEach(() => useSessionStore.setState(useSessionStore.getInitialState(), true))
 
 describe('session history and recovery', () => {
+  test('legacy preset fields are ignored while editing state restores and new snapshots omit them', () => {
+    session().addToSession([photo('legacy')])
+    session().patchFrame({ style: 'softBlack', top: 17 })
+    const archive = JSON.parse(JSON.stringify(getSessionSnapshot()))
+    archive.framePresets = { old: { style: 'white' } }
+    archive.active.framePresets = { old: { style: 'white' } }
+    archive.active.photos[0].cropPresets = { old: { ratio: '4:3' } }
+    useSessionStore.setState(useSessionStore.getInitialState(), true)
+    restoreSessionSnapshot(archive)
+    expect(session().commonFrame).toMatchObject({ style: 'softBlack' })
+    expect(session().photos[0].id).toBe('legacy')
+    const saved = getSessionSnapshot() as any
+    expect(saved.framePresets).toBeUndefined()
+    expect(saved.active.framePresets).toBeUndefined()
+    expect(saved.active.photos[0].cropPresets).toBeUndefined()
+  })
+
   test('crop geometry and rotation are one undoable edit and survive session snapshots', () => {
     session().addToSession([photo('crop')])
     session().setScreen('edit')

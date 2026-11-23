@@ -26,11 +26,6 @@ function parseAngle(value: string): number | undefined {
 export function CropControls({ crop: current, sourceWidth, sourceHeight, onChange, onApply, onCancel }: Props) {
   const { t } = useTranslation()
   const crop = { x: 0, y: 0, width: 1, height: 1, ratio: 'original' as const, locked: true, ...current, rotation: current?.rotation ?? 0 }
-  const [presets, setPresets] = useState<Record<string, CropRect>>(() => {
-    try { return JSON.parse(localStorage.getItem('lustra.crop-presets.v1') ?? '{}') as Record<string, CropRect> } catch { return {} }
-  })
-  const [presetName, setPresetName] = useState('')
-  const [selectedPreset, setSelectedPreset] = useState('')
   const [rotationDraft, setRotationDraft] = useState(() => formatAngle(crop.rotation))
   const editingRotation = useRef(false)
 
@@ -38,10 +33,6 @@ export function CropControls({ crop: current, sourceWidth, sourceHeight, onChang
     if (!editingRotation.current) setRotationDraft(formatAngle(crop.rotation))
   }, [crop.rotation])
 
-  const persistPresets = (next: Record<string, CropRect>) => {
-    setPresets(next)
-    try { localStorage.setItem('lustra.crop-presets.v1', JSON.stringify(next)) } catch { /* Storage may be unavailable in private contexts. */ }
-  }
   const updateRotation = (value: string) => {
     setRotationDraft(value)
     const angle = parseAngle(value)
@@ -56,20 +47,6 @@ export function CropControls({ crop: current, sourceWidth, sourceHeight, onChang
     }
     onChange({ ...crop, rotation: angle })
     setRotationDraft(formatAngle(angle))
-  }
-  const savePreset = () => {
-    const name = presetName.trim()
-    if (!name) return
-    persistPresets({ ...presets, [name]: structuredClone(crop) })
-    setSelectedPreset(name)
-  }
-  const loadPreset = (name: string) => {
-    setSelectedPreset(name)
-    if (!presets[name]) return
-    setPresetName(name)
-    const preset = structuredClone(presets[name])
-    const ratio = ratioValue(preset.ratio ?? 'original', sourceWidth, sourceHeight, preset.customRatio)
-    onChange(ratio ? fitCropRatio(preset, sourceWidth, sourceHeight, ratio) : preset)
   }
 
   return <div className="controls-scroll crop-controls" aria-label={t('crop.mode')}>
@@ -110,18 +87,6 @@ export function CropControls({ crop: current, sourceWidth, sourceHeight, onChang
       </div>
       <output className="crop-controls__angle-readout" aria-label={t('crop.rotationValue')} aria-live="polite">{formatAngle(crop.rotation)}°</output>
       <button type="button" className="button button--quiet crop-controls__reset" aria-label={t('crop.resetRotation')} onClick={() => onChange({ ...crop, rotation: 0 })}>{t('crop.resetRotation')}</button>
-    </section>
-
-    <section className="crop-controls__section crop-controls__presets">
-      <h3>{t('crop.presetSection')}</h3>
-      <label className="field-label">{t('crop.presetName')}<input value={presetName} onChange={event => setPresetName(event.target.value)} placeholder={t('crop.presetName')} /></label>
-      <button type="button" className="button button--quiet" disabled={!presetName.trim()} onClick={savePreset}>{t('crop.savePreset')}</button>
-      <label className="field-label">{t('crop.presets')}
-        <select aria-label={t('crop.presets')} value={selectedPreset} onChange={event => loadPreset(event.target.value)}>
-          <option value="">{t('crop.loadPreset')}</option>{Object.keys(presets).map(name => <option key={name} value={name}>{name}</option>)}
-        </select>
-      </label>
-      <button type="button" className="button button--quiet" disabled={!selectedPreset || !presets[selectedPreset]} onClick={() => persistPresets({ ...presets, [selectedPreset]: structuredClone(crop) })}>{t('crop.update')}</button>
     </section>
 
     <div className="crop-controls__actions">

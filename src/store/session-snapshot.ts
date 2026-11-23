@@ -74,7 +74,9 @@ function migrateLegacyWhite(workspace: StoredWorkspace): StoredWorkspace {
 
 function serializePhoto(photo: SessionPhoto): StoredPhoto | undefined {
   if (photo.source.kind !== 'path') return undefined
-  return { ...photo, source: { kind: 'path', path: photo.source.path } }
+  // Discard legacy user-saved preset payloads without touching current edit data.
+  const { cropPresets: _cropPresets, framePresets: _framePresets, presets: _presets, ...current } = photo as SessionPhoto & Record<string, unknown>
+  return { ...current, source: { kind: 'path', path: photo.source.path } } as StoredPhoto
 }
 
 function stableLayout(layout: SessionLayout, validIds: Set<string>): SessionLayout {
@@ -114,6 +116,7 @@ function serializeEntry(entry: HistoryEntry, validIds: Set<string>): HistoryEntr
 }
 
 export function serializeWorkspace(workspace: SessionWorkspace): StoredWorkspace {
+  const { framePresets: _framePresets, presets: _presets, ...currentWorkspace } = workspace as SessionWorkspace & Record<string, unknown>
   const photos = workspace.photos.flatMap((photo) => {
     const stored = serializePhoto(photo)
     return stored ? [stored] : []
@@ -131,7 +134,7 @@ export function serializeWorkspace(workspace: SessionWorkspace): StoredWorkspace
   const serializeSeries = ({ undo, redo }: SessionHistory['common']) => ({ undo: undo.flatMap(serialize), redo: redo.flatMap(serialize) })
 
   return {
-    ...workspace,
+    ...currentWorkspace,
     photos,
     removedPhotos,
     activePhotoId: photos.find(({ id }) => id === workspace.activePhotoId)?.id ?? photos[0]?.id ?? null,

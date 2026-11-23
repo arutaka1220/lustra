@@ -44,7 +44,6 @@ i18n.addResources('en', 'translation', {
   'framePreview.inset': 'Fine inner border',
   'framePreview.shadow': 'Soft shadow',
   'crop.mode': 'Crop & Rotate', 'crop.ratio': 'Ratio', 'crop.aspectRatio': 'Aspect Ratio', 'crop.customRatio': 'Custom ratio', 'crop.lock': 'Lock ratio', 'crop.rotation': 'Rotation', 'crop.rotationValue': 'Rotation angle',
-  'crop.presetSection': 'Crop Preset', 'crop.presetName': 'Preset name', 'crop.presets': 'Crop presets', 'crop.save': 'Save preset', 'crop.savePreset': 'Save preset', 'crop.loadPreset': 'Load preset…', 'crop.update': 'Update preset',
   'crop.apply': 'Apply', 'crop.cancel': 'Cancel', 'crop.resetRotation': 'Reset rotation',
 })
 
@@ -92,6 +91,5 @@ i18n.addResources('ja', 'translation', {
   'framePreview.inset': '細い内枠',
   'framePreview.shadow': '柔らかい影',
   'crop.mode': 'クロップ・回転', 'crop.ratio': '比率', 'crop.aspectRatio': 'アスペクト比', 'crop.customRatio': 'カスタム比率', 'crop.lock': '比率を固定', 'crop.rotation': '回転', 'crop.rotationValue': '回転角度',
-  'crop.presetSection': 'Crop Preset', 'crop.presetName': 'プリセット名', 'crop.presets': 'Crop Preset', 'crop.save': '保存', 'crop.savePreset': 'プリセットを保存', 'crop.loadPreset': 'プリセットを読み込み…', 'crop.update': 'プリセットを更新',
   'crop.apply': '適用', 'crop.cancel': 'キャンセル', 'crop.resetRotation': '回転をリセット',
 })

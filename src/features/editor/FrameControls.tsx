@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import { Check, Link2, Link2Off } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { SliderInput } from './SliderInput'
@@ -26,15 +26,6 @@ const oppositeSide = { top: 'bottom', bottom: 'top', left: 'right', right: 'left
 export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFrameEditEnd, children }: FrameControlsProps) {
   const { t } = useTranslation()
   const { isOpen, toggle } = useInspectorSections()
-  const [presets, setPresets] = useState<Record<string, FrameSettings>>(() => {
-    try { return JSON.parse(localStorage.getItem('lustra.frame-presets.v1') ?? '{}') as Record<string, FrameSettings> } catch { return {} }
-  })
-  const [presetName, setPresetName] = useState('')
-  const [selectedPreset, setSelectedPreset] = useState('')
-  const persistPresets = (next: Record<string, FrameSettings>) => {
-    setPresets(next)
-    try { localStorage.setItem('lustra.frame-presets.v1', JSON.stringify(next)) } catch (error) { console.warn('Could not save frame presets', error) }
-  }
   const sliderGestures = { onChangeStart: onFrameEditStart, onChangeEnd: onFrameEditEnd }
   const patch = (changes: Partial<FrameSettings>) => {
     if (onPatch) {
@@ -85,18 +76,6 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
       </InspectorSection>
 
       <InspectorSection title={t('edit.appearance')} open={isOpen('effects')} onToggle={() => toggle('effects')}>
-        <section className="frame-presets" aria-label="Frame presets">
-          <label className="field-label">Preset name<input value={presetName} onChange={event => setPresetName(event.target.value)} /></label>
-          <div className="frame-presets__actions">
-            <button type="button" className="button button--quiet" disabled={!presetName.trim()} onClick={() => {
-              const name = presetName.trim(); persistPresets({ ...presets, [name]: structuredClone(frame) }); setSelectedPreset(name)
-            }}>Save preset</button>
-            <select aria-label="Saved frame presets" value={selectedPreset} onChange={event => {
-              const name = event.target.value; setSelectedPreset(name); if (name && presets[name]) { setPresetName(name); patch(structuredClone(presets[name])) }
-            }}><option value="">Load preset…</option>{Object.keys(presets).map(name => <option key={name} value={name}>{name}</option>)}</select>
-            <button type="button" className="button button--quiet" disabled={!selectedPreset || !presets[selectedPreset]} onClick={() => persistPresets({ ...presets, [selectedPreset]: structuredClone(frame) })}>Update preset</button>
-          </div>
-        </section>
         {frame.style === 'blurred' && <>
           <SliderInput label={t('framePreview.blur')} value={frame.blurStrength} max={40} unit="px" onChange={(value) => onChange('blurStrength', value)} {...sliderGestures} />
           <SliderInput label={t('framePreview.brightness')} value={frame.backgroundBrightness} min={60} max={140} onChange={(value) => onChange('backgroundBrightness', value)} {...sliderGestures} />
