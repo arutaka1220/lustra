@@ -18,7 +18,7 @@ export type PhotoSource =
   | { kind: 'path'; path: string; url: string; missing?: boolean }
   | { kind: 'file'; file: File; url: string }
 
-export type FrameStyle = 'black' | 'white' | 'softBlack' | 'softWhite' | 'blurred' | 'custom' | 'ambientGradient'
+export type FrameStyle = 'black' | 'white' | 'softBlack' | 'softWhite' | 'blurred' | 'custom' | 'ambientGradient' | 'edgeStretch'
 
 export type LinkedPaddingRestore = {
   vertical?: { top: number; bottom: number }
@@ -46,6 +46,9 @@ export type FrameSettings = {
   ambientSoftness?: number
   ambientBrightness?: number
   ambientColorSource?: 'fullImage' | 'edges'
+  edgeStretchMode?: 'extend' | 'mirror'
+  edgeStretchBlur?: number
+  edgeStretchFade?: number
   showInset: boolean
   showShadow: boolean
   textElements?: TextElement[]

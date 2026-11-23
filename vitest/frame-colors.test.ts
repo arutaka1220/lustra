@@ -10,6 +10,6 @@ describe('frame color defaults', () => {
     expect(FRAME_COLORS.softBlack).toBe('#242424')
   })
   it('keeps the established styles and adds Ambient Gradient in the same picker', () => {
-    expect(FRAME_STYLE_ORDER).toEqual(['black', 'white', 'blurred', 'softBlack', 'softWhite', 'ambientGradient', 'custom'])
+    expect(FRAME_STYLE_ORDER).toEqual(['black', 'white', 'blurred', 'softBlack', 'softWhite', 'ambientGradient', 'edgeStretch', 'custom'])
   })
 })

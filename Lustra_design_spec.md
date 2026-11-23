@@ -641,3 +641,10 @@ v0.3時点での仕様を記録した説明。最新の確定内容は本文と�
 - FrameSettingsのambientIntensity、ambientSoftness、ambientBrightness、ambientColorSourceを保存する。新規作成時と欠損フィールドは85、65、0、Full Imageを既定値として扱う。保存済みの数値は変更しない。
 - 抽出した色を位置重心に基づいて滑らかに補間し、Intensityに応じて色彩を控えめに強調する。プレビューとmacOS書き出しは同じ抽出色・空間配置・強調率を用いる。
 - Frame inspectorに名前付きPresetの保存、適用、更新を置き、FrameSettings全体をアプリのローカルストレージへ永続化する。
+
+### PR #2（2026-11-23）Edge Stretch
+
+- Edge StretchはFrame選択欄の同階層に置き、選択中だけStretch Mode、Blur、FadeをAppearanceに表示する。既定値はExtend、Blur 8、Fade 12。Blur/Fadeの範囲は0–40。
+- 背景は中央写真とは別レイヤーに描く。Padding後の表示画像境界を基準に各辺の端ピクセルを延長し、Mirrorでは境界からの距離を反射する。角はX/Yの反射または端値複製を両軸で合成する。Fit/Fillで見える画像領域を基準にする。
+- プレビュー・書き出しの作業解像度は長辺640px以下に制限し、背景レイヤーのみBlurする。写真中央は従来のシャープな描画経路を維持する。設定はFrameSettingsに保持し、既存のUndo/Redo、写真単位上書き、Preset、session snapshotの仕組みを使う。
+- macOSのJPEG/PNG/WebPエンコーダー共通の合成前に背景を生成する。旧Frame JSONにEdge Stretch設定がない場合はExtend/8/12を使う。

@@ -14,6 +14,21 @@ const activeFrame = () => getEffectiveFrame(session().photos.find(({ id }) => id
 beforeEach(() => useSessionStore.setState(useSessionStore.getInitialState(), true))
 
 describe('session history and recovery', () => {
+  test('Edge Stretch settings survive per-photo edits, undo/redo, and session restoration', () => {
+    session().addToSession([photo('edge')])
+    session().setEditMode('this')
+    session().beginFrameEdit()
+    session().patchFrame({ style: 'edgeStretch', edgeStretchMode: 'mirror', edgeStretchBlur: 19, edgeStretchFade: 7 })
+    session().endFrameEdit()
+    expect(session().photos[0].overrides).toMatchObject({ style: 'edgeStretch', edgeStretchMode: 'mirror', edgeStretchBlur: 19, edgeStretchFade: 7 })
+    session().undo()
+    expect(session().photos[0].overrides).toEqual({})
+    session().redo()
+    const archive = JSON.parse(JSON.stringify(getSessionSnapshot()))
+    useSessionStore.setState(useSessionStore.getInitialState(), true)
+    restoreSessionSnapshot(archive)
+    expect(session().photos[0].overrides).toMatchObject({ style: 'edgeStretch', edgeStretchMode: 'mirror', edgeStretchBlur: 19, edgeStretchFade: 7 })
+  })
   test('Ambient Gradient settings survive undo, redo, and session snapshot restoration', () => {
     session().addToSession([photo('ambient')])
     session().setScreen('edit')

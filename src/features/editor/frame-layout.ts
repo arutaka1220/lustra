@@ -9,6 +9,7 @@ export const FRAME_COLORS = {
   softBlack: '#242424',
   softWhite: '#fafaf8',
   blurred: '#454842',
+  edgeStretch: '#454842',
   custom: '#000000',
   ambientGradient: '#777777',
 } satisfies Record<FrameSettings['style'], string>

@@ -3,6 +3,7 @@
 #import <Foundation/Foundation.h>
 #import <ImageIO/ImageIO.h>
 #include <stdint.h>
+#include <string.h>
 #include <sys/sysctl.h>
 
 typedef struct {
@@ -31,6 +32,9 @@ typedef struct {
     double ambient_softness;
     double ambient_brightness;
     uint32_t ambient_edges;
+    uint32_t edge_mode;
+    double edge_blur;
+    double edge_fade;
 } LustraRenderSettings;
 
 typedef struct {
@@ -226,6 +230,65 @@ static void box_blur(
     }
 }
 
+static bool draw_edge_stretch(CGContextRef context, const LustraImage *photo,
+    const LustraRenderSettings *s, CGColorSpaceRef srgb) {
+    const double scale = fmin(1.0, 640.0 / fmax(s->width, s->height));
+    const uint32_t w = (uint32_t)fmax(1, round(s->width * scale));
+    const uint32_t h = (uint32_t)fmax(1, round(s->height * scale));
+    CGContextRef layer = create_context(w, h, srgb);
+    if (!layer) return false;
+    CGRect image = canvas_rect(s->image, s->height);
+    CGRect visible = canvas_rect(s->visible, s->height);
+    image = CGRectMake(image.origin.x*scale, image.origin.y*scale, image.size.width*scale, image.size.height*scale);
+    visible = CGRectMake(visible.origin.x*scale, visible.origin.y*scale, visible.size.width*scale, visible.size.height*scale);
+    draw_oriented(layer, photo, image);
+    uint8_t *pixels = CGBitmapContextGetData(layer);
+    size_t bytes = (size_t)w*h*4;
+    uint8_t *source = malloc(bytes);
+    if (!pixels || !source) { free(source); CGContextRelease(layer); return false; }
+    memcpy(source, pixels, bytes);
+    int left = (int)floor(visible.origin.x), right = (int)ceil(CGRectGetMaxX(visible))-1;
+    int bottom = (int)floor(visible.origin.y), top = (int)ceil(CGRectGetMaxY(visible))-1;
+    left = left < 0 ? 0 : left; right = right >= (int)w ? (int)w-1 : right;
+    bottom = bottom < 0 ? 0 : bottom; top = top >= (int)h ? (int)h-1 : top;
+    if (left > right || bottom > top) { free(source); CGContextRelease(layer); return false; }
+    for (int y=0; y<(int)h; y++) for (int x=0; x<(int)w; x++) {
+        if (x>=left && x<=right && y>=bottom && y<=top) continue;
+        int sx=x, sy=y;
+        if (s->edge_mode) {
+            if (x<left) sx=left+(left-x-1)%(right-left+1);
+            if (x>right) sx=right-(x-right-1)%(right-left+1);
+            if (y<bottom) sy=bottom+(bottom-y-1)%(top-bottom+1);
+            if (y>top) sy=top-(y-top-1)%(top-bottom+1);
+        } else { sx=x<left?left:(x>right?right:x); sy=y<bottom?bottom:(y>top?top:y); }
+        size_t dst=((size_t)y*w+x)*4, src=((size_t)sy*w+sx)*4;
+        double distance=fmax(x<left?left-x:x>right?x-right:0, y<bottom?bottom-y:y>top?y-top:0);
+        double fade=s->edge_fade*fmin(s->width,s->height)/1080.0*scale;
+        double t=fade>0?fmax(0,fmin(1,1-distance/fade)):0;
+        double weight=t*t*(3-2*t);
+        int depth=(int)fmax(1,round(fade));
+        int ix=x<left?left+depth:x>right?right-depth:sx;
+        int iy=y<bottom?bottom+depth:y>top?top-depth:sy;
+        ix=ix<left?left:(ix>right?right:ix); iy=iy<bottom?bottom:(iy>top?top:iy);
+        size_t inward=((size_t)iy*w+ix)*4;
+        for(int c=0;c<4;c++) pixels[dst+c]=(uint8_t)(source[src+c]*(1-weight)+source[inward+c]*weight);
+    }
+    free(source);
+    double blur=s->edge_blur*fmin(s->width,s->height)/1080.0*scale;
+    if (blur>=0.5) {
+        uint8_t *tmp=malloc(bytes); if (!tmp) { CGContextRelease(layer); return false; }
+        int radius=(int)round(blur);
+        for(int i=0;i<3;i++){ box_blur(pixels,tmp,w,h,4,w*4,radius); box_blur(tmp,pixels,h,w,w*4,4,radius); }
+        free(tmp);
+    }
+    CGImageRef image_ref=CGBitmapContextCreateImage(layer);
+    CGContextRelease(layer);
+    if (!image_ref) return false;
+    CGContextDrawImage(context, CGRectMake(0,0,s->width,s->height), image_ref);
+    CGImageRelease(image_ref);
+    return true;
+}
+
 static bool draw_background(
     CGContextRef context,
     const LustraImage *photo,
@@ -242,6 +305,7 @@ static bool draw_background(
     CGContextSetFillColorWithColor(context, color);
     CGContextFillRect(context, full);
     CGColorRelease(color);
+    if (settings->style == 7) return draw_edge_stretch(context, photo, settings, srgb);
     if (settings->style == 6) {
         CGContextRef sample = create_context(96, 96, srgb);
         if (sample == NULL) return false;
