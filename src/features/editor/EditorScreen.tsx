@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
 import { ArrowLeft, ArrowRight, Check, FileSearch } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useSessionStore, getEffectiveFrame } from '../../store/session-store'
-import type { FrameSettings } from '../../types/photo'
+import type { FrameSettings, SessionPhoto } from '../../types/photo'
 import { pickImageFiles, pickImageFolder } from '../import/photo-picker'
 import { TextInspector } from '../text/TextInspector'
 import { Filmstrip } from './Filmstrip'
 import { FramePreview } from './FramePreview'
 import { FrameControls } from './FrameControls'
+import { CropControls } from './CropControls'
 import { prefetchEditPreview, previewNeighborIndices } from './preview-cache'
 import { useFilmstripLayout } from '../../hooks/useFilmstripLayout'
 
@@ -35,6 +36,7 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
   const beginFrameEdit = useSessionStore((state) => state.beginFrameEdit)
   const endFrameEdit = useSessionStore((state) => state.endFrameEdit)
   const setCompleted = useSessionStore((state) => state.setCompleted)
+  const setPhotoCrop = useSessionStore((state) => state.setPhotoCrop)
   const doneNext = useSessionStore((state) => state.doneNext)
   const nextPhoto = useSessionStore((state) => state.nextPhoto)
   const previousPhoto = useSessionStore((state) => state.previousPhoto)
@@ -47,6 +49,8 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
   const relink = useSessionStore((state) => state.relinkPhoto)
   const [relinkError, setRelinkError] = useState<{ id: string; key: string } | null>(null)
   const [locating, setLocating] = useState(false)
+  const [cropMode, setCropMode] = useState(false)
+  const initialCrop = useRef<SessionPhoto['cropTransform']>(undefined)
   const frame = useMemo(() => getEffectiveFrame(activePhoto, commonFrame), [activePhoto, commonFrame])
   const controlsFrame = editMode === 'all' ? getEffectiveFrame(activePhoto, commonFrame) : frame
   const index = Math.max(0, photos.findIndex((photo) => photo.id === activePhoto?.id))
@@ -100,6 +104,7 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
     <main className={`editor-layout ${inspectorOpen ? '' : 'editor-layout--inspector-collapsed'}`} style={layoutStyle}>
       {inspectorOpen && <>
         <aside className="settings-panel" aria-label={t('edit.inspector')}>
+          <div className="editor-normal-controls" hidden={cropMode}>
           <div className="scope-control">
             <span className="scope-control__label">{t('edit.applyTo')}</span>
             <div className="scope-tabs" role="group" aria-label={t('edit.applyTo')}>
@@ -117,6 +122,8 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
           >
             <TextInspector photo={photo} frame={controlsFrame} />
           </FrameControls>
+          </div>
+          {cropMode && <CropControls crop={photo.cropTransform} sourceWidth={photo.imageWidth ?? 1} sourceHeight={photo.imageHeight ?? 1} onChange={crop => setPhotoCrop(photo.id, { ...crop, rotation: crop.rotation ?? photo.cropTransform?.rotation ?? 0 })} onApply={() => { endFrameEdit(); setCropMode(false) }} onCancel={() => { setPhotoCrop(photo.id, initialCrop.current); endFrameEdit(); setCropMode(false) }} />}
         </aside>
         <div
           className="inspector-resizer"
@@ -156,7 +163,7 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
         <div className="preview-stage-wrap">
           <div className="preview-stage-content">
             {photo.source.url
-              ? <FramePreview photo={photo} frame={frame} onImageError={() => markMissing(photo.id, photo.source)} onRevealInspector={onRevealInspector} />
+              ? <FramePreview photo={photo} frame={frame} crop={photo.cropTransform} cropMode={cropMode} onCropModeChange={active => { if (active) initialCrop.current = photo.cropTransform; setCropMode(active) }} onCropChange={crop => setPhotoCrop(photo.id, crop)} onCropEditStart={beginFrameEdit} onCropEditEnd={endFrameEdit} onImageError={() => markMissing(photo.id, photo.source)} onRevealInspector={onRevealInspector} />
               : <div className="relink-card">
                 <FileSearch size={26} />
                 <strong>{t('session.sourceMissing')}</strong>

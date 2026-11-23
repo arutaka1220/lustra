@@ -28,6 +28,7 @@ export type ExportJob = {
   id: string
   path: string
   frame: FrameSettings
+  crop?: { x: number; y: number; width: number; height: number; rotation: number; ratio?: string; locked?: boolean; customRatio?: number }
   text: TextDrawRecipe[]
   metadata?: { camera?: string; lens?: string }
 }

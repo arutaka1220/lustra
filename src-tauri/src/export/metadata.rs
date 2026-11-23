@@ -191,8 +191,23 @@ pub fn webp_with_profile(
     if !original.starts_with(b"RIFF") || original.get(8..12) != Some(b"WEBP") {
         return Err("The WebP encoder produced an invalid file.".to_owned());
     }
-    // The export canvas is opaque, so libwebp emits a single lossy VP8 chunk.
-    if original.get(12..16) != Some(b"VP8 ") {
+    if original.get(12..16) == Some(b"VP8X") {
+        if original.len() < 30 {
+            return Err("The WebP encoder produced an invalid extended file.".to_owned());
+        }
+        let mut bytes = original;
+        if !profile.is_empty() && bytes[20] & 0x20 == 0 {
+            let mut icc_chunk = Vec::new();
+            push_webp_chunk(&mut icc_chunk, b"ICCP", profile)?;
+            bytes.splice(30..30, icc_chunk);
+            bytes[20] |= 0x20;
+        }
+        set_riff_length(&mut bytes)?;
+        return Ok(bytes);
+    }
+    // libwebp can choose lossy VP8 or lossless VP8L for RGBA input.
+    let pixel_chunk = original.get(12..16);
+    if pixel_chunk != Some(b"VP8 ") && pixel_chunk != Some(b"VP8L") {
         return Err("The WebP encoder produced an unexpected pixel chunk.".to_owned());
     }
     let mut bytes = b"RIFF\0\0\0\0WEBP".to_vec();

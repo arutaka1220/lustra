@@ -61,7 +61,8 @@ function centerRect(bounds: FrameRect, width: number, height: number): FrameRect
 /** Add padding around the complete, uncropped source image. */
 export function getPhotoLayout(canvas: Size, source: Size, frame: FrameSettings) {
   if (frame.style === 'none') {
-    const image = centerRect({ ...canvas, x: 0, y: 0 }, canvas.width, canvas.height)
+    const scale = Math.min(canvas.width / source.width, canvas.height / source.height)
+    const image = centerRect({ ...canvas, x: 0, y: 0 }, source.width * scale, source.height * scale)
     return { image, visible: image, overflowX: 0, overflowY: 0 }
   }
   const fractions = innerFractions(frame)

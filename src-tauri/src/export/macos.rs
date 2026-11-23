@@ -32,6 +32,11 @@ struct NativeRenderSettings {
     edge_mode: u32,
     edge_blur: f64,
     edge_fade: f64,
+    crop_x: f64,
+    crop_y: f64,
+    crop_width: f64,
+    crop_height: f64,
+    rotation: f64,
 }
 
 #[repr(C)]
@@ -135,7 +140,26 @@ pub fn render(path: &Path, job: &ExportJob, settings: &ExportSettings) -> Result
         )
     };
     let photo = NativeImage(NonNull::new(photo).ok_or_else(|| error_message(error))?);
-    let layout = layout(&job.frame, source_width, source_height, settings.size)?;
+    let crop = job.crop;
+    let crop_x = crop.x.clamp(0.0, 0.999);
+    let crop_y = crop.y.clamp(0.0, 0.999);
+    let crop_width = crop.width.clamp(0.001, 1.0 - crop_x);
+    let crop_height = crop.height.clamp(0.001, 1.0 - crop_y);
+    let crop_source_width = (f64::from(source_width) * crop_width).round().max(1.0) as u32;
+    let crop_source_height = (f64::from(source_height) * crop_height).round().max(1.0) as u32;
+    let mut layout = layout(&job.frame, source_width, source_height, settings.size)?;
+    let crop_aspect = f64::from(crop_source_width) / f64::from(crop_source_height);
+    let image_aspect = layout.image.width / layout.image.height;
+    if crop_aspect > image_aspect {
+        let height = layout.image.width / crop_aspect;
+        layout.image.y += (layout.image.height - height) / 2.0;
+        layout.image.height = height;
+    } else {
+        let width = layout.image.height * crop_aspect;
+        layout.image.x += (layout.image.width - width) / 2.0;
+        layout.image.width = width;
+    }
+    layout.visible_image = layout.image;
     if settings.format == ExportFormat::Webp && (layout.width > 16_383 || layout.height > 16_383) {
         return Err(
             "WebP is limited to 16,383 pixels on each side. Choose a smaller size.".to_owned(),
@@ -177,6 +201,15 @@ pub fn render(path: &Path, job: &ExportJob, settings: &ExportSettings) -> Result
         edge_mode: u32::from(job.frame.edge_stretch_mode == "mirror"),
         edge_blur: job.frame.edge_stretch_blur.clamp(0.0, 40.0),
         edge_fade: job.frame.edge_stretch_fade.clamp(0.0, 40.0),
+        crop_x,
+        crop_y,
+        crop_width,
+        crop_height,
+        rotation: if crop.rotation.is_finite() {
+            crop.rotation.clamp(-3600.0, 3600.0)
+        } else {
+            0.0
+        },
     };
 
     let text_data = job

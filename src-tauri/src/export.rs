@@ -105,9 +105,40 @@ pub struct ExportJob {
     path: PathBuf,
     frame: Frame,
     #[serde(default)]
+    crop: Crop,
+    #[serde(default)]
     text: Vec<TextItem>,
     #[serde(default)]
     metadata: MetadataCorrections,
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Crop {
+    #[serde(default)]
+    x: f64,
+    #[serde(default)]
+    y: f64,
+    #[serde(default = "one")]
+    width: f64,
+    #[serde(default = "one")]
+    height: f64,
+    #[serde(default)]
+    rotation: f64,
+}
+fn one() -> f64 {
+    1.0
+}
+impl Default for Crop {
+    fn default() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.0,
+            width: 1.0,
+            height: 1.0,
+            rotation: 0.0,
+        }
+    }
 }
 
 #[derive(Clone, Default, Deserialize)]
@@ -980,6 +1011,7 @@ mod tests {
                 path: path.clone(),
                 id: "frame-color-pixel".to_owned(),
                 frame: export_frame,
+                crop: Crop::default(),
                 text: vec![],
                 metadata: MetadataCorrections {
                     camera: None,
@@ -1044,6 +1076,83 @@ mod tests {
         .unwrap();
         assert_eq!(item.opacity, None);
         assert_eq!(item.anchor_mode, None);
+    }
+
+    #[test]
+    fn crop_defaults_for_legacy_jobs_and_clamps_geometry() {
+        let legacy: Crop = serde_json::from_str("{}").unwrap();
+        assert_eq!(
+            (
+                legacy.x,
+                legacy.y,
+                legacy.width,
+                legacy.height,
+                legacy.rotation
+            ),
+            (0.0, 0.0, 1.0, 1.0, 0.0)
+        );
+        let crop: Crop = serde_json::from_value(
+            serde_json::json!({"x":0.8,"y":0.1,"width":1.0,"height":0.5,"rotation":12.75}),
+        )
+        .unwrap();
+        assert_eq!(crop.rotation, 12.75);
+        assert!((crop.width.clamp(0.001, 1.0 - crop.x) - 0.2).abs() < 1e-12);
+    }
+
+    #[test]
+    fn crop_changes_original_output_dimensions_without_mutating_source() {
+        let directory = ScratchDirectory::new();
+        let path = directory.0.join("crop-source.png");
+        fs::write(&path, SOURCE_PNG).unwrap();
+        let source_before = fs::read(&path).unwrap();
+        let mut export_frame = frame();
+        export_frame.style = FrameStyle::None;
+        let job = ExportJob {
+            id: "crop-test".into(),
+            path: path.clone(),
+            frame: export_frame,
+            crop: Crop {
+                x: 0.0,
+                y: 0.0,
+                width: 0.5,
+                height: 1.0,
+                rotation: 12.75,
+            },
+            text: vec![],
+            metadata: MetadataCorrections::default(),
+        };
+        let mut settings = ExportSettings {
+            format: ExportFormat::Png,
+            size: ExportSize::Original(OriginalSize::Original),
+            quality: 90,
+            keep_camera: false,
+            keep_lens: false,
+            keep_exposure: false,
+            keep_date: false,
+            keep_gps: false,
+            keep_serial: false,
+            apply_metadata_corrections: false,
+            color_space: ColorSpace::Srgb,
+        };
+        for format in [ExportFormat::Png, ExportFormat::Jpeg, ExportFormat::Webp] {
+            settings.format = format;
+            let bytes = platform::render(&path, &job, &settings).unwrap();
+            match format {
+                ExportFormat::Png => {
+                    let decoder = png::Decoder::new(Cursor::new(bytes));
+                    let info = decoder.read_info().unwrap().info().clone();
+                    assert_eq!((info.width, info.height), (3, 2));
+                }
+                ExportFormat::Jpeg => assert!(bytes.starts_with(&[0xff, 0xd8])),
+                ExportFormat::Webp => {
+                    assert!(bytes.starts_with(b"RIFF"));
+                    assert_eq!(&bytes[8..12], b"WEBP");
+                    assert_eq!(&bytes[12..16], b"VP8X");
+                    assert_ne!(bytes[20] & 0x20, 0);
+                }
+            }
+        }
+        assert_eq!(fs::read(path).unwrap(), source_before);
     }
 
     #[test]
@@ -1117,6 +1226,7 @@ mod tests {
             path: path.clone(),
             id: "test".to_owned(),
             frame: custom_frame,
+            crop: Crop::default(),
             text: vec![TextItem {
                 text: "Lustra".to_owned(),
                 anchor: "bottom-center".to_owned(),
