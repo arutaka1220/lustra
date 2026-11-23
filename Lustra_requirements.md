@@ -174,7 +174,7 @@ RAW現像や明るさ調整・色調整などの編集機能は搭載しない�
 - Crop RatioはOriginal、Free、1:1、3:2、4:3、16:9、9:16、Customを提供する。初期値はOriginal。Custom比率を入力できる。
 - Crop矩形はEXIF向き適用後の元画像に対する正規化座標で保存する。自由角度回転は小数点以下を保持し、画像中心を基準にする。回転時は一様拡大してCrop範囲内の透明部分を防ぐ。
 - Crop範囲と回転をプレビュー・JPEG/PNG/WebP書き出しへ適用する。UIオーバーレイは画像へ合成しない。元画像ファイルは変更しない。
-- Cropの一連の編集は1回のUndo履歴として扱い、Escapeで履歴へ残さず破棄する。All Photos / This Photo、プリセット、Current / Recent Sessionと再起動復元でCropを保持する。旧データはCropなし・回転0°として読む。
+- Cropの一連の編集は1回のUndo履歴として扱い、Escapeで履歴へ残さず破棄する。All Photos / This Photo、Current / Recent Sessionと再起動復元でCropを保持する。旧データはCropなし・回転0°として読む。
 - 元画像全体を保持し、その周囲に上・下・左・右の余白を追加できる。画像自体はトリミング・引き伸ばししない設定も維持する。
 - 余白値は完成キャンバスの各辺に対する割合（%）で、既存セッションとの単位互換性を保つ。各辺の値は0〜49%とする。
 - 完成キャンバスは次のように算出する。L/R/T/Bは各辺の割合を100で割った値。
@@ -547,16 +547,16 @@ RAW現像や明るさ調整・色調整などの編集機能は搭載しない�
 - インストール前にエディタ状態を保存し、export中または保存失敗時は中止する。保存済みsnapshotは`sessions.pre-update.json`へ原子的に複製し、互換性のないsnapshotが見つかった場合はそのバックアップから復元する。
 # 変更追補（2026-11-20）
 
-この追補は本文中の旧仕様より優先する。フレームはBlack `#000000`、White `#FFFFFF`、Blurred、Soft Black `#242424`、Soft White `#fafaf8`、Customの6種類とし、3列×2行で指定順に表示する。Preset機能は廃止し、セッション単位の編集設定とUndo/Redoは維持する。PaddingはVertical（Top/Bottom）とHorizontal（Left/Right）に分けて連動を操作し、解除時はリンク前の独立値に戻す。Custom色のMy Paletteはアプリ共通で最大16色とする。
+この追補は本文中の旧仕様より優先する。フレームはBlack `#000000`、White `#FFFFFF`、Blurred、Soft Black `#242424`、Soft White `#fafaf8`、Customの6種類とし、3列×2行で指定順に表示する。保存型Preset機能は提供せず、セッション単位の編集設定とUndo/Redoは維持する。PaddingはVertical（Top/Bottom）とHorizontal（Left/Right）に分けて連動を操作し、解除時はリンク前の独立値に戻す。Custom色のMy Paletteはアプリ共通で最大16色とする。
 
 ### PR #1（2026-11-23）Ambient Gradient
 
-- 本PRでは従来のPreset廃止方針を変更し、Ambient Gradientを含むFrameSettingsの保存・適用・更新を提供する。
+- FrameSettingsは現在のセッションと写真に適用して保存し、名前付きPresetとしての保存・適用・更新は提供しない。
 - Frame選択欄の既存スタイルと同じ階層にAmbient Gradientを追加する。写真中央は通常の描画経路を維持し、フレーム背景だけに効果を適用する。
 - 元写真を96×96へ縮小し、3×3の空間領域ごとにFull ImageまたはEdgesから4bit/channel量子化色を抽出する。局所頻度と彩度を評価して最大5色を選び、各色の画面上の重心を保持する。色抽出はプレビューで写真ラスタごとにキャッシュする。
 - 重心位置に応じて背景色を空間補間し、Intensity（初期85%）、Softness（65%）、Brightness（0）、Color Source（Full Image）を適用する。Intensityに応じて抽出色の彩度を穏やかに強調し、Brightness補正では色相を維持する。保存済み設定は維持し、欠損値にのみ新しい初期値を使う。範囲はIntensity/Softness 0–100、Brightness -100–100。
 - 設定値は既存FrameSettingsに含め、All Photos / This Photo、履歴、セッションsnapshotの共通経路を使う。旧書き出しデータのAmbient設定は初期値で読み込む。
-- Preset name、Save preset、選択して適用、Update presetでFrameSettings全体をアプリ内へ保存し、再起動後も再利用できる。
+- FrameSettingsはセッション保存・復元で維持する。旧版に残るPreset情報は編集設定として適用せず、読み込みを妨げない。
 - PixiJS・Canvas 2Dの共有背景レイヤーとmacOSネイティブ書き出しでAmbient背景を描画する。書き出しは既存のJPEG、PNG、WebPエンコーダーを使用する。
 
 ### v0.6（2026-11-20）Custom Color UI
@@ -571,7 +571,7 @@ RAW現像や明るさ調整・色調整などの編集機能は搭載しない�
 
 - 既存Frameタイルと同じ階層にEdge Stretchを追加し、選択時のみStretch Mode（Extend/Mirror）、Blur（0–40、初期8）、Fade（0–40、初期12）を表示する。
 - 中央写真は通常のFit/Fill描画のまま保ち、Paddingが作る外側の背景だけを辺ピクセルから延長する。Extendは境界色を外向きへ複製し、Mirrorは境界から反射したサンプルを使用し、四隅では水平・垂直の写像を合成する。
-- Blurは境界背景レイヤーだけに適用し、作業画像の長辺を最大640pxに制限する。FrameSettingsに設定を含めAll Photos/This Photo、履歴、プリセット、セッション保存の共通経路で復元する。旧データはExtend/8/12で読む。
+- Blurは境界背景レイヤーだけに適用し、作業画像の長辺を最大640pxに制限する。FrameSettingsに設定を含めAll Photos/This Photo、履歴、セッション保存の共通経路で復元する。旧データはExtend/8/12で読む。
 - JPEG/PNG/WebPを含むmacOS書き出しで同設定を適用する。
 ## Frame None と Watermark
 
@@ -579,5 +579,5 @@ RAW現像や明るさ調整・色調整などの編集機能は搭載しない�
 - Watermarkは既存のText & Metadataのテキスト要素として扱う。Add Watermark、Camera、Lens、Exposure Informationのテンプレートを用意し、EXIF変数と自由テキストを組み合わせて編集できる。未取得の撮影情報は既存の欠損表示仕様に従う。Lustra名、ロゴ、固定著作権表記は自動挿入しない。
 - テキスト要素はPhoto-relativeまたはCanvas-relativeのアンカーを持つ。新規WatermarkはPhoto-relativeを既定とする。旧データでアンカー方式が未指定の場合はCanvas-relative、透明度が未指定の場合は100%として読む。
 - 文字透明度は0〜100%で設定し、プレビューと書き出しに反映する。位置、アンカー、オフセットは既存の1080基準を使い、プレビューとネイティブ書き出しで同じ配置規則を使う。
-- テキスト、アンカー方式、オフセット、スタイル、表示状態、透明度はFrame設定とともにプリセットおよびセッションスナップショットへ保存する。既存のAll Photos / This Photo、Undo / Redo、セッション自動保存・復元経路を使う。
+- テキスト、アンカー方式、オフセット、スタイル、表示状態、透明度はFrame設定とともにセッションスナップショットへ保存する。既存のAll Photos / This Photo、Undo / Redo、セッション自動保存・復元経路を使う。
 - JPEG / PNG / WebPのOriginal、720、1080、1440、2160px書き出しで最終写真へWatermarkを合成する。既存のICC、EXIF、GPS設定を維持し、元画像ファイルは変更しない。

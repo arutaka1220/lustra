@@ -42,11 +42,8 @@ test('adds a photo anchored EXIF watermark and edits its opacity on a None frame
   expect(photoAnchoredBounds?.y).toBeCloseTo(beforeAnchorSwitch!.y, 0)
 
   await page.getByRole('button', { name: 'Appearance' }).click()
-  await page.getByRole('textbox', { name: 'Preset name' }).fill('Photo watermark')
-  await page.getByRole('button', { name: 'Save preset' }).click()
   await opacity.fill('73')
   await opacity.press('Enter')
-  await page.getByLabel('Saved frame presets').selectOption('Photo watermark')
-  await expect(layer).toHaveCSS('opacity', '0.45')
+  await expect(layer).toHaveCSS('opacity', '0.73')
   await expect(anchorMode).toHaveText('Photo')
 })

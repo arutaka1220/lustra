@@ -298,7 +298,7 @@ Lustraは、Lightroom等でセレクト・現像された写真にEXIFを用い�
 - 回転角度は写真中心基準の小数度で保存し、数値入力とスライダーを同期する。回転後は一様スケールを求め、Crop出力域へ透明ピクセルを残さない。
 - Crop座標はEXIF向き反映後のソースに対する正規化値で保持する。Crop適用後に通常のFrame/Padding描画へ渡し、Photo-relative文字アンカーはこの写真領域、Canvas-relativeアンカーはキャンバス全体を基準にする。
 - オーバーレイ、グリッド、ハンドル、角度表示は編集専用で書き出さない。PixiJS優先、Canvas 2Dフォールバックを維持し、ドラッグ中に画像を再読込しない。
-- 1回のCropモード編集を履歴の1単位とし、確定時にUndoへ記録、キャンセル時は記録しない。Crop設定は写真単位の編集データとしてプリセット、All Photos/This Photo、セッションsnapshotへ含める。旧snapshotはCropなしとして復元する。
+- 1回のCropモード編集を履歴の1単位とし、確定時にUndoへ記録、キャンセル時は記録しない。Crop設定は写真単位の編集データとしてAll Photos/This Photo、セッションsnapshotへ含める。旧snapshotはCropなしとして復元する。
 - Crop Ratioは写真領域の比率であり、Frame/Paddingを含むCanvas比率とは別に扱う。Cropだけの変更でCanvas設定を変更しない。
 
 ### 4.5 Filmstrip
@@ -651,13 +651,13 @@ v0.3時点での仕様を記録した説明。最新の確定内容は本文と�
 - 背景を共有Canvasレイヤーに描き、PixiJSとCanvas 2Dの双方で再利用する。書き出し側は同じ縮小寸法、色量子化、色順序、放射位置を用い、既存の画像形式エンコーダーへ渡す。
 - FrameSettingsのambientIntensity、ambientSoftness、ambientBrightness、ambientColorSourceを保存する。新規作成時と欠損フィールドは85、65、0、Full Imageを既定値として扱う。保存済みの数値は変更しない。
 - 抽出した色を位置重心に基づいて滑らかに補間し、Intensityに応じて色彩を控えめに強調する。プレビューとmacOS書き出しは同じ抽出色・空間配置・強調率を用いる。
-- Frame inspectorに名前付きPresetの保存、適用、更新を置き、FrameSettings全体をアプリのローカルストレージへ永続化する。
+- Preset UIは提供しない。FrameSettingsは既存のセッション保存・復元経路で保持する。
 
 ### PR #2（2026-11-23）Edge Stretch
 
 - Edge StretchはFrame選択欄の同階層に置き、選択中だけStretch Mode、Blur、FadeをAppearanceに表示する。既定値はExtend、Blur 8、Fade 12。Blur/Fadeの範囲は0–40。
 - 背景は中央写真とは別レイヤーに描く。Padding後の表示画像境界を基準に各辺の端ピクセルを延長し、Mirrorでは境界からの距離を反射する。角はX/Yの反射または端値複製を両軸で合成する。Fit/Fillで見える画像領域を基準にする。
-- プレビュー・書き出しの作業解像度は長辺640px以下に制限し、背景レイヤーのみBlurする。写真中央は従来のシャープな描画経路を維持する。設定はFrameSettingsに保持し、既存のUndo/Redo、写真単位上書き、Preset、session snapshotの仕組みを使う。
+- プレビュー・書き出しの作業解像度は長辺640px以下に制限し、背景レイヤーのみBlurする。写真中央は従来のシャープな描画経路を維持する。設定はFrameSettingsに保持し、既存のUndo/Redo、写真単位上書き、session snapshotの仕組みを使う。
 - macOSのJPEG/PNG/WebPエンコーダー共通の合成前に背景を生成する。旧Frame JSONにEdge Stretch設定がない場合はExtend/8/12を使う。
 ## Frame None と Watermark
 
@@ -667,4 +667,4 @@ WatermarkはText & Metadata内の通常のテキスト要素として追加す�
 
 配置基準はPhoto-relativeとCanvas-relativeから選ぶ。新規Watermarkは写真基準を初期値とし、旧データの未指定値はキャンバス基準として読む。切り替え時は表示位置が変わらないようにオフセットを変換する。写真基準はプレビュー上の写真領域に追従し、キャンバス基準は写真位置に関係なくキャンバス上の位置を保つ。いずれも1080基準の共通オフセットを使う。
 
-プリセットとセッション保存では、Watermarkの内容、配置基準、アンカー、オフセット、スタイル、表示状態、透明度をFrame設定とともに保存する。書き出しでは同じアンカー領域とスケールを使い、JPEG / PNG / WebPの最終画像へ文字を合成する。Lustraブランドの文字やロゴは自動追加しない。
+セッション保存では、Watermarkの内容、配置基準、アンカー、オフセット、スタイル、表示状態、透明度をFrame設定とともに保存する。書き出しでは同じアンカー領域とスケールを使い、JPEG / PNG / WebPの最終画像へ文字を合成する。Lustraブランドの文字やロゴは自動追加しない。
