@@ -157,8 +157,8 @@ struct Frame {
     ambient_color_source: String,
 }
 
-fn ambient_intensity_default() -> f64 { 70.0 }
-fn ambient_softness_default() -> f64 { 75.0 }
+fn ambient_intensity_default() -> f64 { 85.0 }
+fn ambient_softness_default() -> f64 { 65.0 }
 fn ambient_source_default() -> String { "fullImage".to_owned() }
 
 fn full_opacity() -> f64 {
@@ -815,8 +815,8 @@ mod tests {
             background_opacity: 70.0,
             show_inset: true,
             show_shadow: true,
-            ambient_intensity: 70.0,
-            ambient_softness: 75.0,
+            ambient_intensity: 85.0,
+            ambient_softness: 65.0,
             ambient_brightness: 0.0,
             ambient_color_source: "fullImage".into(),
         }
@@ -932,8 +932,8 @@ mod tests {
         });
         let parsed: Frame = serde_json::from_value(value).unwrap();
         assert!(matches!(parsed.style, FrameStyle::AmbientGradient));
-        assert_eq!(parsed.ambient_intensity, 70.0);
-        assert_eq!(parsed.ambient_softness, 75.0);
+        assert_eq!(parsed.ambient_intensity, 85.0);
+        assert_eq!(parsed.ambient_softness, 65.0);
         assert_eq!(parsed.ambient_brightness, 0.0);
         assert_eq!(parsed.ambient_color_source, "fullImage");
     }

@@ -103,8 +103,8 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
           <SliderInput label={t('framePreview.opacity')} value={frame.backgroundOpacity ?? 100} max={100} onChange={(value) => onChange('backgroundOpacity', value)} {...sliderGestures} />
         </>}
         {frame.style === 'ambientGradient' && <>
-          <SliderInput label={t('framePreview.intensity')} value={frame.ambientIntensity ?? 70} max={100} unit="%" onChange={value => onChange('ambientIntensity', value)} {...sliderGestures} />
-          <SliderInput label={t('framePreview.softness')} value={frame.ambientSoftness ?? 75} max={100} unit="%" onChange={value => onChange('ambientSoftness', value)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.intensity')} value={frame.ambientIntensity ?? 85} max={100} unit="%" onChange={value => onChange('ambientIntensity', value)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.softness')} value={frame.ambientSoftness ?? 65} max={100} unit="%" onChange={value => onChange('ambientSoftness', value)} {...sliderGestures} />
           <SliderInput label={t('framePreview.ambientBrightness')} value={frame.ambientBrightness ?? 0} min={-100} max={100} onChange={value => onChange('ambientBrightness', value)} {...sliderGestures} />
           <label className="field-label">{t('framePreview.colorSource')}<select value={frame.ambientColorSource ?? 'fullImage'} onChange={event => onChange('ambientColorSource', event.target.value as 'fullImage' | 'edges')}><option value="fullImage">{t('framePreview.fullImage')}</option><option value="edges">{t('framePreview.edges')}</option></select></label>
         </>}

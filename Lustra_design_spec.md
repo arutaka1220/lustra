@@ -638,5 +638,6 @@ v0.3時点での仕様を記録した説明。最新の確定内容は本文と�
 - 元画像を48×48の作業画像へ縮小し、量子化色の頻度と彩度を抑制的に評価して最大5色を使う。各色の位置重心を保持し、Edgesは8px相当の内側領域を除外する。プレビューとmacOS書き出しは同じ色順・重心配置の放射状グラデーションを使う。
 - Brightnessは背景への明暗補正とし、通常の負値では色相と特徴色を保つ。Softnessは分布の広がりを調整し、高値でも色の位置差を残す。
 - 背景を共有Canvasレイヤーに描き、PixiJSとCanvas 2Dの双方で再利用する。書き出し側は同じ縮小寸法、色量子化、色順序、放射位置を用い、既存の画像形式エンコーダーへ渡す。
-- FrameSettingsのambientIntensity、ambientSoftness、ambientBrightness、ambientColorSourceを保存する。欠損フィールドは70、75、0、Full Imageを既定値として扱う。
+- FrameSettingsのambientIntensity、ambientSoftness、ambientBrightness、ambientColorSourceを保存する。新規作成時と欠損フィールドは85、65、0、Full Imageを既定値として扱う。保存済みの数値は変更しない。
+- 抽出した色を位置重心に基づいて滑らかに補間し、Intensityに応じて色彩を控えめに強調する。プレビューとmacOS書き出しは同じ抽出色・空間配置・強調率を用いる。
 - Frame inspectorに名前付きPresetの保存、適用、更新を置き、FrameSettings全体をアプリのローカルストレージへ永続化する。

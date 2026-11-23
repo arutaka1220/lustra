@@ -118,8 +118,8 @@ function paintAmbientBackground(context: CanvasRenderingContext2D, scene: FrameS
   const { raster, frame, size } = scene
   const source = frame.ambientColorSource ?? 'fullImage'
   const samples = ambientColors(raster, source)
-  const intensity = Math.max(0, Math.min(100, frame.ambientIntensity ?? 70)) / 100
-  const softness = Math.max(0, Math.min(100, frame.ambientSoftness ?? 75)) / 100
+  const intensity = Math.max(0, Math.min(100, frame.ambientIntensity ?? 85)) / 100
+  const softness = Math.max(0, Math.min(100, frame.ambientSoftness ?? 65)) / 100
   const brightness = Math.max(-100, Math.min(100, frame.ambientBrightness ?? 0))
   const layer = document.createElement('canvas')
   layer.width = layer.height = 256
@@ -145,9 +145,14 @@ function paintAmbientBackground(context: CanvasRenderingContext2D, scene: FrameS
     const neutral = 119
     const factor = brightness < 0 ? Math.max(0, 1 + brightness / 120) : 1
     const lift = brightness > 0 ? brightness * 1.36 : 0
-    image.data[i] = Math.max(0, Math.min(255, (neutral + ((r / total) - neutral) * intensity) * factor + lift))
-    image.data[i + 1] = Math.max(0, Math.min(255, (neutral + ((g / total) - neutral) * intensity) * factor + lift))
-    image.data[i + 2] = Math.max(0, Math.min(255, (neutral + ((b / total) - neutral) * intensity) * factor + lift))
+    const rr = neutral + ((r / total) - neutral) * intensity
+    const gg = neutral + ((g / total) - neutral) * intensity
+    const bb = neutral + ((b / total) - neutral) * intensity
+    const luma = rr * 0.2126 + gg * 0.7152 + bb * 0.0722
+    const saturation = 1 + intensity * 0.35
+    image.data[i] = Math.max(0, Math.min(255, (luma + (rr - luma) * saturation) * factor + lift))
+    image.data[i + 1] = Math.max(0, Math.min(255, (luma + (gg - luma) * saturation) * factor + lift))
+    image.data[i + 2] = Math.max(0, Math.min(255, (luma + (bb - luma) * saturation) * factor + lift))
     image.data[i + 3] = 255
   }
   ctx.putImageData(image, 0, 0)

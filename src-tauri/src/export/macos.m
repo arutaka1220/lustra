@@ -244,7 +244,11 @@ static bool draw_background(
             double components[4]; for (int c = 0; c < 3; c++) {
                 double value = sums[best][c] / (double)counts[best];
                 components[c] = fmax(0, fmin(255, value)) / 255.0;
-            } components[3] = 1.0;
+            }
+            double luma = components[0] * 0.2126 + components[1] * 0.7152 + components[2] * 0.0722;
+            double saturation = 1.0 + settings->ambient_intensity * 0.35;
+            for (int c = 0; c < 3; c++) components[c] = fmax(0, fmin(1, luma + (components[c] - luma) * saturation));
+            components[3] = 1.0;
             CGFloat locations[] = {0, 1}; CGFloat c0[] = {components[0],components[1],components[2],components[3]}; CGFloat c1[] = {components[0],components[1],components[2],0};
             CGColorRef colors[] = { CGColorCreate(srgb,c0), CGColorCreate(srgb,c1) };
             CGGradientRef gradient = CGGradientCreateWithColors(srgb, (__bridge CFArrayRef)@[( __bridge id)colors[0], (__bridge id)colors[1]], locations);
