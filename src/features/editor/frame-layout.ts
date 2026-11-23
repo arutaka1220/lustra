@@ -4,6 +4,7 @@ export type Size = { width: number; height: number }
 export type FrameRect = Size & { x: number; y: number }
 
 export const FRAME_COLORS = {
+  none: '#000000',
   black: '#000000',
   white: '#FFFFFF',
   softBlack: '#242424',
@@ -35,6 +36,7 @@ function innerFractions(frame: FrameSettings) {
 
 /** The padding values are percentages of the completed canvas edge, as in legacy sessions. */
 export function canvasAspectRatio(frame: FrameSettings, source?: Size): number {
+  if (frame.style === 'none') return source && source.width > 0 && source.height > 0 ? source.width / source.height : 4 / 5
   const inner = innerFractions(frame)
   const imageAspect = source && source.width > 0 && source.height > 0 ? source.width / source.height : 4 / 5
   return imageAspect * inner.height / inner.width
@@ -58,6 +60,10 @@ function centerRect(bounds: FrameRect, width: number, height: number): FrameRect
 
 /** Add padding around the complete, uncropped source image. */
 export function getPhotoLayout(canvas: Size, source: Size, frame: FrameSettings) {
+  if (frame.style === 'none') {
+    const image = centerRect({ ...canvas, x: 0, y: 0 }, canvas.width, canvas.height)
+    return { image, visible: image, overflowX: 0, overflowY: 0 }
+  }
   const fractions = innerFractions(frame)
   const padded: FrameRect = {
     x: canvas.width * fractions.left,

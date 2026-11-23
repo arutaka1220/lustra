@@ -19,7 +19,7 @@ type FrameControlsProps = {
   children?: ReactNode
 }
 
-export const FRAME_STYLE_ORDER = ['black', 'white', 'blurred', 'softBlack', 'softWhite', 'ambientGradient', 'edgeStretch', 'custom'] as const
+export const FRAME_STYLE_ORDER = ['none', 'black', 'white', 'blurred', 'softBlack', 'softWhite', 'ambientGradient', 'edgeStretch', 'custom'] as const
 const sides = ['top', 'bottom', 'left', 'right'] as const
 const oppositeSide = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' } as const
 

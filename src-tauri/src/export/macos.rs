@@ -41,6 +41,7 @@ struct NativeText {
     weight: u32,
     horizontal_anchor: u32,
     vertical_anchor: u32,
+    photo_relative: u32,
     rgba: u32,
     x: f64,
     y: f64,
@@ -151,6 +152,7 @@ pub fn render(path: &Path, job: &ExportJob, settings: &ExportSettings) -> Result
         quality: u32::from(settings.quality),
         preserve_color_space: u32::from(matches!(settings.color_space, ColorSpace::Original)),
         style: match job.frame.style {
+            FrameStyle::None => 8,
             FrameStyle::Black => 0,
             FrameStyle::White => 1,
             FrameStyle::Blurred => 2,
@@ -161,8 +163,8 @@ pub fn render(path: &Path, job: &ExportJob, settings: &ExportSettings) -> Result
             FrameStyle::EdgeStretch => 7,
         },
         custom_color: parse_hex_color(job.frame.custom_color.as_deref().unwrap_or("#000000")),
-        inset: u32::from(job.frame.show_inset),
-        shadow: u32::from(job.frame.show_shadow),
+        inset: u32::from(job.frame.show_inset && !matches!(job.frame.style, FrameStyle::None)),
+        shadow: u32::from(job.frame.show_shadow && !matches!(job.frame.style, FrameStyle::None)),
         image: layout.image,
         visible: layout.visible_image,
         blur: job.frame.blur_strength.clamp(0.0, 120.0),
@@ -230,6 +232,8 @@ mod tests {
             font_family: "Arial".to_owned(),
             weight: 400,
             color: color.to_owned(),
+            opacity: None,
+            anchor_mode: None,
         }
     }
 
@@ -245,6 +249,22 @@ mod tests {
             let native: NativeText = data.native();
             assert_eq!(native.rgba, expected);
         }
+    }
+
+    #[test]
+    fn photo_relative_text_mode_is_forwarded_to_native_renderer() {
+        let mut item = item("#ffffff");
+        item.anchor_mode = Some("photo".to_owned());
+        let data = TextData::from_item(&item).unwrap();
+        assert_eq!(data.native().photo_relative, 1);
+    }
+
+    #[test]
+    fn text_opacity_is_encoded_into_the_native_text_color_alpha() {
+        let mut item = item("#ffffff");
+        item.opacity = Some(42.0);
+        let native = TextData::from_item(&item).unwrap().native();
+        assert_eq!(native.rgba & 0xff, 107);
     }
 }
 
@@ -289,9 +309,13 @@ impl<'a> TextData<'a> {
             _ => (0, 2),
         };
         let color = self.item.color.trim_start_matches('#');
+        let opacity = self.item.opacity.unwrap_or(100.0).clamp(0.0, 100.0) / 100.0;
         let rgba = match color.len() {
-            6 => u32::from_str_radix(color, 16).map(|rgb| (rgb << 8) | 0xff),
-            _ => u32::from_str_radix(color, 16),
+            6 => u32::from_str_radix(color, 16)
+                .map(|rgb| (rgb << 8) | (opacity * 255.0).round() as u32),
+            _ => u32::from_str_radix(color, 16).map(|rgba| {
+                (rgba & 0xffff_ff00) | (((rgba & 0xff) as f64 * opacity).round() as u32)
+            }),
         }
         .unwrap_or(0xffff_ffff);
         NativeText {
@@ -300,6 +324,7 @@ impl<'a> TextData<'a> {
             weight: self.item.weight.clamp(100, 900),
             horizontal_anchor,
             vertical_anchor,
+            photo_relative: u32::from(self.item.anchor_mode.as_deref() == Some("photo")),
             rgba,
             x: self.item.x.clamp(-10_000.0, 10_000.0),
             y: self.item.y.clamp(-10_000.0, 10_000.0),

@@ -43,6 +43,7 @@ typedef struct {
     uint32_t weight;
     uint32_t horizontal_anchor;
     uint32_t vertical_anchor;
+    uint32_t photo_relative;
     uint32_t rgba;
     double x;
     double y;
@@ -301,10 +302,12 @@ static bool draw_background(
     const double height = settings->height;
     CGRect full = CGRectMake(0, 0, width, height);
     uint32_t matte = settings->style == 0 ? 0x000000ff : settings->style == 1 ? 0xffffffff : settings->style == 3 ? 0xfafaf8ff : settings->style == 4 ? (settings->custom_color << 8) | 0xff : settings->style == 5 ? 0x242424ff : settings->style == 6 ? 0x777777ff : 0x454842ff;
-    CGColorRef color = make_color(srgb, matte);
-    CGContextSetFillColorWithColor(context, color);
-    CGContextFillRect(context, full);
-    CGColorRelease(color);
+    if (settings->style != 8) {
+        CGColorRef color = make_color(srgb, matte);
+        CGContextSetFillColorWithColor(context, color);
+        CGContextFillRect(context, full);
+        CGColorRelease(color);
+    }
     if (settings->style == 7) return draw_edge_stretch(context, photo, settings, srgb);
     if (settings->style == 6) {
         CGContextRef sample = create_context(96, 96, srgb);
@@ -407,7 +410,7 @@ static bool draw_background(
     if (layer == NULL) {
         return false;
     }
-    color = make_color(srgb, matte);
+    CGColorRef color = make_color(srgb, matte);
     CGContextSetFillColorWithColor(layer, color);
     CGContextFillRect(layer, CGRectMake(0, 0, layer_width, layer_height));
     CGColorRelease(color);
@@ -517,7 +520,8 @@ static void draw_text(
     size_t count,
     double width,
     double height,
-    double unit
+    double unit,
+    CGRect photo_bounds
 ) {
     CGContextSetTextMatrix(context, CGAffineTransformIdentity);
     for (size_t index = 0; index < count; index++) {
@@ -538,8 +542,9 @@ static void draw_text(
         NSArray<NSString *> *lines = [text componentsSeparatedByString:@"\n"];
         double horizontal = item->horizontal_anchor * 0.5;
         double vertical = item->vertical_anchor * 0.5;
-        double x = width * horizontal + item->x * unit;
-        double y = height - height * vertical - item->y * unit + lines.count * line_height * vertical;
+        CGRect bounds = item->photo_relative ? photo_bounds : CGRectMake(0, 0, width, height);
+        double x = bounds.origin.x + bounds.size.width * horizontal + item->x * unit;
+        double y = bounds.origin.y + bounds.size.height - bounds.size.height * vertical - item->y * unit + lines.count * line_height * vertical;
         double baseline = y - (line_height + CTFontGetAscent(font) - CTFontGetDescent(font)) * 0.5;
         for (NSString *line_text in lines) {
             NSAttributedString *attributed = [[NSAttributedString alloc] initWithString:line_text attributes:attributes];
@@ -670,7 +675,7 @@ uint32_t lustra_render_image(
         if (settings->inset) {
             draw_inset(context, srgb, visible, settings->style, unit);
         }
-        draw_text(context, srgb, text, text_count, settings->width, settings->height, unit);
+        draw_text(context, srgb, text, text_count, settings->width, settings->height, unit, visible);
 
         bool success = settings->format == 2
             ? encode_extended_webp(context, color_space, settings, output)

@@ -221,24 +221,26 @@ export class FrameBackdrop {
     const key = [size.width, size.height, dpr, frame.style, frame.customColor, frame.blurStrength, frame.backgroundBrightness,
       frame.backgroundOpacity, frame.ambientIntensity, frame.ambientSoftness, frame.ambientBrightness, frame.ambientColorSource,
       frame.edgeStretchMode, frame.edgeStretchBlur, frame.edgeStretchFade,
-      frame.showShadow, visible.x, visible.y, visible.width, visible.height].join(':')
+      frame.style !== 'none' && frame.showShadow, visible.x, visible.y, visible.width, visible.height].join(':')
     if (this.raster === raster && this.key === key) return false
 
     const canvas = this.canvas
     canvas.width = Math.max(1, Math.round(size.width * dpr))
     canvas.height = Math.max(1, Math.round(size.height * dpr))
-    const context = canvas.getContext('2d', { alpha: false })
+    const context = canvas.getContext('2d', { alpha: frame.style === 'none' })
     if (!context) return false
     this.raster = raster
     this.key = key
 
     context.setTransform(canvas.width / size.width, 0, 0, canvas.height / size.height, 0, 0)
-    context.fillStyle = frame.style === 'custom' ? (frame.customColor ?? '#000000') : FRAME_COLORS[frame.style]
-    context.fillRect(0, 0, size.width, size.height)
+    if (frame.style !== 'none') {
+      context.fillStyle = frame.style === 'custom' ? (frame.customColor ?? '#000000') : FRAME_COLORS[frame.style]
+      context.fillRect(0, 0, size.width, size.height)
+    }
     if (frame.style === 'blurred' && (frame.backgroundOpacity ?? 100) > 0) paintBlurredBackground(context, scene)
     if (frame.style === 'ambientGradient') paintAmbientBackground(context, scene)
     if (frame.style === 'edgeStretch') paintEdgeStretchBackground(context, scene)
-    if (frame.showShadow) {
+    if (frame.style !== 'none' && frame.showShadow) {
       const unit = canvasUnit(size)
       context.save()
       context.beginPath()
@@ -292,7 +294,7 @@ export function createCanvasRenderer(): PreviewRenderer {
       context.rect(visible.x, visible.y, visible.width, visible.height)
       context.clip()
       context.drawImage(raster.image, image.x, image.y, image.width, image.height)
-      if (frame.showInset) {
+      if (frame.style !== 'none' && frame.showInset) {
         const { rect, weight, cssColor } = getInsetStroke(scene)
         context.lineWidth = weight
         context.strokeStyle = cssColor

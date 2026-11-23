@@ -54,7 +54,7 @@ export async function createPixiRenderer(): Promise<PreviewRenderer> {
       photograph.height = image.height
       clippingMask.clear().rect(visible.x, visible.y, visible.width, visible.height).fill(0xffffff)
       inset.clear()
-      if (frame.showInset) {
+      if (frame.style !== 'none' && frame.showInset) {
         const { rect, weight, color, alpha } = getInsetStroke(scene)
         inset.rect(rect.x, rect.y, rect.width, rect.height).stroke({ width: weight, color, alpha })
       }

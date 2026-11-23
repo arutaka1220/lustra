@@ -18,7 +18,7 @@ export type PhotoSource =
   | { kind: 'path'; path: string; url: string; missing?: boolean }
   | { kind: 'file'; file: File; url: string }
 
-export type FrameStyle = 'black' | 'white' | 'softBlack' | 'softWhite' | 'blurred' | 'custom' | 'ambientGradient' | 'edgeStretch'
+export type FrameStyle = 'none' | 'black' | 'white' | 'softBlack' | 'softWhite' | 'blurred' | 'custom' | 'ambientGradient' | 'edgeStretch'
 
 export type LinkedPaddingRestore = {
   vertical?: { top: number; bottom: number }

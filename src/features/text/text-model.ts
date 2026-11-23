@@ -12,25 +12,28 @@ export const TEXT_ANCHORS = [
 ] as const
 
 export type TextAnchor = (typeof TEXT_ANCHORS)[number]
+export type TextAnchorMode = 'photo' | 'canvas'
 export type MetadataField = keyof PhotoMetadata
 
 export type TextElement = {
   id: string
   template: string
   anchor: TextAnchor
+  anchorMode?: TextAnchorMode
   x: number
   y: number
   size: number
   fontFamily: string
   weight: number
   color: 'auto' | string
+  opacity?: number
   /** Last accepted custom color is retained while Auto is selected. */
   customColor?: string
   visible: boolean
   groupId?: string
 }
 
-export type TextDrawRecipe = Pick<TextElement, 'anchor' | 'x' | 'y' | 'size' | 'fontFamily' | 'weight' | 'color'> & { text: string }
+export type TextDrawRecipe = Pick<TextElement, 'anchor' | 'anchorMode' | 'x' | 'y' | 'size' | 'fontFamily' | 'weight' | 'color' | 'opacity'> & { text: string }
 export type MetadataCorrectionMode = 'exact' | 'partial' | 'regex'
 export type MetadataCorrectionRule = { id: string; mode: MetadataCorrectionMode; pattern: string; replacement: string }
 export type MetadataCorrectionsState = { camera: MetadataCorrectionRule[]; lens: MetadataCorrectionRule[] }
@@ -200,10 +203,10 @@ export function resolveTextLayers(photo: SessionPhoto, frame: FrameSettings, cor
     if (!element.visible) return []
     const resolved = resolveTemplate(element.template, metadata, locale)
     if (resolved.missing.length || !resolved.text.trim()) return []
-    const { anchor, x, y, size, fontFamily, weight, color } = element
+    const { anchor, anchorMode, x, y, size, fontFamily, weight, color, opacity } = element
     const blurred = color === 'auto' && frame.style === 'blurred' && raster && canvasSize
       ? sampleBlurredTextBackground(raster, frame, canvasSize, element)
       : undefined
-    return [{ text: resolved.text, anchor, x, y, size, fontFamily, weight, color: textColor(color, frame.style, frame.customColor, blurred) }]
+    return [{ text: resolved.text, anchor, anchorMode: anchorMode ?? 'canvas', x, y, size, fontFamily, weight, color: textColor(color, frame.style, frame.customColor, blurred), opacity: opacity ?? 100 }]
   })
 }

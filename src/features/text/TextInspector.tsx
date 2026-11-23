@@ -14,7 +14,7 @@ import { useMetadataCorrections } from './metadata-corrections-store'
 import { useSelectedTextIds, useTextEditor } from './text-editor-store'
 import type { MetadataFocus } from './text-editor-store'
 import {
-  createTextElement, DEFAULT_TEXT_FONT, getEffectiveMetadata, getTextElements, METADATA_VARIABLES,
+  createTextElement, DEFAULT_TEXT_FONT, getEffectiveMetadata, getTextAnchorPosition, getTextElements, METADATA_VARIABLES,
   resolveTemplate, TEXT_ANCHORS, textColor,
 } from './text-model'
 import type { MetadataField, TextAnchor, TextElement } from './text-model'
@@ -143,8 +143,8 @@ export function TextInspector({ photo, frame }: TextInspectorProps) {
     select(photo.id, next)
   }
 
-  const addElement = () => {
-    const next = { ...createTextElement(''), anchor: 'center' as const, x: 0, y: 0, size: 28 }
+  const addElement = (template = '') => {
+    const next = { ...createTextElement(template), anchor: 'bottom-left' as const, anchorMode: 'photo' as const, x: 34, y: -34, size: 28 }
     writeElements([...elements, next])
     select(photo.id, [next.id])
     requestAnimationFrame(() => editor.current?.focus())
@@ -178,14 +178,50 @@ export function TextInspector({ photo, frame }: TextInspectorProps) {
     setMetadata(photo.id, { [field]: value } as Partial<PhotoMetadata>)
   }
 
+  const changeAnchorMode = (element: TextElement, mode: 'photo' | 'canvas') => {
+    const previousMode = element.anchorMode ?? 'canvas'
+    if (previousMode === mode) return
+    const roots = [...document.querySelectorAll<HTMLElement>('.text-overlay')]
+    const root = roots.find((candidate) => candidate.dataset.photoId === photo.id
+      && candidate.querySelector<HTMLElement>(`[data-text-id="${CSS.escape(element.id)}"]`))
+    const layer = root?.querySelector<HTMLElement>(`[data-text-id="${CSS.escape(element.id)}"]`)
+    const canvasSize = root && { width: root.clientWidth, height: root.clientHeight }
+    const scale = canvasSize ? Math.min(canvasSize.width, canvasSize.height) / 1080 : 0
+    let x = element.x
+    let y = element.y
+    if (root && layer && canvasSize && scale > 0) {
+      const rootRect = root.getBoundingClientRect()
+      const layerRect = layer.getBoundingClientRect()
+      const [column, row] = getTextAnchorPosition(element.anchor)
+      const oldPhotoRect = {
+        x: Number(root.dataset.photoX ?? 0),
+        y: Number(root.dataset.photoY ?? 0),
+        width: Number(root.dataset.photoWidth ?? canvasSize.width),
+        height: Number(root.dataset.photoHeight ?? canvasSize.height),
+      }
+      const newOrigin = mode === 'photo' ? oldPhotoRect : { x: 0, y: 0, ...canvasSize }
+      const anchorX = layerRect.left - rootRect.left + column * layerRect.width
+      const anchorY = layerRect.top - rootRect.top + row * layerRect.height
+      x = (anchorX - newOrigin.x - column * newOrigin.width) / scale
+      y = (anchorY - newOrigin.y - row * newOrigin.height) / scale
+    }
+    updateElement(element.id, { anchorMode: mode, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 })
+  }
+
   return (
     <>
       <InspectorSection title={t('text.title')} open={isOpen('text')} onToggle={() => toggle('text')}>
         <div className="text-actions">
-          <button className="button button--secondary button--small" type="button" onClick={addElement}><Plus size={14} /> {t('text.new')}</button>
+          <button className="button button--secondary button--small" type="button" onClick={() => addElement()}><Plus size={14} /> {t('text.new')}</button>
+          <button className="button button--secondary button--small" type="button" onClick={() => addElement('{camera}\n{lens}\n{focal_length} · {aperture} · {shutter_speed} · ISO {iso}')}><Plus size={14} /> {t('text.addWatermark')}</button>
           {editMode === 'this' && photo.overrides.textElements && (
             <button className="icon-button text-icon-button" type="button" onClick={() => resetPhotoOverride(photo.id, 'textElements')} title={t('text.resetShared')} aria-label={t('text.resetShared')}><RotateCcw size={14} /></button>
           )}
+        </div>
+        <div className="text-actions">
+          <button className="button button--secondary button--small" type="button" onClick={() => addElement('{camera}')}>{t('text.template.camera')}</button>
+          <button className="button button--secondary button--small" type="button" onClick={() => addElement('{lens}')}>{t('text.template.lens')}</button>
+          <button className="button button--secondary button--small" type="button" onClick={() => addElement('{focal_length} · {aperture} · {shutter_speed} · ISO {iso}')}>{t('text.template.exposure')}</button>
         </div>
         {elements.length > 0 && <ul className="text-layer-list">
           {elements.map((element) => {
@@ -227,6 +263,10 @@ export function TextInspector({ photo, frame }: TextInspectorProps) {
               <SelectField className="text-field" value={active.anchor} onValueChange={(value) => updateElement(active.id, { anchor: value as TextAnchor })}
                 options={TEXT_ANCHORS.map((anchor) => ({ value: anchor, label: t(`text.anchor.${anchor}`) }))} />
             </label>
+            <label>{t('text.anchorMode')}
+              <SelectField className="text-field" value={active.anchorMode ?? 'canvas'} onValueChange={(value) => changeAnchorMode(active, value as 'photo' | 'canvas')}
+                options={[{ value: 'photo', label: t('text.anchorMode.photo') }, { value: 'canvas', label: t('text.anchorMode.canvas') }]} />
+            </label>
             <div className="text-field-pair">
               <OffsetInput label={t('text.horizontalOffset')} value={active.x} onChange={(x) => updateElement(active.id, { x })} />
               <OffsetInput label={t('text.verticalOffset')} value={active.y} onChange={(y) => updateElement(active.id, { y })} />
@@ -258,6 +298,7 @@ export function TextInspector({ photo, frame }: TextInspectorProps) {
             </label>
           </div>
           <SliderInput label={t('text.size')} value={active.size} min={8} max={160} unit="px" onChange={(size) => updateElement(active.id, { size })} onChangeStart={beginEdit} onChangeEnd={endEdit} />
+          <SliderInput label={t('text.opacity')} value={active.opacity ?? 100} min={0} max={100} unit="%" onChange={(opacity) => updateElement(active.id, { opacity })} onChangeStart={beginEdit} onChangeEnd={endEdit} />
           <div className="text-color-controls">
             <div className="text-color-mode" role="group" aria-label={t('text.color')}>
               <button type="button" className={active.color === 'auto' ? 'is-active' : ''} aria-pressed={active.color === 'auto'} onClick={() => updateElement(active.id, { color: 'auto', customColor: active.color === 'auto' ? active.customColor : active.color })}>{t('text.auto')}</button>
