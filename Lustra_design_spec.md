@@ -167,7 +167,6 @@ Lustraは、Lightroom等でセレクト・現像された写真にEXIFを用い�
 ├──────────────────────────┬──────────────────────────────────────────────────────┤
 │ 左: Frame Settings      │  中央～右: 写真とフレームのライブプレビュー             │
 │ [All Photos|This Photo]  │  ※ワークスペースは白固定、写真フレームは独立設定         │
-│ Preset ▾                 │                                                      │
 │ Frame ▾                  │                                                      │
 │ Padding ▾                │                                                      │
 │ Text & Metadata ▾        │                                                      │
@@ -249,12 +248,11 @@ Lustraは、Lightroom等でセレクト・現像された写真にEXIFを用い�
 **推奨セクション順（提案。各セクションの独立開閉・開閉状態保存は確定）**
 
 1. `Apply to`：`All Photos | This Photo`（常時上部に表示）[確定]
-2. `Preset`：選択、未保存マーク、更新・新規保存アクション [確定]
-3. `Frame`：Black / White / Blurred Background、枠線、シャドウ [確定]
-4. `Padding`：左右連動、上下連動、4辺のスライダー・数値。元画像全体を維持し、余白を加えた完成キャンバスに合わせてプレビューする [確定]
-5. `Text & Metadata`：要素リスト、追加、削除、グループ化、表示切替 [確定]
-6. `Typography`：選択文字のフォント、ウェイト、色、サイズ [確定]
-7. `Guides`：スマートガイドON/OFF（詳細は折りたたみ） [確定]
+2. `Frame`：Black / White / Blurred Background、枠線、シャドウ [確定]
+3. `Padding`：左右連動、上下連動、4辺のスライダー・数値。元画像全体を維持し、余白を加えた完成キャンバスに合わせてプレビューする [確定]
+4. `Text & Metadata`：要素リスト、追加、削除、グループ化、表示切替 [確定]
+5. `Typography`：選択文字のフォント、ウェイト、色、サイズ [確定]
+6. `Guides`：スマートガイドON/OFF（詳細は折りたたみ） [確定]
 
 - [確定] 開閉状態はユーザーの選択を記憶し、**すべてのセクションを同時に開くこともできる**。初回の開閉初期値のみ[提案]として、よく使う項目を開いた状態にしてよい。
 - [確定・提案] インスペクタを260〜450pxでリサイズでき、項目数が増えても左側だけスクロール。
@@ -319,7 +317,7 @@ Lustraは、Lightroom等でセレクト・現像された写真にEXIFを用い�
 - [確定] 詳細に品質、EXIFのカメラ／レンズ／露出／撮影日時／GPSカテゴリ別保持、機器シリアル番号、`Apply Metadata Corrections`、ICCをまとめる。
 - [確定] GPS、機器シリアル番号、`Apply Metadata Corrections`は初期OFF。補正をONにした場合、出力対象として保持するカメラ／レンズの標準EXIF項目へ補正値を反映する。元画像は変更しない。
 - [確定] ICCはsRGB変換が初期値。必要ならPreserve Originalを選べる。
-- [確定] 前回選択値と保存先を永続保存。プリセットには含めない。
+- [確定] 前回選択値と保存先を永続保存。フレーム編集設定とは独立させる。
 - [提案] 基本画面にはFormat / Size / Destination / Exportを表示。`Advanced Settings`のDisclosure内に詳細項目。
 - [確定] 書き出し開始後は編集を一時制限。
 
@@ -365,7 +363,6 @@ Lustraは、Lightroom等でセレクト・現像された写真にEXIFを用い�
 | `CanvasViewport` | 余白を含む写真フレームプレビュー | 白いワークスペース、元画像全体、ズーム、パン、選択、読み込み | [確定・提案] |
 | `TextLayerItem` | 編集要素リスト | 可視/非表示/EXIF不足/グループ | [確定] |
 | `SmartGuideOverlay` | ドラッグ中整列補助 | 吸着、等間隔、hidden | [確定] |
-| `PresetSelector` | デザインの呼び出し | 未保存変更マーク、更新/別名保存 | [確定] |
 | `SessionListItem` | Recent Sessions | 通常/参照切れ/使用中 | [確定・提案] |
 | `ExportProgress` | 複数写真処理 | running/cancel pending/failed/completed | [確定] |
 | `ConfirmationDialog` | 破壊的操作等 | 明確な主語・キャンセル導線 | [確定・提案] |
@@ -502,8 +499,7 @@ Lustraは、Lightroom等でセレクト・現像された写真にEXIFを用い�
 ### 11.1 デザイン側に残る判断
 
 1. アプリのロゴ・製品アイコン・スプラッシュ表示などのブランド識別子。**色調と基本デザインは既に確定。**
-2. 初期の内蔵フレームプリセットの具体的な名称、個数、配置デザイン。
-3. ズーム操作の細かいジェスチャー／ショートカット（ホイール、ピンチ、Space+ドラッグ等）。
+2. ズーム操作の細かいジェスチャー／ショートカット（ホイール、ピンチ、Space+ドラッグ等）。
 4. インポート・レビューのサムネイル密度の最終値（デフォルト表示枚数と可変列数）。
 5. 将来カスタムフレーム色を許可する場合のワークスペース背景ルール（現行は白固定）。
 6. Recent Sessionsの保存数を0にして履歴を無効化できるようにするか。
@@ -581,7 +577,7 @@ v0.3時点での仕様を記録した説明。最新の確定内容は本文と�
 - JPEG / PNG / WebPのEXIF / XMP値を表示へ統合し、XMPのURI名前空間識別、項目単位の補完、日時の小数秒・タイムゾーン保持を仕様化。
 # 変更追補（2026-11-20）
 
-この追補は本文中の旧Preset/色/Padding記述より優先する。InspectorにPresetセクションを表示しない。FrameはBlack、White、Blurred、Soft Black、Soft White、Customの順で3列×2行に配置し、Custom色とアプリ共通My Palette（最大16色）を扱う。PaddingはVerticalとHorizontalの各グループにLink操作を置き、解除時にリンク前の辺値を復元する。
+この追補は本文中の旧色/Padding記述より優先する。Preset機能は廃止し、InspectorにPresetセクションを表示しない。FrameはBlack、White、Blurred、Soft Black、Soft White、Customの順で3列×2行に配置し、Custom色とアプリ共通My Palette（最大16色）を扱う。PaddingはVerticalとHorizontalの各グループにLink操作を置き、解除時にリンク前の辺値を復元する。
 
 ### v0.7（2026-11-20）Custom Color UI
 

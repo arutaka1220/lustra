@@ -66,8 +66,8 @@
 .candidate-footer { justify-content: flex-end; }
 .import-dropzone { cursor: auto; }
 
-.preset-controls, .override-settings { display: grid; gap: 6px; }
-.preset-actions, .photo-option-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.override-settings { display: grid; gap: 6px; }
+.photo-option-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .photo-option-actions { margin-top: 12px; }
 .override-settings { margin-top: 8px; font-size: 11px; }
 .override-settings summary { color: var(--text-secondary); cursor: pointer; }
