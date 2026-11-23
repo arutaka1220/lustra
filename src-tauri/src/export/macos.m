@@ -222,12 +222,13 @@ static bool draw_background(
         if (sample == NULL) return false;
         draw_oriented(sample, photo, CGRectMake(0, 0, 48, 48));
         uint8_t *pixels = CGBitmapContextGetData(sample);
-        uint32_t counts[512] = {0}; uint64_t sums[512][3] = {{0}};
+        uint32_t counts[512] = {0}; uint64_t sums[512][5] = {{0}};
         for (int y = 0; y < 48; y++) for (int x = 0; x < 48; x++) {
             if (settings->ambient_edges && x > 8 && x < 39 && y > 8 && y < 39) continue;
             size_t p = ((size_t)y * 48 + x) * 4;
             uint32_t key = ((pixels[p] >> 5) << 6) | ((pixels[p + 1] >> 5) << 3) | (pixels[p + 2] >> 5);
             counts[key]++; for (int c = 0; c < 3; c++) sums[key][c] += pixels[p + c];
+            sums[key][3] += x; sums[key][4] += y;
         }
         CGContextRelease(sample);
         CGContextSaveGState(context);
@@ -247,15 +248,16 @@ static bool draw_background(
             CGFloat locations[] = {0, 1}; CGFloat c0[] = {components[0],components[1],components[2],components[3]}; CGFloat c1[] = {components[0],components[1],components[2],0};
             CGColorRef colors[] = { CGColorCreate(srgb,c0), CGColorCreate(srgb,c1) };
             CGGradientRef gradient = CGGradientCreateWithColors(srgb, (__bridge CFArrayRef)@[( __bridge id)colors[0], (__bridge id)colors[1]], locations);
-            double x = fmod(n * 73 + 29, 192) + 32, y = fmod(n * 107 + 41, 192) + 32;
-            CGFloat radius = 110 + settings->ambient_softness * 210;
-            CGContextSaveGState(context); CGContextSetAlpha(context, settings->ambient_intensity * 0.58);
+            double x = sums[best][3] / (double)counts[best] * 256.0 / 48.0;
+            double y = sums[best][4] / (double)counts[best] * 256.0 / 48.0;
+            CGFloat radius = 62 + settings->ambient_softness * 140;
+            CGContextSaveGState(context); CGContextSetAlpha(context, settings->ambient_intensity * fmin(0.82, 0.42 + sqrt((double)counts[best] / 2304.0) * 0.7));
             CGContextDrawRadialGradient(context, gradient, CGPointMake(x, 256 - y), 0,
                 CGPointMake(x, 256 - y), radius, kCGGradientDrawsAfterEndLocation);
             CGContextRestoreGState(context); CGGradientRelease(gradient); CGColorRelease(colors[0]); CGColorRelease(colors[1]);
         }
         if (settings->ambient_brightness != 0) {
-            CGFloat alpha = fabs(settings->ambient_brightness) / 200.0;
+            CGFloat alpha = settings->ambient_brightness > 0 ? settings->ambient_brightness / 240.0 : -settings->ambient_brightness / 330.0;
             CGColorRef tone = make_color(srgb, settings->ambient_brightness > 0 ? 0xffffffff : 0x000000ff);
             CGContextSetAlpha(context, alpha); CGContextSetFillColorWithColor(context, tone);
             CGContextFillRect(context, CGRectMake(0, 0, 256, 256)); CGColorRelease(tone);

@@ -547,8 +547,8 @@ RAW現像や明るさ調整・色調整などの編集機能は搭載しない�
 
 - 本PRでは従来のPreset廃止方針を変更し、Ambient Gradientを含むFrameSettingsの保存・適用・更新を提供する。
 - Frame選択欄の既存スタイルと同じ階層にAmbient Gradientを追加する。写真中央は通常の描画経路を維持し、フレーム背景だけに効果を適用する。
-- 元写真を48×48へ縮小し、Full ImageまたはEdges（内側31×31領域を除外）からRGBの上位5量子化色を抽出する。色抽出はプレビューで写真ラスタごとにキャッシュする。
-- 抽出色を複数の広い放射グラデーションとして重ね、Intensity（初期70%）、Softness（75%）、Brightness（0）、Color Source（Full Image）を背景へ適用する。範囲はIntensity/Softness 0–100、Brightness -100–100。
+- 元写真を48×48へ縮小し、Full ImageまたはEdges（内側31×31領域を除外）から量子化色を抽出する。頻度と彩度を抑制的に評価し、各色の画面上の重心を保持する。色抽出はプレビューで写真ラスタごとにキャッシュする。
+- 重心位置に応じた放射グラデーションで背景を合成する。Intensity（初期70%）、Softness（75%）、Brightness（0）、Color Source（Full Image）を適用する。Brightness補正は色相を変えず、-20〜-45%でも特徴色を残す。範囲はIntensity/Softness 0–100、Brightness -100–100。
 - 設定値は既存FrameSettingsに含め、All Photos / This Photo、履歴、セッションsnapshotの共通経路を使う。旧書き出しデータのAmbient設定は初期値で読み込む。
 - Preset name、Save preset、選択して適用、Update presetでFrameSettings全体をアプリ内へ保存し、再起動後も再利用できる。
 - PixiJS・Canvas 2Dの共有背景レイヤーとmacOSネイティブ書き出しでAmbient背景を描画する。書き出しは既存のJPEG、PNG、WebPエンコーダーを使用する。

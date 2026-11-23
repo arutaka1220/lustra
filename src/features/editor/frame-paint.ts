@@ -1,7 +1,7 @@
 import type { FrameSettings } from '../../types/photo'
 import { canvasUnit, FRAME_COLORS, getBackgroundRect, getPhotoLayout } from './frame-layout'
 import type { FrameRect, Size } from './frame-layout'
-import { extractAmbientColors } from './ambient-colors'
+import { extractAmbientSamples } from './ambient-colors'
 
 export type PhotoRaster = Size & { image: HTMLCanvasElement | HTMLImageElement }
 
@@ -99,25 +99,25 @@ function paintBlurredBackground(context: CanvasRenderingContext2D, scene: FrameS
   context.restore()
 }
 
-const ambientColorCache = new WeakMap<PhotoRaster, { source: string; colors: string[] }>()
+const ambientColorCache = new WeakMap<PhotoRaster, { source: string; samples: ReturnType<typeof extractAmbientSamples> }>()
 function ambientColors(raster: PhotoRaster, source: 'fullImage' | 'edges') {
   const cached = ambientColorCache.get(raster)
-  if (cached?.source === source) return cached.colors
+  if (cached?.source === source) return cached.samples
   const sample = document.createElement('canvas')
   sample.width = sample.height = 48
   const ctx = sample.getContext('2d', { willReadFrequently: true })
-  if (!ctx) return ['#5d6570', '#83909a', '#b2aaa0', '#606d70']
+  if (!ctx) return []
   ctx.drawImage(raster.image, 0, 0, 48, 48)
   const { data } = ctx.getImageData(0, 0, 48, 48)
-  const colors = extractAmbientColors(data, 48, 48, source)
-  ambientColorCache.set(raster, { source, colors })
-  return colors
+  const samples = extractAmbientSamples(data, 48, 48, source)
+  ambientColorCache.set(raster, { source, samples })
+  return samples
 }
 
 function paintAmbientBackground(context: CanvasRenderingContext2D, scene: FrameScene) {
   const { raster, frame, size } = scene
   const source = frame.ambientColorSource ?? 'fullImage'
-  const colors = ambientColors(raster, source)
+  const samples = ambientColors(raster, source)
   const intensity = Math.max(0, Math.min(100, frame.ambientIntensity ?? 70)) / 100
   const softness = Math.max(0, Math.min(100, frame.ambientSoftness ?? 75)) / 100
   const brightness = Math.max(-100, Math.min(100, frame.ambientBrightness ?? 0))
@@ -126,15 +126,15 @@ function paintAmbientBackground(context: CanvasRenderingContext2D, scene: FrameS
   const ctx = layer.getContext('2d')
   if (!ctx) return
   ctx.fillStyle = '#777777'; ctx.fillRect(0, 0, 256, 256)
-  colors.forEach((color, i) => {
-    const x = ((i * 73 + 29) % 192) + 32, y = ((i * 107 + 41) % 192) + 32
-    const radius = 110 + softness * 210
+  samples.forEach(({ color, x: sx, y: sy, weight }) => {
+    const x = 16 + sx * 224, y = 16 + sy * 224
+    const radius = 62 + softness * 140
     const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius)
     gradient.addColorStop(0, color); gradient.addColorStop(1, 'rgba(120,120,120,0)')
-    ctx.globalAlpha = intensity * 0.58; ctx.fillStyle = gradient; ctx.fillRect(0, 0, 256, 256)
+    ctx.globalAlpha = intensity * Math.min(0.82, 0.42 + Math.sqrt(weight) * 0.7); ctx.fillStyle = gradient; ctx.fillRect(0, 0, 256, 256)
   })
   ctx.globalAlpha = 1
-  if (brightness) { ctx.fillStyle = brightness > 0 ? `rgba(255,255,255,${brightness / 200})` : `rgba(0,0,0,${-brightness / 200})`; ctx.fillRect(0, 0, 256, 256) }
+  if (brightness) { ctx.fillStyle = brightness > 0 ? `rgba(255,255,255,${brightness / 240})` : `rgba(0,0,0,${-brightness / 330})`; ctx.fillRect(0, 0, 256, 256) }
   context.drawImage(layer, 0, 0, size.width, size.height)
 }
 
