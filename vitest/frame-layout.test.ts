@@ -19,6 +19,18 @@ const frame = (changes: Partial<FrameSettings> = {}): FrameSettings => ({
 })
 
 describe('padding based canvas layout', () => {
+  test('None keeps the source canvas ratio and places the image edge to edge', () => {
+    const source = { width: 1600, height: 900 }
+    const settings = frame({ style: 'none', top: 12, bottom: 8, left: 10, right: 10 })
+    const canvas = { width: 1600, height: 900 }
+    expect(canvasAspectRatio(settings, source)).toBeCloseTo(1600 / 900)
+    expect(getPhotoLayout(canvas, source, settings)).toEqual({
+      image: { x: 0, y: 0, width: 1600, height: 900 },
+      visible: { x: 0, y: 0, width: 1600, height: 900 },
+      overflowX: 0,
+      overflowY: 0,
+    })
+  })
   test('migrates presets by removing old ratio and fit keys while retaining design settings', () => {
     const legacyPreset = {
       ...frame({ top: 8, bottom: 22, left: 12, right: 12, style: 'white' }),

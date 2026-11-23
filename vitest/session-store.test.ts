@@ -148,7 +148,7 @@ describe('session history and recovery', () => {
     session().setScreen('edit')
     session().patchFrame({
       style: 'custom', customColor: '#123ABC', top: 12, bottom: 24, left: 9, right: 9,
-      textElements: [{ id: 'title', template: 'Lustra test', anchor: 'bottom-left', x: 34, y: -18, size: 20, fontFamily: 'Arial', weight: 400, color: '#123ABC', visible: true }],
+      textElements: [{ id: 'title', template: '{camera} · ISO {iso}', anchor: 'bottom-left', anchorMode: 'photo', x: 34, y: -18, size: 20, fontFamily: 'Arial', weight: 400, color: '#123ABC', opacity: 42, visible: true }],
     })
     session().setCompleted('restart', true)
 
@@ -162,7 +162,7 @@ describe('session history and recovery', () => {
       expect(session().photos[0].completed).toBe(true)
       expect(session().commonFrame).toMatchObject({ style: 'custom', customColor: '#123ABC' })
       expect(activeFrame()).toMatchObject({ top: 12, bottom: 24, left: 9, right: 9 })
-      expect(session().commonFrame.textElements?.[0]).toMatchObject({ template: 'Lustra test', color: '#123ABC' })
+      expect(session().commonFrame.textElements?.[0]).toMatchObject({ template: '{camera} · ISO {iso}', color: '#123ABC', anchorMode: 'photo', opacity: 42 })
     }
   })
 

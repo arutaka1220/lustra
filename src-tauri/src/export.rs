@@ -98,7 +98,7 @@ pub struct ExportSettings {
     color_space: ColorSpace,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportJob {
     id: String,
@@ -110,7 +110,7 @@ pub struct ExportJob {
     metadata: MetadataCorrections,
 }
 
-#[derive(Default, Deserialize)]
+#[derive(Clone, Default, Deserialize)]
 pub struct MetadataCorrections {
     camera: Option<String>,
     lens: Option<String>,
@@ -119,6 +119,7 @@ pub struct MetadataCorrections {
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum FrameStyle {
+    None,
     Black,
     White,
     Blurred,
@@ -133,7 +134,7 @@ enum FrameStyle {
     EdgeStretch,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Frame {
     style: FrameStyle,
@@ -165,18 +166,30 @@ struct Frame {
     edge_stretch_fade: f64,
 }
 
-fn ambient_intensity_default() -> f64 { 85.0 }
-fn ambient_softness_default() -> f64 { 65.0 }
-fn ambient_source_default() -> String { "fullImage".to_owned() }
-fn edge_mode_default() -> String { "extend".to_owned() }
-fn edge_blur_default() -> f64 { 8.0 }
-fn edge_fade_default() -> f64 { 12.0 }
+fn ambient_intensity_default() -> f64 {
+    85.0
+}
+fn ambient_softness_default() -> f64 {
+    65.0
+}
+fn ambient_source_default() -> String {
+    "fullImage".to_owned()
+}
+fn edge_mode_default() -> String {
+    "extend".to_owned()
+}
+fn edge_blur_default() -> f64 {
+    8.0
+}
+fn edge_fade_default() -> f64 {
+    12.0
+}
 
 fn full_opacity() -> f64 {
     100.0
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TextItem {
     text: String,
@@ -188,6 +201,10 @@ struct TextItem {
     font_family: String,
     weight: u32,
     color: String,
+    #[serde(default)]
+    opacity: Option<f64>,
+    #[serde(default)]
+    anchor_mode: Option<String>,
 }
 
 fn bottom_left() -> String {
@@ -218,6 +235,36 @@ fn layout(
 ) -> Result<Layout, String> {
     if source_width == 0 || source_height == 0 {
         return Err("Invalid image or canvas dimensions.".to_owned());
+    }
+
+    if matches!(frame.style, FrameStyle::None) {
+        let edge = match size {
+            ExportSize::Original(OriginalSize::Original) => None,
+            ExportSize::ShortEdge(edge) if edge > 0 => Some(edge),
+            ExportSize::ShortEdge(_) => return Err("Invalid export size.".to_owned()),
+        };
+        let scale = edge
+            .map(|value| f64::from(value) / f64::from(source_width.min(source_height)))
+            .unwrap_or(1.0);
+        let width = (f64::from(source_width) * scale).round().max(1.0) as u32;
+        let height = (f64::from(source_height) * scale).round().max(1.0) as u32;
+        if u64::from(width) * u64::from(height) > 90_000_000 || width > 32_768 || height > 32_768 {
+            return Err(
+                "The output dimensions are too large. Choose a smaller export size.".to_owned(),
+            );
+        }
+        let image = Rect {
+            x: 0.0,
+            y: 0.0,
+            width: f64::from(width),
+            height: f64::from(height),
+        };
+        return Ok(Layout {
+            width,
+            height,
+            image,
+            visible_image: image,
+        });
     }
 
     // Padding values remain percentages of the completed canvas, matching the
@@ -858,6 +905,31 @@ mod tests {
     }
 
     #[test]
+    fn none_original_size_ignores_saved_padding_and_preserves_source_dimensions() {
+        let mut settings = frame();
+        settings.style = FrameStyle::None;
+        settings.left = 18.0;
+        settings.top = 12.0;
+        let result = layout(
+            &settings,
+            1600,
+            900,
+            ExportSize::Original(OriginalSize::Original),
+        )
+        .unwrap();
+        assert_eq!((result.width, result.height), (1600, 900));
+        assert_eq!(
+            (
+                result.image.x,
+                result.image.y,
+                result.image.width,
+                result.image.height
+            ),
+            (0.0, 0.0, 1600.0, 900.0)
+        );
+    }
+
+    #[test]
     fn short_edge_scales_complete_canvas_and_keeps_source_aspect_ratio() {
         let mut frame = frame();
         frame.left = 10.0;
@@ -901,7 +973,9 @@ mod tests {
             export_frame.style = style;
             export_frame.custom_color = custom_color.map(str::to_owned);
             export_frame.left = 50.0;
-            if matches!(style, FrameStyle::EdgeStretch) { export_frame.edge_stretch_fade = 0.0; }
+            if matches!(style, FrameStyle::EdgeStretch) {
+                export_frame.edge_stretch_fade = 0.0;
+            }
             let job = ExportJob {
                 path: path.clone(),
                 id: "frame-color-pixel".to_owned(),
@@ -924,7 +998,10 @@ mod tests {
                 other => panic!("Unexpected PNG color type: {other:?}"),
             };
             if matches!(style, FrameStyle::AmbientGradient | FrameStyle::EdgeStretch) {
-                assert_ne!(pixel, expected, "generated frame edge should contain photo-derived color");
+                assert_ne!(
+                    pixel, expected,
+                    "generated frame edge should contain photo-derived color"
+                );
             } else {
                 assert_eq!(pixel, expected);
             }
@@ -952,6 +1029,21 @@ mod tests {
         assert_eq!(parsed.ambient_softness, 65.0);
         assert_eq!(parsed.ambient_brightness, 0.0);
         assert_eq!(parsed.ambient_color_source, "fullImage");
+    }
+
+    #[test]
+    fn none_frame_and_old_text_items_deserialize_with_safe_defaults() {
+        assert!(matches!(
+            serde_json::from_str::<FrameStyle>("\"none\""),
+            Ok(FrameStyle::None)
+        ));
+        let item: TextItem = serde_json::from_value(serde_json::json!({
+            "text": "{camera}", "x": 34, "y": -34, "size": 28,
+            "fontFamily": "Arial", "weight": 400, "color": "#ffffff"
+        }))
+        .unwrap();
+        assert_eq!(item.opacity, None);
+        assert_eq!(item.anchor_mode, None);
     }
 
     #[test]
@@ -1034,6 +1126,8 @@ mod tests {
                 font_family: "Arial".to_owned(),
                 weight: 700,
                 color: "#ffffff".to_owned(),
+                opacity: None,
+                anchor_mode: None,
             }],
             metadata: MetadataCorrections {
                 camera: Some("NIKON New Camera".to_owned()),
@@ -1055,6 +1149,23 @@ mod tests {
                 color_space: ColorSpace::Srgb,
             };
             let pixels = platform::render(&path, &job, &settings).unwrap();
+            if format == ExportFormat::Png {
+                let mut without_text = job.clone();
+                without_text.text.clear();
+                let clean_pixels = platform::render(&path, &without_text, &settings).unwrap();
+                assert_ne!(
+                    pixels, clean_pixels,
+                    "watermark text should be composited into PNG pixels"
+                );
+
+                let mut transparent = job.clone();
+                transparent.text[0].opacity = Some(0.0);
+                let transparent_pixels = platform::render(&path, &transparent, &settings).unwrap();
+                assert_ne!(
+                    pixels, transparent_pixels,
+                    "watermark opacity should affect the rendered pixels"
+                );
+            }
             let exif = metadata::filtered_exif(&path, &settings, &job.metadata)
                 .unwrap()
                 .unwrap();

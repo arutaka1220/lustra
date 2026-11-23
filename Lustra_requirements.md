@@ -567,3 +567,11 @@ RAW現像や明るさ調整・色調整などの編集機能は搭載しない�
 - 中央写真は通常のFit/Fill描画のまま保ち、Paddingが作る外側の背景だけを辺ピクセルから延長する。Extendは境界色を外向きへ複製し、Mirrorは境界から反射したサンプルを使用し、四隅では水平・垂直の写像を合成する。
 - Blurは境界背景レイヤーだけに適用し、作業画像の長辺を最大640pxに制限する。FrameSettingsに設定を含めAll Photos/This Photo、履歴、プリセット、セッション保存の共通経路で復元する。旧データはExtend/8/12で読む。
 - JPEG/PNG/WebPを含むmacOS書き出しで同設定を適用する。
+## Frame None と Watermark
+
+- Frameに`None`を追加する。余白、背景、内枠、影を生成せず、Original書き出しでは元写真のピクセル寸法を維持する。切り替え前のFrameとPadding値は保持する。
+- Watermarkは既存のText & Metadataのテキスト要素として扱う。Add Watermark、Camera、Lens、Exposure Informationのテンプレートを用意し、EXIF変数と自由テキストを組み合わせて編集できる。未取得の撮影情報は既存の欠損表示仕様に従う。Lustra名、ロゴ、固定著作権表記は自動挿入しない。
+- テキスト要素はPhoto-relativeまたはCanvas-relativeのアンカーを持つ。新規WatermarkはPhoto-relativeを既定とする。旧データでアンカー方式が未指定の場合はCanvas-relative、透明度が未指定の場合は100%として読む。
+- 文字透明度は0〜100%で設定し、プレビューと書き出しに反映する。位置、アンカー、オフセットは既存の1080基準を使い、プレビューとネイティブ書き出しで同じ配置規則を使う。
+- テキスト、アンカー方式、オフセット、スタイル、表示状態、透明度はFrame設定とともにプリセットおよびセッションスナップショットへ保存する。既存のAll Photos / This Photo、Undo / Redo、セッション自動保存・復元経路を使う。
+- JPEG / PNG / WebPのOriginal、720、1080、1440、2160px書き出しで最終写真へWatermarkを合成する。既存のICC、EXIF、GPS設定を維持し、元画像ファイルは変更しない。

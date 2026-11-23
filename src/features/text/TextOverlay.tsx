@@ -55,13 +55,16 @@ function joinBounds(rects: TextBounds[]): TextBounds {
   }
 }
 
-function layerStyle(element: TextElement, frame: FrameSettings, scale: number, blurredColor?: string): CSSProperties {
+function layerStyle(element: TextElement, frame: FrameSettings, scale: number, blurredColor?: string, imageBounds?: TextBounds, canvasSize?: Size): CSSProperties {
   const [column, row] = getTextAnchorPosition(element.anchor)
+  const photoAnchor = element.anchorMode === 'photo' && imageBounds && canvasSize
+  const origin = photoAnchor ? imageBounds : { x: 0, y: 0, width: canvasSize?.width ?? 0, height: canvasSize?.height ?? 0 }
   return {
-    left: `calc(${column * 100}% + ${element.x * scale}px)`,
-    top: `calc(${row * 100}% + ${element.y * scale}px)`,
+    left: `${origin.x + column * origin.width + element.x * scale}px`,
+    top: `${origin.y + row * origin.height + element.y * scale}px`,
     transform: `translate(${column * -100}%, ${row * -100}%) translate(var(--text-drag-x, 0px), var(--text-drag-y, 0px))`,
     color: textColor(element.color, frame.style, frame.customColor, blurredColor),
+    opacity: Math.max(0, Math.min(100, element.opacity ?? 100)) / 100,
     fontFamily: getCanvasFontFamily(element.fontFamily),
     fontWeight: element.weight,
     fontSize: element.size * scale,
@@ -226,7 +229,16 @@ export function TextOverlay({ photo, frame, interactive, canvasSize, imageBounds
   }
 
   return (
-    <div ref={root} className="text-overlay" aria-hidden={interactive ? undefined : true}>
+    <div
+      ref={root}
+      className="text-overlay"
+      data-photo-id={photo.id}
+      data-photo-x={imageBounds?.x ?? 0}
+      data-photo-y={imageBounds?.y ?? 0}
+      data-photo-width={imageBounds?.width ?? size?.width ?? 0}
+      data-photo-height={imageBounds?.height ?? size?.height ?? 0}
+      aria-hidden={interactive ? undefined : true}
+    >
       {scale > 0 && elements.map((element) => {
         if (!element.visible) return null
         const { text, missing } = resolveTemplate(element.template, metadata, i18n.resolvedLanguage ?? i18n.language)
@@ -235,7 +247,7 @@ export function TextOverlay({ photo, frame, interactive, canvasSize, imageBounds
         const blurredColor = element.color === 'auto' && raster && size && frame.style === 'blurred'
           ? sampleBlurredTextBackground(raster, frame, size, element)
           : undefined
-        const style = layerStyle(element, frame, scale, blurredColor)
+        const style = layerStyle(element, frame, scale, blurredColor, imageBounds, size ?? undefined)
         if (!interactive) return <span className="canvas-text" key={element.id} style={style}>{text}</span>
         const message = provisional
           ? photo.metadataState === 'loading' && !photo.metadataOverrides

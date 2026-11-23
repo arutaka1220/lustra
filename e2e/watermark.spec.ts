@@ -1,0 +1,52 @@
+import { expect, test } from '@playwright/test'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+
+const appUrl = process.env.LUSTRA_E2E_FILE_MODE === '1' ? pathToFileURL(resolve('dist/index.html')).href : '/'
+
+test('adds a photo anchored EXIF watermark and edits its opacity on a None frame', async ({ page }) => {
+  await page.goto(appUrl)
+  await page.getByRole('button', { name: /import photos/i }).click()
+  await page.locator('input[type=file]').first().setInputFiles([resolve('src-tauri/tests/fixtures/test_exif_01.jpg')])
+  const details = page.getByRole('dialog', { name: /photo details in png and webp/i })
+  if (await details.isVisible()) await details.getByRole('button', { name: 'Got It' }).click()
+  await page.getByRole('button', { name: /import 1 photo/i }).click()
+  await expect(page.getByRole('region', { name: /photos/i })).toBeVisible({ timeout: 10_000 })
+
+  const noFrame = page.getByRole('button', { name: 'None', exact: true })
+  await noFrame.click()
+  await expect(noFrame).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Text & Metadata' }).click()
+  await page.getByRole('button', { name: 'Add Watermark' }).click()
+  const layer = page.locator('.canvas-text--interactive').last()
+  await expect(layer).toContainText(/Nikon|NIKKOR|ISO/)
+  await layer.click()
+  await page.getByRole('button', { name: 'Typography' }).click()
+  const opacity = page.getByRole('spinbutton', { name: 'Opacity' })
+  await opacity.fill('45')
+  await opacity.press('Enter')
+  await expect(layer).toHaveCSS('opacity', '0.45')
+  const beforeAnchorSwitch = await layer.boundingBox()
+  const anchorMode = page.getByRole('combobox', { name: 'Position relative to' })
+  await anchorMode.click()
+  await page.getByRole('option', { name: 'Canvas' }).click()
+  await expect(anchorMode).toHaveText('Canvas')
+  const canvasAnchoredBounds = await layer.boundingBox()
+  expect(canvasAnchoredBounds?.x).toBeCloseTo(beforeAnchorSwitch!.x, 0)
+  expect(canvasAnchoredBounds?.y).toBeCloseTo(beforeAnchorSwitch!.y, 0)
+  await anchorMode.click()
+  await page.getByRole('option', { name: 'Photo' }).click()
+  await expect(anchorMode).toHaveText('Photo')
+  const photoAnchoredBounds = await layer.boundingBox()
+  expect(photoAnchoredBounds?.x).toBeCloseTo(beforeAnchorSwitch!.x, 0)
+  expect(photoAnchoredBounds?.y).toBeCloseTo(beforeAnchorSwitch!.y, 0)
+
+  await page.getByRole('button', { name: 'Appearance' }).click()
+  await page.getByRole('textbox', { name: 'Preset name' }).fill('Photo watermark')
+  await page.getByRole('button', { name: 'Save preset' }).click()
+  await opacity.fill('73')
+  await opacity.press('Enter')
+  await page.getByLabel('Saved frame presets').selectOption('Photo watermark')
+  await expect(layer).toHaveCSS('opacity', '0.45')
+  await expect(anchorMode).toHaveText('Photo')
+})

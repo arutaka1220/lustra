@@ -56,6 +56,25 @@ describe('metadata corrections and text export', () => {
     ])
   })
 
+  test('photo-relative anchors and opacity reach the export text recipe with legacy-safe defaults', () => {
+    const oldText = createTextElement('{camera}')
+    const watermarked = { ...createTextElement('{camera} · ISO {iso}'), anchorMode: 'photo' as const, opacity: 42 }
+    const resolved = resolveTextLayers(photo, { ...frame, textElements: [oldText, watermarked] })
+    expect(resolved).toMatchObject([
+      { anchorMode: 'canvas', opacity: 100 },
+      { anchorMode: 'photo', opacity: 42, text: 'NIKON Z 6_2 · ISO 100' },
+    ])
+  })
+
+  test('EXIF templates resolve independently for each photo', () => {
+    const template = { ...createTextElement('{camera} · ISO {iso}'), anchorMode: 'photo' as const }
+    const first = resolveTextLayers(photo, { ...frame, textElements: [template] })
+    const secondPhoto = { ...photo, id: 'photo-2', metadata: { camera: 'FUJIFILM X-T5', iso: '400' } }
+    const second = resolveTextLayers(secondPhoto, { ...frame, textElements: [template] })
+    expect(first[0].text).toBe('NIKON Z 6_2 · ISO 100')
+    expect(second[0].text).toBe('FUJIFILM X-T5 · ISO 400')
+  })
+
   test('anchor positions are fractions of the full canvas', () => {
     expect(getTextAnchorPosition('bottom-right')).toEqual([1, 1])
     expect(getTextAnchorPosition('center')).toEqual([0.5, 0.5])
