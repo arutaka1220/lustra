@@ -25,6 +25,8 @@ type FramePreviewProps = {
   onRevealInspector?: () => void
   fallbackPreview?: ReactNode
   crop?: SessionPhoto['cropTransform']
+  cropMode?: boolean
+  onCropModeChange?: (active: boolean) => void
   onCropChange?: (crop: SessionPhoto['cropTransform']) => void
   onCropEditStart?: () => void
   onCropEditEnd?: () => void
@@ -48,7 +50,7 @@ function rasterizeImage(image: HTMLImageElement, maxEdge: number): PhotoRaster {
   return { image: canvas, width: canvas.width, height: canvas.height }
 }
 
-export function FramePreview({ photo, frame, compact = false, readOnly = false, onImageError, onRevealInspector, fallbackPreview, crop, onCropChange, onCropEditStart, onCropEditEnd }: FramePreviewProps) {
+export function FramePreview({ photo, frame, compact = false, readOnly = false, onImageError, onRevealInspector, fallbackPreview, crop, cropMode: controlledCropMode, onCropModeChange, onCropChange, onCropEditStart, onCropEditEnd }: FramePreviewProps) {
   const { t } = useTranslation()
   const viewport = useRef<HTMLDivElement>(null)
   const surface = useRef<HTMLDivElement>(null)
@@ -59,7 +61,12 @@ export function FramePreview({ photo, frame, compact = false, readOnly = false, 
   const [available, setAvailable] = useState<Size>({ width: 1, height: 1 })
   const [loaded, setLoaded] = useState<LoadedPhoto>()
   const [retryKey, setRetryKey] = useState(0)
-  const [cropMode, setCropMode] = useState(false)
+  const [localCropMode, setLocalCropMode] = useState(false)
+  const cropMode = controlledCropMode ?? localCropMode
+  const changeCropMode = (active: boolean) => {
+    if (controlledCropMode === undefined) setLocalCropMode(active)
+    onCropModeChange?.(active)
+  }
   const interactive = !compact && !readOnly
   const initialCrop = useRef(crop)
   useEffect(() => {
@@ -68,13 +75,13 @@ export function FramePreview({ photo, frame, compact = false, readOnly = false, 
       const target = event.target instanceof HTMLElement ? event.target : null
       if (document.documentElement.dataset.lustraPreviewDrag || document.documentElement.dataset.lustraTextDrag) return
       if (target?.closest('input,textarea,select,[contenteditable="true"]') && !(cropMode && (event.key === 'Enter' || event.key === 'Escape'))) return
-      if (event.key.toLowerCase() === 'c' && !event.metaKey && !event.ctrlKey && !event.altKey) { event.preventDefault(); setCropMode(value => { if (!value) { initialCrop.current = crop; onCropEditStart?.() } else onCropEditEnd?.(); return !value }) }
-      if (event.key === 'Enter' && cropMode) { event.preventDefault(); onCropEditEnd?.(); setCropMode(false) }
-      if (event.key === 'Escape' && cropMode) { event.preventDefault(); onCropChange?.(initialCrop.current); onCropEditEnd?.(); setCropMode(false) }
+      if (event.key.toLowerCase() === 'c' && !event.metaKey && !event.ctrlKey && !event.altKey) { event.preventDefault(); if (!cropMode) { initialCrop.current = crop; onCropEditStart?.() } else onCropEditEnd?.(); changeCropMode(!cropMode) }
+      if (event.key === 'Enter' && cropMode) { event.preventDefault(); onCropEditEnd?.(); changeCropMode(false) }
+      if (event.key === 'Escape' && cropMode) { event.preventDefault(); onCropChange?.(initialCrop.current); onCropEditEnd?.(); changeCropMode(false) }
     }
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
-  }, [interactive, cropMode, crop, onCropChange])
+  }, [interactive, cropMode, crop, onCropChange, onCropEditStart, onCropEditEnd, onCropModeChange, controlledCropMode])
   const sourceUrl = photo.source.url
   const status = loaded?.url === sourceUrl ? loaded : undefined
   const sourceMissing = photo.source.kind === 'path' && photo.source.missing === true
@@ -211,13 +218,13 @@ export function FramePreview({ photo, frame, compact = false, readOnly = false, 
 
   return (
     <div className={`framed-preview-viewport${compact ? ' framed-preview-viewport--compact' : ''}`} ref={viewport}>
-      <div className={`preview-board preview-board--${frame.style}${cropMode ? ' is-cropping' : ''}`} onDoubleClick={event => { const bounds = visible; const rect = event.currentTarget.getBoundingClientRect(); const x = event.clientX - rect.left, y = event.clientY - rect.top; const onPhoto = !!bounds && x >= bounds.x && x <= bounds.x + bounds.width && y >= bounds.y && y <= bounds.y + bounds.height; if (!interactive || !onPhoto || (event.target as HTMLElement).closest('.canvas-text, input, button, select')) return; if (document.documentElement.dataset.lustraPreviewDrag) return; initialCrop.current = crop; if (cropMode) onCropEditEnd?.(); else onCropEditStart?.(); setCropMode(value => !value) }} style={{ ...size, '--custom-frame-color': frame.customColor ?? '#000000' } as React.CSSProperties}>
+      <div className={`preview-board preview-board--${frame.style}${cropMode ? ' is-cropping' : ''}`} onDoubleClick={event => { const bounds = visible; const rect = event.currentTarget.getBoundingClientRect(); const x = event.clientX - rect.left, y = event.clientY - rect.top; const onPhoto = !!bounds && x >= bounds.x && x <= bounds.x + bounds.width && y >= bounds.y && y <= bounds.y + bounds.height; if (!interactive || !onPhoto || (event.target as HTMLElement).closest('.canvas-text, input, button, select')) return; if (document.documentElement.dataset.lustraPreviewDrag) return; initialCrop.current = crop; if (cropMode) onCropEditEnd?.(); else onCropEditStart?.(); changeCropMode(!cropMode) }} style={{ ...size, '--custom-frame-color': frame.customColor ?? '#000000' } as React.CSSProperties}>
         <div className="framed-preview-surface" ref={surface} hidden={!raster || !seen || sourceMissing} role="img" aria-label={compact ? undefined : photo.name} aria-hidden={compact || undefined} />
         {!raster && fallbackPreview}
         {!raster && !fallbackPreview && smallPreview?.raster && !missing && <div className="preview-loading-thumb" aria-hidden="true"><PhotoThumbnailCanvas url={sourceUrl} fit="contain" /></div>}
         {sourceMissing || status?.error ? <span className="framed-preview-message"><ImageOff size={18} />{t('framePreview.unavailable')}</span> : highResolution?.error ? <span className="framed-preview-message preview-error" role="alert">{t('framePreview.previewError')}<button type="button" onClick={() => { setLoaded(undefined); setRetryKey(value => value + 1) }}>{t('framePreview.retry')}</button></span> : !raster && !smallPreview?.raster && !fallbackPreview && !compact && <span className="framed-preview-message" role="status">{t('framePreview.loading')}</span>}
         {raster && !sourceMissing && seen && <TextOverlay photo={photo} frame={frame} interactive={interactive && !cropMode} imageBounds={visible} canvasSize={size} raster={raster} onRevealInspector={onRevealInspector} />}
-        {cropMode && interactive && visible && sourceRaster && <><div className="crop-mode-badge">{t('crop.mode')}</div><CropOverlay bounds={visible} crop={crop} source={sourceRaster.image} sourceWidth={sourceRaster.width} sourceHeight={sourceRaster.height} onChange={value => onCropChange?.({ ...value, rotation: value.rotation ?? crop?.rotation ?? 0 })} /></>}
+        {cropMode && interactive && visible && sourceRaster && <CropOverlay bounds={visible} crop={crop} source={sourceRaster.image} sourceWidth={sourceRaster.width} sourceHeight={sourceRaster.height} onChange={value => onCropChange?.({ ...value, rotation: value.rotation ?? crop?.rotation ?? 0 })} />}
       </div>
     </div>
   )
