@@ -12,6 +12,7 @@ import { FrameControls } from './FrameControls'
 import { CropControls } from './CropControls'
 import { prefetchEditPreview, previewNeighborIndices } from './preview-cache'
 import { useFilmstripLayout } from '../../hooks/useFilmstripLayout'
+import { effectiveFrameSettings } from './frame-layout'
 
 type EditorScreenProps = {
   inspectorOpen: boolean
@@ -52,7 +53,27 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
   const [cropMode, setCropMode] = useState(false)
   const initialCrop = useRef<SessionPhoto['cropTransform']>(undefined)
   const frame = useMemo(() => getEffectiveFrame(activePhoto, commonFrame), [activePhoto, commonFrame])
-  const controlsFrame = editMode === 'all' ? getEffectiveFrame(activePhoto, commonFrame) : frame
+  const rawControlsFrame = editMode === 'all' ? getEffectiveFrame(activePhoto, commonFrame) : frame
+  const controlsFrame = effectiveFrameSettings(rawControlsFrame)
+  const updateCanvasFrame = <K extends keyof FrameSettings>(key: K, value: FrameSettings[K]) => {
+    if (rawControlsFrame.canvasLayout === 'portraitCard') {
+      if (key === 'style') { updateFrame('portraitBackgroundStyle', value as FrameSettings['style']); return }
+      if (key === 'customColor') { updateFrame('portraitBackgroundCustomColor', value as string); return }
+      if (key === 'blurStrength') { updateFrame('portraitBackgroundBlur', value as number); return }
+      if (key === 'backgroundBrightness') { updateFrame('portraitBackgroundBrightness', value as number); return }
+    }
+    updateFrame(key, value)
+  }
+  const patchCanvasFrame = (changes: Partial<FrameSettings>) => {
+    const mapped: Partial<FrameSettings> = { ...changes }
+    if (rawControlsFrame.canvasLayout === 'portraitCard') {
+      if ('style' in mapped) { mapped.portraitBackgroundStyle = mapped.style; delete mapped.style }
+      if ('customColor' in mapped) { mapped.portraitBackgroundCustomColor = mapped.customColor; delete mapped.customColor }
+      if ('blurStrength' in mapped) { mapped.portraitBackgroundBlur = mapped.blurStrength; delete mapped.blurStrength }
+      if ('backgroundBrightness' in mapped) { mapped.portraitBackgroundBrightness = mapped.backgroundBrightness; delete mapped.backgroundBrightness }
+    }
+    patchFrame(mapped)
+  }
   const index = Math.max(0, photos.findIndex((photo) => photo.id === activePhoto?.id))
   const prefetchKey = previewNeighborIndices(photos.length, index).map(i => `${photos[i].id}\t${photos[i].source.url}`).join('\n')
   useEffect(() => {
@@ -117,8 +138,8 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
               <button className="text-button" onClick={() => resetAllOverrides(photo.id)}>{t('edit.resetOverrides')}</button>
             </details>}
           </div>
-          <FrameControls frame={controlsFrame} onChange={updateFrame}
-            onPatch={patchFrame} onFrameEditStart={beginFrameEdit} onFrameEditEnd={endFrameEdit}
+          <FrameControls frame={controlsFrame} onChange={updateCanvasFrame}
+            onPatch={patchCanvasFrame} onFrameEditStart={beginFrameEdit} onFrameEditEnd={endFrameEdit}
           >
             <TextInspector photo={photo} frame={controlsFrame} />
           </FrameControls>
@@ -163,7 +184,7 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
         <div className="preview-stage-wrap">
           <div className="preview-stage-content">
             {photo.source.url
-              ? <FramePreview photo={photo} frame={frame} crop={photo.cropTransform} cropMode={cropMode} onCropModeChange={active => { if (active) initialCrop.current = photo.cropTransform; setCropMode(active) }} onCropChange={crop => setPhotoCrop(photo.id, crop)} onCropEditStart={beginFrameEdit} onCropEditEnd={endFrameEdit} onImageError={() => markMissing(photo.id, photo.source)} onRevealInspector={onRevealInspector} />
+              ? <FramePreview photo={photo} frame={frame} crop={photo.cropTransform} cropMode={cropMode} onCropModeChange={active => { if (active) initialCrop.current = photo.cropTransform; setCropMode(active) }} onCropChange={crop => setPhotoCrop(photo.id, crop)} onCropEditStart={beginFrameEdit} onCropEditEnd={endFrameEdit} onPortraitPositionChange={position => updateFrame('portraitVerticalPosition', position)} onPortraitPositionEditStart={beginFrameEdit} onPortraitPositionEditEnd={endFrameEdit} onImageError={() => markMissing(photo.id, photo.source)} onRevealInspector={onRevealInspector} />
               : <div className="relink-card">
                 <FileSearch size={26} />
                 <strong>{t('session.sourceMissing')}</strong>

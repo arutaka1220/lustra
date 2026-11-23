@@ -1,5 +1,5 @@
 import type { FrameSettings } from '../../types/photo'
-import { canvasUnit, FRAME_COLORS, getBackgroundRect, getPhotoLayout } from './frame-layout'
+import { canvasUnit, effectiveFrameSettings, FRAME_COLORS, getBackgroundRect, getPhotoLayout } from './frame-layout'
 import type { FrameRect, Size } from './frame-layout'
 import { extractAmbientSamples } from './ambient-colors'
 import { edgeFadeWeight, edgeSampleCoordinate } from './edge-stretch'
@@ -22,7 +22,8 @@ export interface PreviewRenderer {
 
 export function createFrameScene(size: Size, raster: PhotoRaster, frame: FrameSettings): FrameScene {
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
-  return { size, raster, frame, layout: getPhotoLayout(size, raster, frame), dpr }
+  const effective = effectiveFrameSettings(frame)
+  return { size, raster, frame: effective, layout: getPhotoLayout(size, raster, frame), dpr }
 }
 
 /** Blur in bounded working space so the Canvas 2D path also works on WebKit without ctx.filter. */

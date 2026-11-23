@@ -47,6 +47,21 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
   }
   return (
     <div className="controls-scroll">
+      <InspectorSection title={t('framePreview.canvas')} open={isOpen('canvas')} onToggle={() => toggle('canvas')}>
+        <label className="field-label">{t('framePreview.canvasLayout')}<select aria-label={t('framePreview.canvasLayout')} value={frame.canvasLayout ?? 'standard'} onChange={event => {
+          const layout = event.target.value as 'standard' | 'portraitCard'
+          if (layout === 'portraitCard') patch({ canvasLayout: layout, portraitRatio: frame.portraitRatio ?? 4 / 5, portraitPhotoSize: frame.portraitPhotoSize ?? 80, portraitVerticalPosition: frame.portraitVerticalPosition ?? 0, portraitBackgroundStyle: frame.portraitBackgroundStyle ?? 'blurred', portraitBackgroundCustomColor: frame.portraitBackgroundCustomColor ?? '#000000', portraitBackgroundBlur: frame.portraitBackgroundBlur ?? 32, portraitBackgroundBrightness: frame.portraitBackgroundBrightness ?? 90 })
+          else patch({ canvasLayout: layout })
+        }}><option value="standard">{t('framePreview.standardLayout')}</option><option value="portraitCard">{t('framePreview.portraitCardLayout')}</option></select></label>
+        {frame.canvasLayout === 'portraitCard' && <>
+          <label className="field-label">{t('framePreview.canvasRatio')}<select aria-label={t('framePreview.canvasRatio')} value={frame.portraitRatio ?? 4 / 5} onChange={event => onChange('portraitRatio', Number(event.target.value))}><option value={4 / 5}>4:5</option><option value={3 / 4}>3:4</option><option value={9 / 16}>9:16</option><option value={1}>1:1</option></select></label>
+          <SliderInput label={t('framePreview.photoSize')} value={frame.portraitPhotoSize ?? 80} min={40} max={90} unit="%" onChange={value => onChange('portraitPhotoSize', value)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.verticalPosition')} value={frame.portraitVerticalPosition ?? 0} min={-0.5} max={0.5} step={0.01} unit="" onChange={value => onChange('portraitVerticalPosition', value)} {...sliderGestures} />
+          <button className="button button--quiet" type="button" onClick={() => onChange('portraitVerticalPosition', 0)}>{t('framePreview.resetPosition')}</button>
+          <SliderInput label={t('framePreview.backgroundBlur')} value={frame.portraitBackgroundBlur ?? 32} max={40} unit="px" onChange={value => onChange('portraitBackgroundBlur', value)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.backgroundBrightness')} value={frame.portraitBackgroundBrightness ?? 90} min={60} max={140} onChange={value => onChange('portraitBackgroundBrightness', value)} {...sliderGestures} />
+        </>}
+      </InspectorSection>
       <InspectorSection title={t('edit.frame')} open={isOpen('frame')} onToggle={() => toggle('frame')}>
         <div className="style-picker">
           {FRAME_STYLE_ORDER.map((style) => style === 'custom'
@@ -59,7 +74,7 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
         </div>
       </InspectorSection>
 
-      <InspectorSection title={t('edit.padding')} open={isOpen('padding')} onToggle={() => toggle('padding')}>
+      {frame.canvasLayout !== 'portraitCard' && <InspectorSection title={t('edit.padding')} open={isOpen('padding')} onToggle={() => toggle('padding')}>
         <p className="padding-help">{t('framePreview.paddingHelp')}</p>
         <p className="padding-help">{t('framePreview.paddingSameAspect')}</p>
         <button className="button button--quiet" type="button" onClick={() => {
@@ -73,10 +88,10 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
             <span>{t(`framePreview.${key}`)}</span><span className="toggle-state">{t(frame[key] ? 'framePreview.on' : 'framePreview.off')}</span>
           </button></header><div className="margin-control-grid">{(key === 'linkVertical' ? sides.slice(0, 2) : sides.slice(2)).map((side) => <SliderInput key={side} label={t(`framePreview.${side}`)} value={frame[side]} max={32} onChange={(value) => setPadding(side, value)} {...sliderGestures} />)}</div>
         </section>)}
-      </InspectorSection>
+      </InspectorSection>}
 
       <InspectorSection title={t('edit.appearance')} open={isOpen('effects')} onToggle={() => toggle('effects')}>
-        {frame.style === 'blurred' && <>
+        {frame.style === 'blurred' && frame.canvasLayout !== 'portraitCard' && <>
           <SliderInput label={t('framePreview.blur')} value={frame.blurStrength} max={40} unit="px" onChange={(value) => onChange('blurStrength', value)} {...sliderGestures} />
           <SliderInput label={t('framePreview.brightness')} value={frame.backgroundBrightness} min={60} max={140} onChange={(value) => onChange('backgroundBrightness', value)} {...sliderGestures} />
           <SliderInput label={t('framePreview.opacity')} value={frame.backgroundOpacity ?? 100} max={100} onChange={(value) => onChange('backgroundOpacity', value)} {...sliderGestures} />
@@ -92,7 +107,7 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
           <SliderInput label={t('framePreview.edgeBlur')} value={frame.edgeStretchBlur ?? 8} max={40} unit="px" onChange={value => onChange('edgeStretchBlur', value)} {...sliderGestures} />
           <SliderInput label={t('framePreview.fade')} value={frame.edgeStretchFade ?? 12} max={40} unit="px" onChange={value => onChange('edgeStretchFade', value)} {...sliderGestures} />
         </>}
-        {(['showInset', 'showShadow'] as const).map((key) => <button className={`check-row ${frame[key] ? 'is-checked' : ''}`} key={key} onClick={() => onChange(key, !frame[key])} aria-pressed={frame[key]}>
+        {frame.canvasLayout !== 'portraitCard' && (['showInset', 'showShadow'] as const).map((key) => <button className={`check-row ${frame[key] ? 'is-checked' : ''}`} key={key} onClick={() => onChange(key, !frame[key])} aria-pressed={frame[key]}>
           <span className="check-box">{frame[key] && <Check size={13} aria-hidden="true" />}</span>
           <span><strong>{t(key === 'showInset' ? 'framePreview.inset' : 'framePreview.shadow')}</strong></span>
         </button>)}

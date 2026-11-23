@@ -7,7 +7,7 @@ import { registerWindowCloseGuard } from '../../store/session-persistence'
 import { getEffectiveFrame } from '../../store/session-store'
 import type { FrameSettings, SessionPhoto } from '../../types/photo'
 import { loadEditPreview } from '../editor/preview-cache'
-import { canvasAspectRatio } from '../editor/frame-layout'
+import { canvasAspectRatio, effectiveFrameSettings } from '../editor/frame-layout'
 import { applyCropToRaster } from '../editor/crop-model'
 import { useMetadataCorrections } from '../text/metadata-corrections-store'
 import { getEffectiveMetadata, resolveTextLayers } from '../text/text-model'
@@ -113,7 +113,8 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
         current.report.outcomes.set(photo.id, { type: 'failed', message: copy.missingSource })
         continue
       }
-      const { aspectPadding: _aspectPadding, ...frame } = getEffectiveFrame(photo, commonFrame)
+      const { aspectPadding: _aspectPadding, ...rawFrame } = getEffectiveFrame(photo, commonFrame)
+      const frame = effectiveFrameSettings(rawFrame)
       const { camera, lens } = getEffectiveMetadata(photo, corrections)
       const sourceRaster = frame.style === 'blurred' && photo.source.url
         ? await loadEditPreview(photo.source.url).catch(() => undefined)

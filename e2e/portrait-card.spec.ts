@@ -1,0 +1,61 @@
+import { expect, test } from '@playwright/test'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+
+const appUrl = process.env.LUSTRA_E2E_FILE_MODE === '1' ? pathToFileURL(resolve('dist/index.html')).href : '/'
+
+test('Portrait Card keeps its canvas and photo settings separate from Standard', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 780 })
+  await page.goto(appUrl)
+  await page.getByRole('button', { name: /import photos/i }).click()
+  await page.locator('input[type=file]').first().setInputFiles([resolve('src-tauri/tests/fixtures/test_exif_01.jpg')])
+  const details = page.getByRole('dialog', { name: /photo details/i })
+  if (await details.isVisible()) await details.getByRole('button', { name: /got it/i }).click()
+  await page.getByRole('button', { name: /import 1 photo/i }).click()
+  await expect(page.locator('.preview-board')).toBeVisible()
+
+  const layout = page.getByRole('combobox', { name: 'Canvas layout' })
+  await layout.selectOption('portraitCard')
+  await expect(page.getByRole('combobox', { name: 'Canvas Ratio' })).toHaveValue('0.8')
+  const size = page.getByRole('spinbutton', { name: 'Photo Size' })
+  await size.fill('65')
+  await size.press('Enter')
+  const position = page.getByRole('spinbutton', { name: 'Vertical Position' })
+  await position.fill('0.2')
+  await position.press('Enter')
+  await expect(page.getByRole('spinbutton', { name: 'Background Blur' })).toHaveValue('32')
+  await expect(page.getByRole('spinbutton', { name: 'Background Brightness' })).toHaveValue('90')
+  await page.locator('.preview-board').click()
+  await page.keyboard.press('c')
+  await expect(page.locator('.crop-overlay')).toBeVisible()
+  await page.getByRole('button', { name: 'Apply' }).click()
+  await expect(page.locator('.crop-overlay')).toBeHidden()
+  await page.getByRole('button', { name: 'Reset Position' }).click()
+  await expect(position).toHaveValue('0')
+  const dragBoard = await page.locator('.preview-board').boundingBox()
+  if (!dragBoard) throw new Error('Could not measure the Portrait Card canvas')
+  const dragX = dragBoard.x + dragBoard.width / 2
+  const dragY = dragBoard.y + dragBoard.height / 2
+  await page.mouse.move(dragX, dragY)
+  await page.mouse.down()
+  await page.mouse.move(dragX + 55, dragY)
+  await page.mouse.up()
+  await expect(position).toHaveValue('0')
+  await page.mouse.move(dragX, dragY)
+  await page.mouse.down()
+  await page.mouse.move(dragX + 55, dragY + 25, { steps: 4 })
+  await page.mouse.up()
+  await expect.poll(async () => Number(await position.inputValue())).toBeGreaterThan(0)
+  await position.fill('-0.15')
+  await position.press('Enter')
+
+  const board = page.locator('.preview-board')
+  const rect = await board.boundingBox()
+  expect(rect).not.toBeNull()
+  expect(rect!.width / rect!.height).toBeCloseTo(0.8, 1)
+  await layout.selectOption('standard')
+  await expect(page.getByRole('spinbutton', { name: 'Photo Size' })).toHaveCount(0)
+  await layout.selectOption('portraitCard')
+  await expect(size).toHaveValue('65')
+  await expect(position).toHaveValue('-0.15')
+})

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { canvasAspectRatio, getPhotoLayout } from '../src/features/editor/frame-layout'
+import { canvasAspectRatio, effectiveFrameSettings, getPhotoLayout } from '../src/features/editor/frame-layout'
 import { hasLegacyCanvasSettings, withoutLegacyCanvasSettings } from '../src/features/editor/frame-migration'
 import type { FrameSettings } from '../src/types/photo'
 
@@ -19,6 +19,24 @@ const frame = (changes: Partial<FrameSettings> = {}): FrameSettings => ({
 })
 
 describe('padding based canvas layout', () => {
+  test('Portrait Card is a canvas mode with centered bounded photo sizing and normalized vertical placement', () => {
+    const source = { width: 1600, height: 900 }
+    const settings = frame({ canvasLayout: 'portraitCard', portraitRatio: 4 / 5, portraitPhotoSize: 80, portraitVerticalPosition: 0 })
+    const canvas = { width: 400, height: 500 }
+    const layout = getPhotoLayout(canvas, source, settings)
+    expect(canvasAspectRatio(settings, source)).toBeCloseTo(4 / 5)
+    expect(layout.image).toEqual({ x: 40, y: 160, width: 320, height: 180 })
+    expect(layout.image.width / layout.image.height).toBeCloseTo(source.width / source.height)
+    expect(layout.visible).toEqual(layout.image)
+    expect(getPhotoLayout(canvas, source, frame({ canvasLayout: 'portraitCard', portraitPhotoSize: 100 })).image.width).toBe(360)
+    expect(getPhotoLayout(canvas, source, frame({ canvasLayout: 'portraitCard', portraitVerticalPosition: 0.5 })).image.y).toBe(330)
+  })
+
+  test('Portrait Card background values are independent of Standard frame values', () => {
+    const settings = frame({ style: 'black', blurStrength: 10, backgroundBrightness: 100, canvasLayout: 'portraitCard', portraitBackgroundStyle: 'blurred', portraitBackgroundBlur: 40, portraitBackgroundBrightness: 90 })
+    expect(effectiveFrameSettings(settings)).toMatchObject({ style: 'blurred', blurStrength: 40, backgroundBrightness: 90 })
+    expect(settings).toMatchObject({ style: 'black', blurStrength: 10, backgroundBrightness: 100 })
+  })
   test('None keeps the source canvas ratio and places the image edge to edge', () => {
     const source = { width: 1600, height: 900 }
     const settings = frame({ style: 'none', top: 12, bottom: 8, left: 10, right: 10 })

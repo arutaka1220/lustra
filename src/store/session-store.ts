@@ -79,6 +79,7 @@ export type SessionState = {
 }
 
 export const initialFrame: FrameSettings = {
+  canvasLayout: 'standard',
   style: 'black',
   ambientIntensity: 85,
   ambientSoftness: 65,

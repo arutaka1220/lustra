@@ -147,7 +147,17 @@ pub fn render(path: &Path, job: &ExportJob, settings: &ExportSettings) -> Result
     let crop_height = crop.height.clamp(0.001, 1.0 - crop_y);
     let crop_source_width = (f64::from(source_width) * crop_width).round().max(1.0) as u32;
     let crop_source_height = (f64::from(source_height) * crop_height).round().max(1.0) as u32;
-    let mut layout = layout(&job.frame, source_width, source_height, settings.size)?;
+    let (layout_source_width, layout_source_height) = if job.frame.canvas_layout == "portraitCard" {
+        (crop_source_width, crop_source_height)
+    } else {
+        (source_width, source_height)
+    };
+    let mut layout = layout(
+        &job.frame,
+        layout_source_width,
+        layout_source_height,
+        settings.size,
+    )?;
     let crop_aspect = f64::from(crop_source_width) / f64::from(crop_source_height);
     let image_aspect = layout.image.width / layout.image.height;
     if crop_aspect > image_aspect {
@@ -159,7 +169,20 @@ pub fn render(path: &Path, job: &ExportJob, settings: &ExportSettings) -> Result
         layout.image.x += (layout.image.width - width) / 2.0;
         layout.image.width = width;
     }
-    layout.visible_image = layout.image;
+    layout.visible_image = if job.frame.canvas_layout == "portraitCard" {
+        let left = layout.image.x.max(0.0);
+        let top = layout.image.y.max(0.0);
+        let right = (layout.image.x + layout.image.width).min(f64::from(layout.width));
+        let bottom = (layout.image.y + layout.image.height).min(f64::from(layout.height));
+        Rect {
+            x: left,
+            y: top,
+            width: (right - left).max(0.0),
+            height: (bottom - top).max(0.0),
+        }
+    } else {
+        layout.image
+    };
     if settings.format == ExportFormat::Webp && (layout.width > 16_383 || layout.height > 16_383) {
         return Err(
             "WebP is limited to 16,383 pixels on each side. Choose a smaller size.".to_owned(),
