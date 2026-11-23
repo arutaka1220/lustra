@@ -16,6 +16,10 @@
 .scope-note { overflow: hidden; margin: 8px 2px 0; color: var(--text-secondary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .scope-note strong { color: var(--text-primary); font-weight: 550; }
 .controls-scroll { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 0 16px 16px; scrollbar-width: thin; scrollbar-color: var(--stroke-color) transparent; }
+.portrait-canvas-field { display: grid; min-width: 0; gap: 6px; margin: 0 0 12px; color: var(--text-secondary); font-size: 12px; line-height: 18px; }
+.portrait-canvas-field > span { white-space: nowrap; }
+.portrait-canvas-field .ui-select-trigger { width: 100%; min-width: 0; }
+.portrait-reset-position { justify-self: start; max-width: 100%; white-space: normal; }
 .inspector-section { border-top: 1px solid var(--stroke-color); }
 .inspector-section:last-child { border-bottom: 1px solid var(--stroke-color); }
 .inspector-section__heading { margin: 0; }
