@@ -150,6 +150,40 @@ describe('ExportScreen start guard', () => {
     expect(mocks.beginExport).not.toHaveBeenCalled()
   })
 
+  it('yields while preparing a 100-photo batch', async () => {
+    const frames: FrameRequestCallback[] = []
+    const hundredPhotos = Array.from({ length: 100 }, (_, index) => ({
+      ...photos[index % photos.length],
+      id: `large-batch-${index}`,
+      name: `large-batch-${index}.jpg`,
+      source: { kind: 'path' as const, path: `/tmp/large-batch-${index}.jpg`, url: `file:///tmp/large-batch-${index}.jpg` },
+    }))
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    mocks.beginExport.mockResolvedValue('run-100')
+    render(<ExportScreen photos={hundredPhotos as never} commonFrame={{} as never} onBackToReview={() => {}} onBackToEditing={() => {}} onFinish={() => {}} onBusyChange={() => {}} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export', exact: true }))
+    expect(screen.getByText('Preparing 100 photos for export.')).toBeInTheDocument()
+    expect(mocks.getEffectiveFrame).not.toHaveBeenCalled()
+
+    await advanceFrame(frames)
+    await advanceFrame(frames)
+    expect(mocks.getEffectiveFrame).toHaveBeenCalledTimes(20)
+    for (let completed = 40; completed <= 80; completed += 20) {
+      await advanceFrame(frames)
+      expect(mocks.getEffectiveFrame).toHaveBeenCalledTimes(completed)
+      expect(mocks.beginExport).not.toHaveBeenCalled()
+    }
+
+    await advanceFrame(frames)
+    await waitFor(() => expect(mocks.beginExport).toHaveBeenCalledTimes(1))
+    expect(mocks.beginExport.mock.calls[0][1]).toHaveLength(100)
+    expect(await screen.findByText('0 of 100 photos processed')).toBeInTheDocument()
+  })
+
   it('ignores a late start rejection after the next run has taken ownership', async () => {
     const starts: Array<ReturnType<typeof deferred<string>>> = []
     const events: Array<(event: ExportEvent) => void> = []
