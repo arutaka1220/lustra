@@ -8,7 +8,7 @@ import { usePhotoThumbnail } from '../import/photo-thumbnail-cache'
 import '../editor/frame-i18n'
 import './review-thumbnail.css'
 
-const OUTPUT_EDGE = 256
+const OUTPUT_EDGE = 768
 const RENDER_CACHE_LIMIT_BYTES = 24 * 1024 * 1024
 type RenderedThumbnail = { key: string; canvas: HTMLCanvasElement; bytes: number; size: { width: number; height: number } }
 const renderedCache = new Map<string, RenderedThumbnail>()
@@ -89,8 +89,8 @@ export function ReviewThumbnail({ photo, frame, onAspectRatio }: Props) {
     if (thumbnail?.raster) onAspectRatio?.(ratio)
   }, [onAspectRatio, ratio, thumbnail?.raster])
   const board = fitCanvasToBounds({
-    width: Math.max(1, available.width - 2),
-    height: Math.max(1, available.height - 2),
+    width: Math.max(1, available.width),
+    height: Math.max(1, available.height),
   }, ratio)
 
   useEffect(() => {

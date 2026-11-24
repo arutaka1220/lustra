@@ -1,12 +1,13 @@
 import * as Dialog from '@radix-ui/react-dialog'
-import { ArrowLeft, Check, Download, ImageOff, ImagePlus, Pencil, X } from 'lucide-react'
+import { ArrowLeft, Check, Download, ImageOff, ImagePlus, Minus, Pencil, Plus, RotateCcw, X } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { FrameSettings, SessionPhoto } from '../../types/photo'
 import { getEffectiveFrame, useSessionStore } from '../../store/session-store'
 import { FramePreview } from '../editor/FramePreview'
 import { ReviewThumbnail } from './ReviewThumbnail'
-import { buildJustifiedRows } from './justified-layout'
+import { buildReviewLayout } from './review-layout'
+import { useReviewMinimumSize } from './useReviewMinimumSize'
 
 type ReviewCardProps = {
   photo: SessionPhoto
@@ -14,17 +15,17 @@ type ReviewCardProps = {
   index: number
   onOpen: (id: string) => void
   onEdit: (id: string) => void
-  aspectRatio: number
   onAspectRatio: (ratio: number) => void
   width: number
   height: number
+  position: { left: number; top: number }
 }
 
-const ReviewCard = memo(function ReviewCard({ photo, commonFrame, index, onOpen, onEdit, aspectRatio, onAspectRatio, width, height }: ReviewCardProps) {
+const ReviewCard = memo(function ReviewCard({ photo, commonFrame, index, onOpen, onEdit, onAspectRatio, width, height, position }: ReviewCardProps) {
   const { t } = useTranslation()
   const frame = useMemo(() => getEffectiveFrame(photo, commonFrame), [commonFrame, photo])
 
-  return <article className="review-card" style={{ width, height, aspectRatio }}>
+  return <article className="review-card" style={{ width, height, left: position.left, top: position.top }}>
     <button className="review-card__image" onClick={() => photo.source.url ? onOpen(photo.id) : onEdit(photo.id)} aria-label={t('review.openPhoto', { name: photo.name })}>
       {photo.source.url ? <ReviewThumbnail photo={photo} frame={frame} onAspectRatio={onAspectRatio} />
         : <span className="review-missing"><ImageOff size={22} /> {t('session.sourceMissing')}</span>}
@@ -47,7 +48,9 @@ export function ReviewScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const gallery = useRef<HTMLDivElement>(null)
   const [galleryWidth, setGalleryWidth] = useState(0)
+  const [galleryHeight, setGalleryHeight] = useState(0)
   const [aspects, setAspects] = useState<Record<string, number>>({})
+  const minimumSizePreference = useReviewMinimumSize()
   const selected = photos.find((photo) => photo.id === selectedId)
   const completed = photos.filter((photo) => photo.completed).length
   useEffect(() => {
@@ -55,7 +58,9 @@ export function ReviewScreen() {
     if (!element) return
     const observer = new ResizeObserver(([entry]) => {
       const width = entry?.contentRect.width ?? 0
+      const height = entry?.contentRect.height ?? 0
       setGalleryWidth((current) => Math.abs(current - width) < 1 ? current : width)
+      setGalleryHeight((current) => Math.abs(current - height) < 1 ? current : height)
     })
     observer.observe(element)
     return () => observer.disconnect()
@@ -68,7 +73,7 @@ export function ReviewScreen() {
 
   const aspectCallbacks = useMemo(() => new Map(photos.map((photo) => [photo.id, (ratio: number) => setPhotoAspect(photo.id, ratio)])), [photos, setPhotoAspect])
 
-  const rows = useMemo(() => buildJustifiedRows(photos.map((photo) => aspects[photo.id] ?? 1.5), galleryWidth), [aspects, galleryWidth, photos])
+  const layout = useMemo(() => buildReviewLayout(photos.map((photo) => aspects[photo.id] ?? 1.5), galleryWidth, galleryHeight, 10, minimumSizePreference.minimumSize), [aspects, galleryHeight, galleryWidth, minimumSizePreference.minimumSize, photos])
 
   const editPhoto = useCallback((id: string) => {
     setActivePhoto(id)
@@ -85,6 +90,20 @@ export function ReviewScreen() {
         </div>
         <div className="review-heading__actions">
           <span className="review-completion"><Check size={14} /> {t('edit.completion', { count: completed, total: photos.length })}</span>
+          <div className="review-size-control">
+            <label htmlFor="review-minimum-size">{t('review.minimumSize')}</label>
+            <div className="review-size-control__slider">
+              <Minus size={14} aria-hidden="true" />
+              <input id="review-minimum-size" type="range" min={160} max={400} step={20} value={minimumSizePreference.minimumSize}
+                disabled={!minimumSizePreference.ready || layout.mode !== 'justified'} aria-valuetext={`${minimumSizePreference.minimumSize}px`}
+                onChange={(event) => minimumSizePreference.update(Number(event.currentTarget.value))} />
+              <Plus size={14} aria-hidden="true" />
+              <output htmlFor="review-minimum-size">{minimumSizePreference.minimumSize}px</output>
+              <button type="button" className="icon-button review-size-control__reset" aria-label={t('review.resetMinimumSize')}
+                title={t('review.resetMinimumSize')} disabled={!minimumSizePreference.ready || minimumSizePreference.minimumSize === 240}
+                onClick={minimumSizePreference.reset}><RotateCcw size={13} /></button>
+            </div>
+          </div>
           <button className="button button--quiet" onClick={() => setScreen('edit')}><ArrowLeft size={15} /> {t('review.back')}</button>
           <button className="button button--primary" disabled={!photos.length} onClick={() => setScreen('export')}><Download size={15} /> {t('review.export')}</button>
         </div>
@@ -93,13 +112,14 @@ export function ReviewScreen() {
         <div className="review-empty"><ImagePlus size={25} /><strong>{t('review.empty')}</strong></div>
       ) : (
         <div className="review-grid" ref={gallery}>
-          {rows.map((row, rowIndex) => <div className="review-grid__row" key={rowIndex} style={{ height: row.height }}>
-            {row.indices.map((index, column) => {
-              const photo = photos[index]
-              return <ReviewCard key={photo.id} photo={photo} commonFrame={commonFrame} index={index} onOpen={openPhoto} onEdit={editPhoto}
-                aspectRatio={aspects[photo.id] ?? 1.5} onAspectRatio={aspectCallbacks.get(photo.id)!} width={row.widths[column]} height={row.height} />
+          <div className="review-grid__canvas" style={{ height: layout.height }}>
+            {layout.tiles.map((tile) => {
+              const photo = photos[tile.index]
+              return <ReviewCard key={photo.id} photo={photo} commonFrame={commonFrame} index={tile.index} onOpen={openPhoto} onEdit={editPhoto}
+                onAspectRatio={aspectCallbacks.get(photo.id)!} width={tile.width} height={tile.height}
+                position={{ left: tile.x, top: tile.y }} />
             })}
-          </div>)}
+          </div>
         </div>
       )}
       <Dialog.Root open={Boolean(selected)} onOpenChange={(open) => { if (!open) setSelectedId(null) }}>
