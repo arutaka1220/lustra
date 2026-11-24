@@ -6,9 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { registerWindowCloseGuard } from '../../store/session-persistence'
 import { getEffectiveFrame } from '../../store/session-store'
 import type { FrameSettings, SessionPhoto } from '../../types/photo'
-import { loadEditPreview } from '../editor/preview-cache'
-import { canvasAspectRatio, effectiveFrameSettings } from '../editor/frame-layout'
-import { applyCropToRaster } from '../editor/crop-model'
+import { effectiveFrameSettings } from '../editor/frame-layout'
 import { useMetadataCorrections } from '../text/metadata-corrections-store'
 import { getEffectiveMetadata, resolveTextLayers } from '../text/text-model'
 import { ExportPreferencesContent } from './ExportPreferencesPanel'
@@ -42,6 +40,8 @@ type ActiveRun = {
   report: ExportReport
   runId: string | null
   cancelling: boolean
+  releaseCloseGuard: (() => void) | null
+  returnPhase: 'settings' | 'result'
 }
 
 function isReadingMetadata(photo: SessionPhoto) {
@@ -81,6 +81,7 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
   const [actionError, setActionError] = useState<{ description: string; detail: string } | null>(null)
   const [confirmation, setConfirmation] = useState<'incomplete' | 'cancel' | null>(null)
   const [phase, setPhase] = useState<'settings' | 'progress' | 'result'>('settings')
+  const [preparing, setPreparing] = useState(false)
   const [progress, setProgress] = useState({ processed: 0, total: 0 })
   const [canCancel, setCanCancel] = useState(false)
   const [cancelling, setCancelling] = useState(false)
@@ -101,58 +102,63 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
       report: { outcomes: new Map(previous?.outcomes), cancelled: false, cleanupErrors: [...(previous?.cleanupErrors ?? [])] },
       runId: null,
       cancelling: false,
+      releaseCloseGuard: null,
+      returnPhase: previous ? 'result' : 'settings',
     }
     const jobs: ExportJob[] = []
-    for (const photo of batch) {
-      current.report.outcomes.delete(photo.id)
-      if (photo.source.kind !== 'path') {
-        current.report.outcomes.set(photo.id, { type: 'failed', message: copy.unsupportedSource })
-        continue
-      }
-      if (photo.source.missing) {
-        current.report.outcomes.set(photo.id, { type: 'failed', message: copy.missingSource })
-        continue
-      }
-      const { aspectPadding: _aspectPadding, ...rawFrame } = getEffectiveFrame(photo, commonFrame)
-      const frame = effectiveFrameSettings(rawFrame)
-      const { camera, lens } = getEffectiveMetadata(photo, corrections)
-      const sourceRaster = frame.style === 'blurred' && photo.source.url
-        ? await loadEditPreview(photo.source.url).catch(() => undefined)
-        : undefined
-      const raster = sourceRaster && photo.cropTransform ? applyCropToRaster(sourceRaster, photo.cropTransform) : sourceRaster
-      const aspectRatio = raster ? canvasAspectRatio(frame, raster) : 4 / 5
-      const textCanvasSize = aspectRatio >= 1
-        ? { width: 1080 * aspectRatio, height: 1080 }
-        : { width: 1080, height: 1080 / aspectRatio }
-      jobs.push({
-        id: photo.id,
-        path: photo.source.path,
-        frame,
-        crop: photo.cropTransform,
-        text: resolveTextLayers(photo, frame, corrections, language, raster, textCanvasSize),
-        metadata: { camera, lens },
-      })
-    }
-
     setConfirmation(null)
     setActionError(null)
+    setProgress({ processed: 0, total: batch.length })
+    setPreparing(true)
+    setCanCancel(true)
+    setPhase('progress')
+    onBusyChange(true)
+    activeRun.current = current
+    current.releaseCloseGuard = registerWindowCloseGuard(() => {
+      if (!current.cancelling) showConfirmation('cancel')
+      return true
+    })
+    try {
+      for (const photo of batch) {
+        if (current.cancelling || activeRun.current !== current) return
+        current.report.outcomes.delete(photo.id)
+        if (photo.source.kind !== 'path') {
+          current.report.outcomes.set(photo.id, { type: 'failed', message: copy.unsupportedSource })
+          continue
+        }
+        if (photo.source.missing) {
+          current.report.outcomes.set(photo.id, { type: 'failed', message: copy.missingSource })
+          continue
+        }
+        const { aspectPadding: _aspectPadding, ...rawFrame } = getEffectiveFrame(photo, commonFrame)
+        const frame = effectiveFrameSettings(rawFrame)
+        const { camera, lens } = getEffectiveMetadata(photo, corrections)
+        jobs.push({
+          id: photo.id,
+          path: photo.source.path,
+          frame,
+          crop: photo.cropTransform,
+          text: resolveTextLayers(photo, frame, corrections, language),
+          metadata: { camera, lens },
+        })
+      }
+
+    if (current.cancelling || activeRun.current !== current) return
+    setPreparing(false)
     if (!jobs.length) {
+      activeRun.current = null
+      current.releaseCloseGuard?.()
       setReport(current.report)
       setPhase('result')
+      onBusyChange(false)
       return
     }
 
     const invalidCount = batch.length - jobs.length
-    activeRun.current = current
-    const releaseCloseGuard = registerWindowCloseGuard(() => {
-      if (!current.cancelling) showConfirmation('cancel')
-      return true
-    })
     setProgress({ processed: invalidCount, total: batch.length })
-    setPhase('progress')
-    onBusyChange(true)
-
-    try {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      if (current.cancelling || activeRun.current !== current) return
+      setPreparing(false)
       const runId = await beginExport(preferences.destination, jobs, getExportSettings(preferences, capabilities), (event) => {
         if (activeRun.current !== current) return
         if (event.type === 'photo') {
@@ -170,7 +176,8 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
         current.report.cancelled = event.cancelled
         current.report.cleanupErrors.push(...event.cleanupErrors)
         activeRun.current = null
-        releaseCloseGuard()
+        current.releaseCloseGuard?.()
+        current.releaseCloseGuard = null
         setReport(current.report)
         setCanCancel(false)
         setCancelling(false)
@@ -185,9 +192,11 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
     } catch (error) {
       if (activeRun.current !== current) return
       activeRun.current = null
-      releaseCloseGuard()
+      current.releaseCloseGuard?.()
+      current.releaseCloseGuard = null
       setConfirmation(null)
       setCanCancel(false)
+      setPreparing(false)
       setPhase(previous ? 'result' : 'settings')
       setActionError({ description: copy.exportFailed, detail: exportError(error) })
       onBusyChange(false)
@@ -196,12 +205,23 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
 
   const requestCancel = async (policy: CancelPolicy) => {
     const current = activeRun.current
-    if (!current?.runId || current.cancelling) return
+    if (!current || current.cancelling) return
 
     current.cancelling = true
     setConfirmation(null)
     setCancelling(true)
     setActionError(null)
+    if (!current.runId) {
+      activeRun.current = null
+      current.releaseCloseGuard?.()
+      current.releaseCloseGuard = null
+      setPreparing(false)
+      setCanCancel(false)
+      setCancelling(false)
+      setPhase(current.returnPhase)
+      onBusyChange(false)
+      return
+    }
     try {
       await cancelExport(current.runId, policy)
     } catch (error) {
@@ -274,11 +294,17 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
 
         {phase === 'progress' && (
           <div className="export-progress">
+            {preparing && <div className="export-progress__preparing" role="status" aria-live="polite">
+              <span className="export-progress__spinner" aria-hidden="true" />
+              <div><strong>{copy.preparingTitle}</strong><span>{copy.preparingCount(photos.length)}</span></div>
+            </div>}
+            {!preparing && <>
             <div className="export-progress__label">
               <span id="export-progress-label">{copy.progressCount(progress.processed, progress.total)}</span>
               <strong>{percentLabel}</strong>
             </div>
             <progress max={progress.total} value={progress.processed} aria-labelledby="export-progress-label" />
+            </>}
             <div className="export-actions export-actions--end">
               <button className="button button--secondary" type="button" disabled={!canCancel || cancelling} onClick={() => showConfirmation('cancel')}>
                 {cancelling ? copy.cancelling : copy.cancel}
