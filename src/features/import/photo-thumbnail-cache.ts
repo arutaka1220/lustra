@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { PhotoRaster } from '../editor/frame-paint'
 
-const THUMBNAIL_EDGE = 384
+const THUMBNAIL_EDGE = 768
 const CACHE_LIMIT_BYTES = 24 * 1024 * 1024
 const MAX_CONCURRENT_DECODES = 2
 const MAX_PENDING_THUMBNAILS = 48

@@ -48,4 +48,16 @@ describe('justified review layout', () => {
     expect(rows.at(-1)!.height).toBeLessThanOrEqual(420)
     expect(rows.every((row) => Number.isFinite(row.height) && row.widths.every(Number.isFinite))).toBe(true)
   })
+
+  it('does not apply the multi-row cap to a gallery that fits in one row', () => {
+    const one = buildJustifiedRows([1.8], 1600, 10, 230, 900)
+    expect(one[0].height).toBeCloseTo(1600 / 1.8)
+    expect(one[0].widths[0]).toBeCloseTo(1600)
+
+    const two = buildJustifiedRows([0.65, 0.7], 1200, 10, 230, 760)
+    expect(two).toHaveLength(1)
+    expect(two[0].height).toBeCloseTo(760)
+    expect(two[0].widths[0] + two[0].widths[1] + 10).toBeLessThanOrEqual(1200)
+    expect(two[0].height).toBeGreaterThan(420)
+  })
 })

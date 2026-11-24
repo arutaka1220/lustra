@@ -6,7 +6,7 @@ export function buildJustifiedRows(aspects: number[], width: number, gap = 10, t
   const ratios = aspects.map((aspect) => Number.isFinite(aspect) && aspect > 0 ? aspect : 1.5)
   const rows: JustifiedRow[] = []
   const maxHeight = Math.max(1, Math.min(availableHeight, 420))
-  const singleRowHeight = Math.min(maxHeight, (width - gap * Math.max(0, ratios.length - 1)) / ratios.reduce((sum, ratio) => sum + ratio, 0))
+  const singleRowHeight = Math.min(Math.max(1, availableHeight), (width - gap * Math.max(0, ratios.length - 1)) / ratios.reduce((sum, ratio) => sum + ratio, 0))
   // A small gallery can use its vertical space too; keep the one-row layout when it fits.
   if (ratios.length <= 5) {
     return [{ indices: ratios.map((_, index) => index), height: singleRowHeight, widths: ratios.map((ratio) => ratio * singleRowHeight) }]
