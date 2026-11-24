@@ -36,6 +36,18 @@ type ExportReport = {
   cleanupErrors: string[]
 }
 
+const EXPORT_JOB_PREPARATION_CHUNK_SIZE = 20
+
+function waitForPreparationPaint() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+  })
+}
+
+function waitForNextFrame() {
+  return new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+}
+
 type ActiveRun = {
   report: ExportReport
   runId: string | null
@@ -82,6 +94,7 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
   const [confirmation, setConfirmation] = useState<'incomplete' | 'cancel' | null>(null)
   const [phase, setPhase] = useState<'settings' | 'progress' | 'result'>('settings')
   const [preparing, setPreparing] = useState(false)
+  const [preparingCount, setPreparingCount] = useState(0)
   const [progress, setProgress] = useState({ processed: 0, total: 0 })
   const [canCancel, setCanCancel] = useState(false)
   const [cancelling, setCancelling] = useState(false)
@@ -110,6 +123,7 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
     setActionError(null)
     setProgress({ processed: 0, total: batch.length })
     setPreparing(true)
+    setPreparingCount(batch.length)
     setCanCancel(true)
     setPhase('progress')
     onBusyChange(true)
@@ -119,44 +133,54 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
       return true
     })
     try {
-      for (const photo of batch) {
+      // Let React render the preparation state and the browser paint it before
+      // any per-photo work can occupy the main thread.
+      await waitForPreparationPaint()
+      if (current.cancelling || activeRun.current !== current) return
+
+      for (const [index, photo] of batch.entries()) {
         if (current.cancelling || activeRun.current !== current) return
         current.report.outcomes.delete(photo.id)
         if (photo.source.kind !== 'path') {
           current.report.outcomes.set(photo.id, { type: 'failed', message: copy.unsupportedSource })
-          continue
-        }
-        if (photo.source.missing) {
+        } else if (photo.source.missing) {
           current.report.outcomes.set(photo.id, { type: 'failed', message: copy.missingSource })
-          continue
+        } else {
+          const { aspectPadding: _aspectPadding, ...rawFrame } = getEffectiveFrame(photo, commonFrame)
+          const frame = effectiveFrameSettings(rawFrame)
+          const { camera, lens } = getEffectiveMetadata(photo, corrections)
+          jobs.push({
+            id: photo.id,
+            path: photo.source.path,
+            frame,
+            crop: photo.cropTransform,
+            text: resolveTextLayers(photo, frame, corrections, language),
+            metadata: { camera, lens },
+          })
         }
-        const { aspectPadding: _aspectPadding, ...rawFrame } = getEffectiveFrame(photo, commonFrame)
-        const frame = effectiveFrameSettings(rawFrame)
-        const { camera, lens } = getEffectiveMetadata(photo, corrections)
-        jobs.push({
-          id: photo.id,
-          path: photo.source.path,
-          frame,
-          crop: photo.cropTransform,
-          text: resolveTextLayers(photo, frame, corrections, language),
-          metadata: { camera, lens },
-        })
+
+        if ((index + 1) % EXPORT_JOB_PREPARATION_CHUNK_SIZE === 0 && index + 1 < batch.length) {
+          await waitForNextFrame()
+          if (current.cancelling || activeRun.current !== current) return
+        }
       }
 
-    if (current.cancelling || activeRun.current !== current) return
-    if (!jobs.length) {
-      activeRun.current = null
-      current.releaseCloseGuard?.()
-      setPreparing(false)
-      setReport(current.report)
-      setPhase('result')
-      onBusyChange(false)
-      return
-    }
+      if (current.cancelling || activeRun.current !== current) return
+      if (!jobs.length) {
+        activeRun.current = null
+        current.releaseCloseGuard?.()
+        current.releaseCloseGuard = null
+        setPreparing(false)
+        setCanCancel(false)
+        setCancelling(false)
+        setReport(current.report)
+        setPhase('result')
+        onBusyChange(false)
+        return
+      }
 
-    const invalidCount = batch.length - jobs.length
-    setProgress({ processed: invalidCount, total: batch.length })
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      const invalidCount = batch.length - jobs.length
+      setProgress({ processed: invalidCount, total: batch.length })
       if (current.cancelling || activeRun.current !== current) return
       // The backend may start the worker before its IPC response returns; keep
       // cancellation disabled until the run ID is available for a safe cancel.
@@ -166,6 +190,7 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
         if (event.type === 'photo') {
           current.report.outcomes.set(event.id, event.outcome)
           setProgress({ processed: event.processed + invalidCount, total: event.total + invalidCount })
+          setPreparing(false)
           return
         }
 
@@ -181,6 +206,7 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
         current.releaseCloseGuard?.()
         current.releaseCloseGuard = null
         setReport(current.report)
+        setPreparing(false)
         setCanCancel(false)
         setCancelling(false)
         setConfirmation(null)
@@ -299,7 +325,7 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
           <div className="export-progress">
             {preparing && <div className="export-progress__preparing" role="status" aria-live="polite">
               <span className="export-progress__spinner" aria-hidden="true" />
-              <div><strong>{copy.preparingTitle}</strong><span>{copy.preparingCount(photos.length)}</span></div>
+              <div><strong>{copy.preparingTitle}</strong><span>{copy.preparingCount(preparingCount)}</span></div>
             </div>}
             {!preparing && <>
             <div className="export-progress__label">
