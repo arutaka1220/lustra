@@ -20,6 +20,12 @@ function assertTiles(aspects: number[], tiles: ReturnType<typeof buildReviewLayo
     const overlapY = Math.min(left.y + left.height, right.y + right.height) - Math.max(left.y, right.y)
     expect(overlapX > 0 && overlapY > 0).toBe(false)
   }
+  for (const tile of tiles) {
+    const right = tiles.filter((other) => other.x >= tile.x + tile.width - 1 && Math.min(tile.y + tile.height, other.y + other.height) > Math.max(tile.y, other.y)).sort((a, b) => a.x - b.x)[0]
+    if (right) expect(Math.abs(right.x - tile.x - tile.width - 10)).toBeLessThanOrEqual(1)
+    const below = tiles.filter((other) => other.y >= tile.y + tile.height - 1 && Math.min(tile.x + tile.width, other.x + other.width) > Math.max(tile.x, other.x)).sort((a, b) => a.y - b.y)[0]
+    if (below) expect(Math.abs(below.y - tile.y - tile.height - 10)).toBeLessThanOrEqual(1)
+  }
 }
 
 describe('adaptive review layout', () => {
@@ -27,13 +33,13 @@ describe('adaptive review layout', () => {
     const ratios = [0.65, 0.7, 1.8, 1.6]
     const layout = buildReviewLayout(ratios, 1200, 760)
     expect(layout.mode).toBe('mosaic')
-    assertTiles(ratios, layout.tiles, 1198, 758)
+    assertTiles(ratios, layout.tiles, 1200, 760)
   })
 
   it('covers portrait, landscape, square, tiny, empty, and large collections', () => {
     for (const ratios of [[0.5], [2], [0.65, 0.7], [1.8, 1.6], [1, 1, 1], [0.15, 5]]) {
       const layout = buildReviewLayout(ratios, 1200, 760)
-      assertTiles(ratios, layout.tiles, 1198, 758)
+      assertTiles(ratios, layout.tiles, 1200, 760)
     }
     expect(buildReviewLayout([], 1200, 760).tiles).toEqual([])
     for (const count of [5, 8, 10, 30, 50, 100, 200]) {

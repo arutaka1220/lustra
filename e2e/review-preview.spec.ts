@@ -26,7 +26,22 @@ test('review opens a framed preview and can switch between images', async ({ pag
   for (const card of [first, second]) {
     await expect(card.locator('.review-thumbnail__canvas')).toBeVisible({ timeout: 10_000 })
     const imageBox = await card.locator('.review-thumbnail__board').boundingBox()
+    const cardBox = await card.locator('..').boundingBox()
     expect(imageBox?.height).toBeGreaterThan(300)
+    expect(Math.abs((imageBox?.x ?? 0) - (cardBox?.x ?? 0))).toBeLessThanOrEqual(1)
+    expect(Math.abs((imageBox?.y ?? 0) - (cardBox?.y ?? 0))).toBeLessThanOrEqual(1)
+    expect(Math.abs((imageBox?.width ?? 0) - (cardBox?.width ?? 0))).toBeLessThanOrEqual(1)
+    expect(Math.abs((imageBox?.height ?? 0) - (cardBox?.height ?? 0))).toBeLessThanOrEqual(1)
+    const check = card.locator('.review-complete-mark').boundingBox()
+    const markBox = await check
+    expect(markBox).not.toBeNull()
+    expect(markBox!.x + markBox!.width).toBeLessThanOrEqual(cardBox!.x + cardBox!.width + 1)
+    expect(markBox!.y).toBeGreaterThanOrEqual(cardBox!.y - 1)
+    await card.hover()
+    const infoBox = await card.locator('..').locator('.review-card__info').boundingBox()
+    expect(infoBox).not.toBeNull()
+    expect(infoBox!.x).toBeGreaterThanOrEqual(cardBox!.x - 1)
+    expect(infoBox!.x + infoBox!.width).toBeLessThanOrEqual(cardBox!.x + cardBox!.width + 1)
   }
   await page.setViewportSize({ width: 900, height: 640 })
   const narrowCard = await first.boundingBox()

@@ -89,8 +89,8 @@ export function ReviewThumbnail({ photo, frame, onAspectRatio }: Props) {
     if (thumbnail?.raster) onAspectRatio?.(ratio)
   }, [onAspectRatio, ratio, thumbnail?.raster])
   const board = fitCanvasToBounds({
-    width: Math.max(1, available.width - 2),
-    height: Math.max(1, available.height - 2),
+    width: Math.max(1, available.width),
+    height: Math.max(1, available.height),
   }, ratio)
 
   useEffect(() => {
