@@ -259,11 +259,16 @@ Lustraは、Lightroom等でセレクト・現像された写真にEXIFを用い�
 - [確定] `This Photo`の状態は写真切替時も維持。
 - [提案] 個別上書きされた設定には小さな変更点表示と`Reset to Shared`操作。色だけで識別させない。
 
-**Typographyの文字色**
+**Frame共通Text Color**
 
-- `Text color`は`Auto | Custom`を選ぶ。Autoでは背景に応じた黒/白を使用し、補足文のみ表示する。Customでは丸型スウォッチとHEX値を示し、フレーム色と共通のカラーピッカーおよびMy Paletteを使う。
-- ピッカー操作は編集中のプレビューへ即時反映し、Custom色はAuto選択中も保持する。個々の文字レイヤーの設定として保存し、既存のAll Photos / This PhotoとUndo履歴に従う。
-- 単色フレームのAutoは実HEX値のコントラストで判定する。Blurredは文字アンカーの局所背景をサンプルする。同一の解決済み文字色を編集プレビュー、Review、Exportで共有する。
+- Frame設定の最後に共通Text Colorを置き、Autoスイッチと丸型パレットを表示する。Frame固有の設定がある場合はそれらの後に置く。Custom Frameでは背景色パレットと余白・見出しで分け、パレット自体に新しいカードや説明文を加えない。
+- Auto ONを初期値とし、Black / Soft Black / Blurred / Ambient Gradient / Edge Stretch / Noneは白、White / Soft Whiteは黒。Customは背景色とのWCAG相対輝度から白黒のコントラスト比を比較する。画像サンプルや文字レイヤー単位の判定は行わない。
+- Auto OFFでは共通の手動色をすべてのテキストへ適用し、既存のカラーピッカーとMy Paletteを利用する。Auto中もパレットの位置を維持し、自動色を選択表示するが操作は無効にする。手動色はFrame変更とAuto切替後も保持する。
+- TypographyからGlobal Text Color、レイヤー色モード、レイヤー用カラーピッカーを除去する。Font、Weight、Size、Opacity、Alignment等は維持する。文字色はFrameだけで管理する。
+- All Photos / This Photoの既存スコープ、Undo/Redo、セッションとRecent Sessionsの保存を維持する。新Auto状態と手動色は写真別オーバーライドへ保存可能とし、写真の切替で適切な共通色を解決する。
+- 旧AutoをAuto ONへ移行する。旧Global色はGlobalモードを使用したレイヤーがあれば共通の手動色へ移行する。旧レイヤー別Custom色のみの場合は最頻色を採用し、同数ならレイヤー順で先の色を採用する。復元時に旧色フィールドを除去し、次の保存から新方式だけを出力する。
+- プレビューとRust書き出しは同一のFrame色解決規則を使い、JPEG / PNG / WebP / Original、Standard / Portrait Cardで文字Opacityを保つ。ICC / EXIF / GPSと元画像の仕様は変えない。
+
 ### 4.4 Edit Frames: Previewと直接操作
 
 **写真の外側にある編集ワークスペース背景は常に白 (#FFFFFF) とする。** [確定]

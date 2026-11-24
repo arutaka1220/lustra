@@ -24,7 +24,7 @@ test('Home import creates a fresh photo import session', async ({ page }) => {
   await expect(page.getByRole('region', { name: /photos/i })).toBeVisible({ timeout: 10_000 })
   await expect(page.getByRole('button', { name: /all photos/i })).toBeVisible()
   await expect(page.getByRole('img', { name: 'test_exif_01.jpg' })).toBeVisible()
-  await page.getByRole('button', { name: /custom/i }).click()
+  await page.getByRole('button', { name: 'Custom frame color' }).click()
   await page.getByRole('button', { name: /custom frame color/i }).click()
   const picker = page.getByRole('dialog', { name: 'Frame Color' })
   await picker.getByRole('textbox', { name: 'HEX' }).fill('#123ABC')

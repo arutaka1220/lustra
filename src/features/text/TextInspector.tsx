@@ -7,7 +7,6 @@ import { SelectField } from '../../components/ui/SelectField'
 import type { FrameSettings, PhotoMetadata, SessionPhoto } from '../../types/photo'
 import { InspectorSection } from '../editor/InspectorSection'
 import { SliderInput } from '../editor/SliderInput'
-import { CustomColorPicker } from '../editor/CustomColorPicker'
 import { useInspectorSections } from '../editor/useInspectorSections'
 import { loadFontCatalog, SUGGESTED_FONTS } from './font-catalog'
 import { useMetadataCorrections } from './metadata-corrections-store'
@@ -15,7 +14,7 @@ import { useSelectedTextIds, useTextEditor } from './text-editor-store'
 import type { MetadataFocus } from './text-editor-store'
 import {
   createTextElement, DEFAULT_TEXT_FONT, getEffectiveMetadata, getTextAnchorPosition, getTextElements, METADATA_VARIABLES,
-  resolveTemplate, TEXT_ANCHORS, textColor,
+  resolveTemplate, TEXT_ANCHORS,
 } from './text-model'
 import type { MetadataField, TextAnchor, TextElement } from './text-model'
 import './text-i18n'
@@ -299,13 +298,6 @@ export function TextInspector({ photo, frame }: TextInspectorProps) {
           </div>
           <SliderInput label={t('text.size')} value={active.size} min={8} max={160} unit="px" onChange={(size) => updateElement(active.id, { size })} onChangeStart={beginEdit} onChangeEnd={endEdit} />
           <SliderInput label={t('text.opacity')} value={active.opacity ?? 100} min={0} max={100} unit="%" onChange={(opacity) => updateElement(active.id, { opacity })} onChangeStart={beginEdit} onChangeEnd={endEdit} />
-          <div className="text-color-controls">
-            <div className="text-color-mode" role="group" aria-label={t('text.color')}>
-              <button type="button" className={active.color === 'auto' ? 'is-active' : ''} aria-pressed={active.color === 'auto'} onClick={() => updateElement(active.id, { color: 'auto', customColor: active.color === 'auto' ? active.customColor : active.color })}>{t('text.auto')}</button>
-              <button type="button" className={active.color !== 'auto' ? 'is-active' : ''} aria-pressed={active.color !== 'auto'} onClick={() => updateElement(active.id, { color: active.customColor ?? (active.color === 'auto' ? textColor('auto', frame.style, frame.customColor) : active.color) })}>{t('text.custom')}</button>
-            </div>
-            {active.color !== 'auto' && <CustomColorPicker title={t('text.textColor')} color={active.color} label={t('text.textColor')} onChange={(color) => updateElement(active.id, { color, customColor: color })} onEditStart={beginEdit} onEditEnd={endEdit} />}
-          </div>
         </> : <p className="text-hint">{t('text.selectLayer')}</p>}
       </InspectorSection>
       <InspectorSection title={t('text.guides')} open={isOpen('guides')} onToggle={() => toggle('guides')}>

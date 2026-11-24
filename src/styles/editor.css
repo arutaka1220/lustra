@@ -36,6 +36,21 @@
 
 /* Inspector controls */
 .style-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.frame-text-color { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--stroke-color); }
+.frame-text-color__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.frame-text-color__header strong { color: var(--text-primary); font-size: 12px; font-weight: 600; }
+.frame-text-color__auto { display: inline-flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 12px; }
+.frame-text-color__auto .switch { position: relative; width: 34px; height: 20px; padding: 2px; background: var(--stroke-color); border: 0; border-radius: 999px; cursor: pointer; transition: background 120ms ease; }
+.frame-text-color__auto .switch.is-on { background: var(--text-primary); }
+.frame-text-color__auto .switch > span { display: block; width: 16px; height: 16px; background: white; border-radius: 50%; box-shadow: 0 1px 2px #0003; transition: transform 120ms ease; }
+.frame-text-color__auto .switch.is-on > span { transform: translateX(14px); }
+.frame-text-color__auto .switch:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.frame-text-color__palette { display: flex; min-height: 42px; align-items: center; gap: 12px; margin-top: 8px; }
+.frame-text-color__swatch { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; padding: 2px; background: transparent; border: 1px solid transparent; border-radius: 50%; cursor: pointer; }
+.frame-text-color__swatch > span { width: 25px; height: 25px; background: var(--swatch-color); border: 1px solid #0003; border-radius: 50%; }
+.frame-text-color__swatch:hover:not(:disabled), .frame-text-color__swatch.is-selected { border-color: var(--text-primary); box-shadow: 0 0 0 2px var(--panel-bg), 0 0 0 3px var(--text-primary); }
+.frame-text-color__swatch:disabled { cursor: default; }
+.frame-text-color__value { margin-left: auto; color: var(--text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
 .style-option { position: relative; display: flex; min-width: 0; flex-direction: column; align-items: stretch; gap: 7px; padding: 6px; color: var(--text-secondary); background: var(--panel-bg); border: 1px solid var(--stroke-color); border-radius: var(--radius-sm); font-size: 11px; text-align: left; cursor: pointer; }
 .style-option:hover { background: var(--surface-hover); }
 .style-option.is-active { color: var(--text-primary); border-color: var(--text-secondary); box-shadow: inset 0 0 0 1px var(--text-secondary); }

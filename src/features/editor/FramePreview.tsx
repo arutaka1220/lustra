@@ -252,7 +252,7 @@ export function FramePreview({ photo, frame, compact = false, readOnly = false, 
         {!raster && fallbackPreview}
         {!raster && !fallbackPreview && smallPreview?.raster && !missing && <div className="preview-loading-thumb" aria-hidden="true"><PhotoThumbnailCanvas url={sourceUrl} fit="contain" /></div>}
         {sourceMissing || status?.error ? <span className="framed-preview-message"><ImageOff size={18} />{t('framePreview.unavailable')}</span> : highResolution?.error ? <span className="framed-preview-message preview-error" role="alert">{t('framePreview.previewError')}<button type="button" onClick={() => { setLoaded(undefined); setRetryKey(value => value + 1) }}>{t('framePreview.retry')}</button></span> : !raster && !smallPreview?.raster && !fallbackPreview && !compact && <span className="framed-preview-message" role="status">{t('framePreview.loading')}</span>}
-        {raster && !sourceMissing && seen && <TextOverlay photo={photo} frame={effectiveFrameSettings(frame)} interactive={interactive && !cropMode} imageBounds={visible} canvasSize={size} raster={raster} onRevealInspector={onRevealInspector} />}
+        {raster && !sourceMissing && seen && <TextOverlay photo={photo} frame={effectiveFrameSettings(frame)} interactive={interactive && !cropMode} imageBounds={visible} canvasSize={size} onRevealInspector={onRevealInspector} />}
         {cropMode && interactive && photoLayout?.image && sourceRaster && <CropOverlay bounds={photoLayout.image} crop={crop} source={sourceRaster.image} sourceWidth={sourceRaster.width} sourceHeight={sourceRaster.height} onChange={value => onCropChange?.({ ...value, rotation: value.rotation ?? crop?.rotation ?? 0 })} />}
       </div>
     </div>
