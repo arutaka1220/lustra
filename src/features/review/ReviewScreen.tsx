@@ -47,6 +47,7 @@ export function ReviewScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const gallery = useRef<HTMLDivElement>(null)
   const [galleryWidth, setGalleryWidth] = useState(0)
+  const [galleryHeight, setGalleryHeight] = useState(0)
   const [aspects, setAspects] = useState<Record<string, number>>({})
   const selected = photos.find((photo) => photo.id === selectedId)
   const completed = photos.filter((photo) => photo.completed).length
@@ -55,7 +56,9 @@ export function ReviewScreen() {
     if (!element) return
     const observer = new ResizeObserver(([entry]) => {
       const width = entry?.contentRect.width ?? 0
+      const height = entry?.contentRect.height ?? 0
       setGalleryWidth((current) => Math.abs(current - width) < 1 ? current : width)
+      setGalleryHeight((current) => Math.abs(current - height) < 1 ? current : height)
     })
     observer.observe(element)
     return () => observer.disconnect()
@@ -68,7 +71,7 @@ export function ReviewScreen() {
 
   const aspectCallbacks = useMemo(() => new Map(photos.map((photo) => [photo.id, (ratio: number) => setPhotoAspect(photo.id, ratio)])), [photos, setPhotoAspect])
 
-  const rows = useMemo(() => buildJustifiedRows(photos.map((photo) => aspects[photo.id] ?? 1.5), galleryWidth), [aspects, galleryWidth, photos])
+  const rows = useMemo(() => buildJustifiedRows(photos.map((photo) => aspects[photo.id] ?? 1.5), galleryWidth, 10, 230, galleryHeight), [aspects, galleryHeight, galleryWidth, photos])
 
   const editPhoto = useCallback((id: string) => {
     setActivePhoto(id)
