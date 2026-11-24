@@ -144,10 +144,10 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
       }
 
     if (current.cancelling || activeRun.current !== current) return
-    setPreparing(false)
     if (!jobs.length) {
       activeRun.current = null
       current.releaseCloseGuard?.()
+      setPreparing(false)
       setReport(current.report)
       setPhase('result')
       onBusyChange(false)
@@ -158,7 +158,9 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
     setProgress({ processed: invalidCount, total: batch.length })
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
       if (current.cancelling || activeRun.current !== current) return
-      setPreparing(false)
+      // The backend may start the worker before its IPC response returns; keep
+      // cancellation disabled until the run ID is available for a safe cancel.
+      setCanCancel(false)
       const runId = await beginExport(preferences.destination, jobs, getExportSettings(preferences, capabilities), (event) => {
         if (activeRun.current !== current) return
         if (event.type === 'photo') {
@@ -187,6 +189,7 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
       })
       if (activeRun.current === current) {
         current.runId = runId
+        setPreparing(false)
         setCanCancel(true)
       }
     } catch (error) {
