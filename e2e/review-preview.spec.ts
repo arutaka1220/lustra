@@ -28,6 +28,10 @@ test('review opens a framed preview and can switch between images', async ({ pag
     const imageBox = await card.locator('.review-thumbnail__board').boundingBox()
     expect(imageBox?.height).toBeGreaterThan(300)
   }
+  await page.setViewportSize({ width: 900, height: 640 })
+  const narrowCard = await first.boundingBox()
+  expect(narrowCard?.x).toBeGreaterThanOrEqual(0)
+  expect((narrowCard?.x ?? 0) + (narrowCard?.width ?? 0)).toBeLessThanOrEqual(900)
   const dialog = page.getByRole('dialog').filter({ has: page.locator('.review-preview-stage') })
   for (const card of [first, second, first]) {
     await card.click()
