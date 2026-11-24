@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog'
-import { ArrowLeft, Check, Download, ImageOff, ImagePlus, Pencil, X } from 'lucide-react'
+import { ArrowLeft, Check, Download, ImageOff, ImagePlus, Minus, Pencil, Plus, RotateCcw, X } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { FrameSettings, SessionPhoto } from '../../types/photo'
@@ -7,6 +7,7 @@ import { getEffectiveFrame, useSessionStore } from '../../store/session-store'
 import { FramePreview } from '../editor/FramePreview'
 import { ReviewThumbnail } from './ReviewThumbnail'
 import { buildReviewLayout } from './review-layout'
+import { useReviewMinimumSize } from './useReviewMinimumSize'
 
 type ReviewCardProps = {
   photo: SessionPhoto
@@ -49,6 +50,7 @@ export function ReviewScreen() {
   const [galleryWidth, setGalleryWidth] = useState(0)
   const [galleryHeight, setGalleryHeight] = useState(0)
   const [aspects, setAspects] = useState<Record<string, number>>({})
+  const minimumSizePreference = useReviewMinimumSize()
   const selected = photos.find((photo) => photo.id === selectedId)
   const completed = photos.filter((photo) => photo.completed).length
   useEffect(() => {
@@ -71,7 +73,7 @@ export function ReviewScreen() {
 
   const aspectCallbacks = useMemo(() => new Map(photos.map((photo) => [photo.id, (ratio: number) => setPhotoAspect(photo.id, ratio)])), [photos, setPhotoAspect])
 
-  const layout = useMemo(() => buildReviewLayout(photos.map((photo) => aspects[photo.id] ?? 1.5), galleryWidth, galleryHeight), [aspects, galleryHeight, galleryWidth, photos])
+  const layout = useMemo(() => buildReviewLayout(photos.map((photo) => aspects[photo.id] ?? 1.5), galleryWidth, galleryHeight, 10, minimumSizePreference.minimumSize), [aspects, galleryHeight, galleryWidth, minimumSizePreference.minimumSize, photos])
 
   const editPhoto = useCallback((id: string) => {
     setActivePhoto(id)
@@ -88,6 +90,20 @@ export function ReviewScreen() {
         </div>
         <div className="review-heading__actions">
           <span className="review-completion"><Check size={14} /> {t('edit.completion', { count: completed, total: photos.length })}</span>
+          <div className="review-size-control">
+            <label htmlFor="review-minimum-size">{t('review.minimumSize')}</label>
+            <div className="review-size-control__slider">
+              <Minus size={14} aria-hidden="true" />
+              <input id="review-minimum-size" type="range" min={160} max={400} step={20} value={minimumSizePreference.minimumSize}
+                disabled={!minimumSizePreference.ready || layout.mode !== 'justified'} aria-valuetext={`${minimumSizePreference.minimumSize}px`}
+                onChange={(event) => minimumSizePreference.update(Number(event.currentTarget.value))} />
+              <Plus size={14} aria-hidden="true" />
+              <output htmlFor="review-minimum-size">{minimumSizePreference.minimumSize}px</output>
+              <button type="button" className="icon-button review-size-control__reset" aria-label={t('review.resetMinimumSize')}
+                title={t('review.resetMinimumSize')} disabled={!minimumSizePreference.ready || minimumSizePreference.minimumSize === 240}
+                onClick={minimumSizePreference.reset}><RotateCcw size={13} /></button>
+            </div>
+          </div>
           <button className="button button--quiet" onClick={() => setScreen('edit')}><ArrowLeft size={15} /> {t('review.back')}</button>
           <button className="button button--primary" disabled={!photos.length} onClick={() => setScreen('export')}><Download size={15} /> {t('review.export')}</button>
         </div>
