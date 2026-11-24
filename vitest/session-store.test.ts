@@ -228,12 +228,18 @@ describe('session history and recovery', () => {
     session().setScreen('edit')
     session().patchFrame({
       style: 'custom', customColor: '#123ABC', top: 12, bottom: 24, left: 9, right: 9,
-      textElements: [{ id: 'title', template: '{camera} · ISO {iso}', anchor: 'bottom-left', anchorMode: 'photo', x: 34, y: -18, size: 20, fontFamily: 'Arial', weight: 400, color: '#123ABC', opacity: 42, visible: true }],
+      textElements: [{ id: 'title', template: '{camera} · ISO {iso}', anchor: 'bottom-left', anchorMode: 'photo', x: 34, y: -18, size: 20, fontFamily: 'Arial', weight: 400, color: '#123ABC', customColor: '#123ABC', opacity: 42, visible: true }],
     })
     session().setCompleted('restart', true)
 
     for (let restart = 0; restart < 3; restart += 1) {
       const archived = JSON.parse(JSON.stringify(getSessionSnapshot()))
+      if (restart === 0) {
+        delete archived.active.commonFrame.autoTextColor
+        delete archived.active.commonFrame.manualTextColor
+        archived.active.commonFrame.textElements[0].color = '#123ABC'
+        archived.active.commonFrame.textElements[0].customColor = '#123ABC'
+      }
       useSessionStore.setState(useSessionStore.getInitialState(), true)
       restoreSessionSnapshot(archived)
       expect(getSessionSnapshot().version).toBe(3)
@@ -242,7 +248,9 @@ describe('session history and recovery', () => {
       expect(session().photos[0].completed).toBe(true)
       expect(session().commonFrame).toMatchObject({ style: 'custom', customColor: '#123ABC' })
       expect(activeFrame()).toMatchObject({ top: 12, bottom: 24, left: 9, right: 9 })
-      expect(session().commonFrame.textElements?.[0]).toMatchObject({ template: '{camera} · ISO {iso}', color: '#123ABC', anchorMode: 'photo', opacity: 42 })
+      expect(session().commonFrame).toMatchObject({ autoTextColor: false, manualTextColor: '#123ABC' })
+      expect(session().commonFrame.textElements?.[0]).toMatchObject({ template: '{camera} · ISO {iso}', anchorMode: 'photo', opacity: 42 })
+      expect(session().commonFrame.textElements?.[0].color).toBeUndefined()
     }
   })
 

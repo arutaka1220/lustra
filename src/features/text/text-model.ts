@@ -1,6 +1,4 @@
 import type { FrameSettings, PhotoMetadata, SessionPhoto } from '../../types/photo'
-import { canvasUnit, FRAME_COLORS, getBackgroundRect } from '../editor/frame-layout'
-import type { PhotoRaster } from '../editor/frame-paint'
 import { formatCaptureDate } from './date-format'
 
 export const TEXT_REFERENCE_SIZE = 1080
@@ -25,15 +23,16 @@ export type TextElement = {
   size: number
   fontFamily: string
   weight: number
-  color: 'auto' | string
+  /** @deprecated Migrated into FrameSettings.manualTextColor on session restore. */
+  color?: string
   opacity?: number
-  /** Last accepted custom color is retained while Auto is selected. */
+  /** @deprecated Legacy per-layer color cache, ignored after migration. */
   customColor?: string
   visible: boolean
   groupId?: string
 }
 
-export type TextDrawRecipe = Pick<TextElement, 'anchor' | 'anchorMode' | 'x' | 'y' | 'size' | 'fontFamily' | 'weight' | 'color' | 'opacity'> & { text: string }
+export type TextDrawRecipe = Pick<TextElement, 'anchor' | 'anchorMode' | 'x' | 'y' | 'size' | 'fontFamily' | 'weight' | 'opacity'> & { text: string; color: string }
 export type MetadataCorrectionMode = 'exact' | 'partial' | 'regex'
 export type MetadataCorrectionRule = { id: string; mode: MetadataCorrectionMode; pattern: string; replacement: string }
 export type MetadataCorrectionsState = { camera: MetadataCorrectionRule[]; lens: MetadataCorrectionRule[] }
@@ -67,7 +66,7 @@ export function getTextAnchorPosition(anchor: TextAnchor): [number, number] {
 export function createTextElement(template: string, id: string = crypto.randomUUID()): TextElement {
   return {
     id, template, anchor: 'bottom-left', x: 34, y: -18, size: 20,
-    fontFamily: DEFAULT_TEXT_FONT, weight: 400, color: 'auto', visible: true,
+    fontFamily: DEFAULT_TEXT_FONT, weight: 400, visible: true,
   }
 }
 
@@ -138,46 +137,6 @@ export function resolveTemplate(template: string, metadata: PhotoMetadata, local
   return { text, missing: [...missing] }
 }
 
-export function textColor(color: TextElement['color'], style: FrameSettings['style'], customFrameColor?: string, blurredColor?: string) {
-  if (color !== 'auto') return color
-  const background = style === 'white' ? '#FFFFFF'
-    : style === 'softWhite' ? '#FAFAF8'
-      : style === 'softBlack' ? '#242424'
-        : style === 'custom' ? customFrameColor ?? '#000000'
-          : style === 'black' ? '#000000' : style === 'ambientGradient' ? '#777777' : blurredColor ?? '#454842'
-  return bestContrastingTextColor(background)
-}
-
-/** Samples the local blurred backdrop under a text anchor without decoding the source again. */
-export function sampleBlurredTextBackground(raster: PhotoRaster, frame: FrameSettings, size: { width: number; height: number }, element: TextElement): string {
-  const sigma = frame.blurStrength * canvasUnit(size)
-  const background = getBackgroundRect(size, raster, sigma)
-  const [column, row] = getTextAnchorPosition(element.anchor)
-  const scale = Math.min(size.width, size.height) / TEXT_REFERENCE_SIZE
-  const x = Math.max(0, Math.min(size.width, column * size.width + element.x * scale))
-  const y = Math.max(0, Math.min(size.height, row * size.height + element.y * scale))
-  const sourceX = Math.max(0, Math.min(raster.width - 1, (x - background.x) / background.width * raster.width))
-  const sourceY = Math.max(0, Math.min(raster.height - 1, (y - background.y) / background.height * raster.height))
-  const sourceRadiusX = Math.max(1, sigma * 2 * raster.width / background.width)
-  const sourceRadiusY = Math.max(1, sigma * 2 * raster.height / background.height)
-  const left = Math.max(0, sourceX - sourceRadiusX)
-  const top = Math.max(0, sourceY - sourceRadiusY)
-  const right = Math.min(raster.width, sourceX + sourceRadiusX)
-  const bottom = Math.min(raster.height, sourceY + sourceRadiusY)
-  const sample = document.createElement('canvas')
-  sample.width = sample.height = 1
-  const context = sample.getContext('2d', { willReadFrequently: true })
-  if (!context) return FRAME_COLORS.blurred
-  context.drawImage(raster.image, left, top, right - left, bottom - top, 0, 0, 1, 1)
-  const [r, g, b] = context.getImageData(0, 0, 1, 1).data
-  const brightness = (frame.backgroundBrightness ?? 100) / 100
-  const opacity = (frame.backgroundOpacity ?? 100) / 100
-  const matte = /^#?([\da-f]{6})$/i.exec(FRAME_COLORS.blurred)?.[1] ?? '454842'
-  const matteChannels = [0, 2, 4].map((offset) => Number.parseInt(matte.slice(offset, offset + 2), 16))
-  const channels = [r, g, b].map((value, index) => Math.round(value * brightness * opacity + matteChannels[index] * (1 - opacity)))
-  return `#${channels.map((channel) => Math.max(0, Math.min(255, channel)).toString(16).padStart(2, '0')).join('')}`
-}
-
 export function bestContrastingTextColor(background: string): '#000000' | '#FFFFFF' {
   const hex = /^#?([\da-f]{6})$/i.exec(background)?.[1]
   if (!hex) return '#FFFFFF'
@@ -191,22 +150,70 @@ export function bestContrastingTextColor(background: string): '#000000' | '#FFFF
   return blackContrast >= whiteContrast ? '#000000' : '#FFFFFF'
 }
 
+export function autoFrameTextColor(style: FrameSettings['style'], customColor?: string): '#000000' | '#FFFFFF' {
+  switch (style) {
+    case 'white':
+    case 'softWhite':
+      return '#000000'
+    case 'custom':
+      return bestContrastingTextColor(customColor ?? '#000000')
+    default:
+      return '#FFFFFF'
+  }
+}
+
+export function resolveFrameTextColor(frame: FrameSettings): string {
+  return frame.autoTextColor === false
+    ? frame.manualTextColor ?? autoFrameTextColor(frame.style, frame.customColor)
+    : autoFrameTextColor(frame.style, frame.customColor)
+}
+
+/** Migrate legacy per-layer colors to a single frame color without dropping user colors. */
+export function migrateLegacyTextColor<T extends Partial<FrameSettings>>(frame: T): T {
+  const elements = frame.textElements ?? []
+  const legacyGlobal = (frame as T & { globalTextColor?: string }).globalTextColor
+  const usedGlobal = elements.some((element) => element.color === 'global')
+  const customColors = elements.flatMap((element) =>
+    typeof element.color === 'string' && /^#?[\da-f]{6}$/i.test(element.color) ? [element.color.startsWith('#') ? element.color : `#${element.color}`] : [])
+  let manualTextColor: string | undefined = frame.manualTextColor
+  if (typeof frame.autoTextColor === 'boolean') {
+    // A frame already using the new setting keeps its mode and retained manual color.
+  } else if (legacyGlobal && usedGlobal) {
+    manualTextColor = legacyGlobal
+  } else if (customColors.length) {
+    const counts = new Map<string, number>()
+    for (const color of customColors) counts.set(color.toUpperCase(), (counts.get(color.toUpperCase()) ?? 0) + 1)
+    manualTextColor = customColors.reduce((winner, color) =>
+      (counts.get(color.toUpperCase()) ?? 0) > (counts.get(winner.toUpperCase()) ?? 0) ? color : winner)
+  }
+  const { globalTextColor: _legacyGlobalTextColor, ...rest } = frame as T & { globalTextColor?: string }
+  return {
+    ...rest,
+    ...(!Object.hasOwn(frame, 'autoTextColor') && manualTextColor !== undefined ? { autoTextColor: false } : {}),
+    ...(manualTextColor === undefined ? {} : { manualTextColor }),
+    ...(frame.textElements ? {
+      textElements: frame.textElements.map((element) => {
+        const { color: _legacyColor, customColor: _legacyCustomColor, ...clean } = element
+        return clean
+      }),
+    } : {}),
+  } as T
+}
+
 export function getCanvasFontFamily(fontFamily: string) {
   // Quote a configured OS font as one family, then use the same fallback for all layers.
   const namedFamily = fontFamily.replace(/["\\\n\r\f]/g, '\\$&')
   return `"${namedFamily}", "${DEFAULT_TEXT_FONT}", "Noto Sans JP Variable", sans-serif`
 }
 
-export function resolveTextLayers(photo: SessionPhoto, frame: FrameSettings, corrections: MetadataCorrectionsState = EMPTY_METADATA_CORRECTIONS, locale = 'en', raster?: PhotoRaster, canvasSize?: { width: number; height: number }): TextDrawRecipe[] {
+export function resolveTextLayers(photo: SessionPhoto, frame: FrameSettings, corrections: MetadataCorrectionsState = EMPTY_METADATA_CORRECTIONS, locale = 'en', _raster?: unknown, _canvasSize?: unknown): TextDrawRecipe[] {
   const metadata = getEffectiveMetadata(photo, corrections)
+  const frameTextColor = resolveFrameTextColor(frame)
   return getTextElements(frame).flatMap((element) => {
     if (!element.visible) return []
     const resolved = resolveTemplate(element.template, metadata, locale)
     if (resolved.missing.length || !resolved.text.trim()) return []
-    const { anchor, anchorMode, x, y, size, fontFamily, weight, color, opacity } = element
-    const blurred = color === 'auto' && frame.style === 'blurred' && raster && canvasSize
-      ? sampleBlurredTextBackground(raster, frame, canvasSize, element)
-      : undefined
-    return [{ text: resolved.text, anchor, anchorMode: anchorMode ?? 'canvas', x, y, size, fontFamily, weight, color: textColor(color, frame.style, frame.customColor, blurred), opacity: opacity ?? 100 }]
+    const { anchor, anchorMode, x, y, size, fontFamily, weight, opacity } = element
+    return [{ text: resolved.text, anchor, anchorMode: anchorMode ?? 'canvas', x, y, size, fontFamily, weight, color: frameTextColor, opacity: opacity ?? 100 }]
   })
 }

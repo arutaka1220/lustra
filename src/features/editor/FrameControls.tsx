@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { type CSSProperties, type ReactNode } from 'react'
 import { Check, Link2, Link2Off } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { SliderInput } from './SliderInput'
@@ -8,8 +8,7 @@ import type { FrameSettings } from '../../types/photo'
 import './frame-i18n'
 import { CustomColorPicker } from './CustomColorPicker'
 import { SelectField } from '../../components/ui/SelectField'
-import { writeAppPreference } from '../../store/session-persistence'
-import { setGlobalPaddingDefaults } from '../../store/session-store'
+import { autoFrameTextColor } from '../text/text-model'
 
 type FrameControlsProps = {
   frame: FrameSettings
@@ -47,6 +46,10 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
   const toggleLink = (key: 'linkSides' | 'linkVertical') => {
     patch({ [key]: !frame[key] })
   }
+  const autoTextColor = frame.autoTextColor !== false
+  const automaticTextColor = autoFrameTextColor(frame.style, frame.customColor)
+  const displayedTextColor = autoTextColor ? automaticTextColor : frame.manualTextColor ?? automaticTextColor
+  const changeManualTextColor = (color: string) => patch({ autoTextColor: false, manualTextColor: color })
   return (
     <div className="controls-scroll">
       <InspectorSection title={t('framePreview.canvas')} open={isOpen('canvas')} onToggle={() => toggle('canvas')}>
@@ -93,16 +96,36 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
               <span>{t(`framePreview.${style}`)}</span>{frame.style === style && <Check size={14} aria-hidden="true" />}
             </button>)}
         </div>
+        <section className="frame-text-color" aria-label={t('framePreview.textColor')}>
+          <header className="frame-text-color__header">
+            <strong>{t('framePreview.textColor')}</strong>
+            <label className="frame-text-color__auto">
+              <span>Auto</span>
+              <button type="button" role="switch" aria-label={t('framePreview.autoTextColor')} aria-checked={autoTextColor}
+                className={`switch ${autoTextColor ? 'is-on' : ''}`}
+                onClick={() => patch(autoTextColor
+                  ? { autoTextColor: false, manualTextColor: frame.manualTextColor ?? automaticTextColor }
+                  : { autoTextColor: true })}>
+                <span />
+              </button>
+            </label>
+          </header>
+          <div className={`frame-text-color__palette ${autoTextColor ? 'is-auto' : ''}`}>
+            {(['#FFFFFF', '#000000'] as const).map((color) => <button key={color} type="button" className={`frame-text-color__swatch ${displayedTextColor.toUpperCase() === color ? 'is-selected' : ''}`}
+              style={{ '--swatch-color': color } as CSSProperties} aria-label={color === '#FFFFFF' ? t('framePreview.textWhite') : t('framePreview.textBlack')}
+              aria-pressed={displayedTextColor.toUpperCase() === color} disabled={autoTextColor}
+              onClick={() => changeManualTextColor(color)}><span /></button>)}
+            <CustomColorPicker compact disabled={autoTextColor} title={t('framePreview.textColor')} label={t('framePreview.textColor')}
+              color={displayedTextColor} selected={!autoTextColor && !['#FFFFFF', '#000000'].includes((frame.manualTextColor ?? '').toUpperCase())}
+              onChange={changeManualTextColor} onEditStart={onFrameEditStart} onEditEnd={onFrameEditEnd} />
+            <span className="frame-text-color__value" aria-live="polite">{displayedTextColor}</span>
+          </div>
+        </section>
       </InspectorSection>
 
       {frame.canvasLayout !== 'portraitCard' && <InspectorSection title={t('edit.padding')} open={isOpen('padding')} onToggle={() => toggle('padding')}>
         <p className="padding-help">{t('framePreview.paddingHelp')}</p>
         <p className="padding-help">{t('framePreview.paddingSameAspect')}</p>
-        <button className="button button--quiet" type="button" onClick={() => {
-          const defaults = frame.aspectPadding ?? {}
-          setGlobalPaddingDefaults(defaults)
-          void writeAppPreference('padding.aspect-defaults', defaults).catch(error => console.warn('Could not save global padding defaults', error))
-        }}>{t('framePreview.savePaddingDefaults')}</button>
         {(['linkVertical', 'linkSides'] as const).map((key) => <section className="padding-group" key={key}>
           <header><strong>{t(key === 'linkVertical' ? 'framePreview.vertical' : 'framePreview.horizontal')}</strong><button className={`link-toggle ${frame[key] ? 'is-on' : ''}`} onClick={() => toggleLink(key)} aria-pressed={frame[key]}>
             {frame[key] ? <Link2 size={16} aria-hidden="true" /> : <Link2Off size={16} aria-hidden="true" />}

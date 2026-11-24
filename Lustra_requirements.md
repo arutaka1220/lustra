@@ -188,12 +188,20 @@ RAW現像や明るさ調整・色調整などの編集機能は搭載しない�
 
 ## 8. EXIF・テキスト編集
 
-### Typographyの文字色
+### Frame共通の文字色
 
-- Typographyには文字色の`Auto / Custom`切り替えを用意する。Autoは現在のフレーム背景から黒または白の高コントラスト色を選び、CustomはHEX/RGB・色相・彩度/明度フィールドと共通My Paletteで色を指定する。
-- Custom色は文字レイヤーごとに保存し、Autoへ切り替えても最後のCustom色を保持する。色操作は編集プレビューへ即時反映し、画像の再デコードやApply操作を要求しない。
-- 単色フレームは実際のHEX値の相対輝度・コントラスト比で選択する。Blurredでは文字アンカー位置近傍のぼかし背景をサンプルし、プレビューと書き出しに同じ確定色を渡す。
-- 色の連続ドラッグは1つのUndo操作として扱い、All Photos / This Photo、保存・再開、Review、Exportでも文字色を維持する。
+- `Frame`セクション下部に、すべてのFrameスタイルで利用できる共通`Text Color`パレットと`Auto`スイッチを表示する。Typographyから文字色UIを撤去し、フォント、ウェイト、サイズ、Opacity、配置などは維持する。
+- 新規セッションはAuto ON。AutoはFrameスタイルのみで決定し、Black / Soft Black / Blurred / Ambient Gradient / Edge Stretch / Noneは白、White / Soft Whiteは黒。Customは背景色とのWCAG相対輝度に基づき白と黒のコントラスト比を比較し、高い方を選ぶ。画像ピクセルや各テキスト位置は解析しない。
+- Auto OFFではHEX/RGB、基本色、共通My Paletteを使い、選択写真の全テキストレイヤーへ同じ手動色を適用する。Photo-relative / Canvas-relative、EXIF、自由テキスト、Watermarkを含み、各レイヤーOpacityは維持する。フレームや写真配置の変更で手動色を変えない。
+- Auto ON中もスウォッチ位置を維持し、操作を無効化して現在の自動色を示す。初回OFFでは直前の有効色を手動色の初期値とし、以後のON/OFFで手動色を保持する。
+- All Photosは写真群の共通Auto状態・手動色、This Photoは選択写真だけのオーバーライドを編集する。共通文字色は写真間スコープと独立し、セッション保存・復元・Undo/Redo・Recent Sessionsで維持する。
+- 旧AutoはAuto ONへ移行する。旧Global指定を持つレイヤーがあればGlobal色を手動色へ移行する。旧個別Custom色しかない場合は、最頻色を採用し同数ならレイヤー順で最初の色を採用してAuto OFFへ移行する。既存の新方式フィールドは保持し、旧色フィールドは復元後の新規保存データから除く。
+- プレビュー、Review、JPEG / PNG / WebP / Original書き出しは同じFrame別色解決を使い、ICC / EXIF / GPSと元画像の扱いを維持する。
+
+### Paddingの初期値
+
+- Paddingはセッション内の比率別設定、Link、Undo/Redoを維持する。`Save as Global Defaults`操作と、それ専用の保存・適用処理は提供しない。
+
 
 ### 8.1 EXIFの表示と上書き
 

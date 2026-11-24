@@ -60,6 +60,9 @@ export type FrameSettings = {
   edgeStretchFade?: number
   showInset: boolean
   showShadow: boolean
+  /** Omitted legacy value means Auto; manualTextColor is retained while Auto is enabled. */
+  autoTextColor?: boolean
+  manualTextColor?: string
   textElements?: TextElement[]
   /** Session-local shared padding presets, keyed by source photo aspect group. */
   aspectPadding?: AspectPaddingMap

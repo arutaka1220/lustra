@@ -27,7 +27,7 @@ test('Portrait Card keeps its canvas and photo settings separate from Standard',
   expect(Math.abs(layoutBox!.width - ratioBox!.width)).toBeLessThan(2)
   await expect.poll(() => page.locator('.portrait-canvas-field > span').evaluateAll(labels => labels.every(label => label.scrollWidth <= label.clientWidth))).toBe(true)
   const appearance = page.getByRole('button', { name: 'Appearance' })
-  await appearance.click()
+  if (await appearance.getAttribute('aria-expanded') !== 'true') await appearance.click()
   const size = page.getByRole('spinbutton', { name: 'Photo Size' })
   await size.fill('65')
   await size.press('Enter')

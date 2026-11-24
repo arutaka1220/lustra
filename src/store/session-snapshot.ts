@@ -2,6 +2,7 @@ import { convertFileSrc, isTauri } from '@tauri-apps/api/core'
 import { PHOTO_METADATA_READER_VERSION } from '../types/photo'
 import type { FrameSettings, PhotoSource, SessionPhoto } from '../types/photo'
 import { withoutLegacyCanvasSettings, withoutLegacyCrop } from '../features/editor/frame-migration'
+import { migrateLegacyTextColor } from '../features/text/text-model'
 import type { HistoryEntry, PhotoEdit, RemovedPhoto, SessionChange, SessionHistory, SessionLayout, ValueChange } from './session-history'
 
 type StoredSource = { kind: 'path'; path: string }
@@ -160,14 +161,14 @@ export function deserializeWorkspace(workspace: StoredWorkspace, initialFrame: F
     return {
       ...withoutCrop,
       metadataState: metadataIsStale ? 'loading' : photo.metadataState,
-      overrides: withoutLegacyCanvasSettings(photo.overrides),
+      overrides: migrateLegacyTextColor(withoutLegacyCanvasSettings(photo.overrides)),
     } as StoredPhoto
   }
   const restorePhoto = (photo: StoredPhoto): SessionPhoto => ({ ...normalizePhoto(photo), source: restoreSource(photo.source) })
   const restorePhotoEdit = (value: Partial<PhotoEdit<StoredSource>>): Partial<PhotoEdit> => {
     const withoutCrop = withoutLegacyCrop(value) as Partial<PhotoEdit<StoredSource>> & { overrides?: Record<string, unknown> }
     const normalized = withoutCrop.overrides
-      ? { ...withoutCrop, overrides: withoutLegacyCanvasSettings(withoutCrop.overrides) as Partial<FrameSettings> }
+      ? { ...withoutCrop, overrides: migrateLegacyTextColor(withoutLegacyCanvasSettings(withoutCrop.overrides) as Partial<FrameSettings>) }
       : withoutCrop
     const { source, ...rest } = normalized
     return source ? { ...rest, source: restoreSource(source) } : rest
@@ -184,8 +185,8 @@ export function deserializeWorkspace(workspace: StoredWorkspace, initialFrame: F
     const removedKeys = new Set(['ratio', 'ratioWidth', 'ratioHeight', 'fit'])
     const keys = change.values.keys.filter((key) => !removedKeys.has(String(key)))
     if (!keys.length) return null
-    const before = withoutLegacyCanvasSettings(change.values.before)
-    const after = withoutLegacyCanvasSettings(change.values.after)
+    const before = migrateLegacyTextColor(withoutLegacyCanvasSettings(change.values.before))
+    const after = migrateLegacyTextColor(withoutLegacyCanvasSettings(change.values.after))
     return { ...change, values: { keys, before, after } }
   }
   const restoreEntry = (entry: HistoryEntry<StoredSource>): HistoryEntry | null => {
@@ -212,7 +213,7 @@ export function deserializeWorkspace(workspace: StoredWorkspace, initialFrame: F
     undo: undo.flatMap((entry) => { const restored = restoreEntry(entry); return restored ? [restored] : [] }),
     redo: redo.flatMap((entry) => { const restored = restoreEntry(entry); return restored ? [restored] : [] }),
   })
-  const normalizedFrame = withoutLegacyCanvasSettings(workspace.commonFrame)
+  const normalizedFrame = migrateLegacyTextColor(withoutLegacyCanvasSettings(workspace.commonFrame))
   return {
     ...workspace,
     commonFrame: { ...initialFrame, ...normalizedFrame },
