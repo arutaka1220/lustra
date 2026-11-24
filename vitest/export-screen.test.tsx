@@ -9,10 +9,11 @@ const mocks = vi.hoisted(() => ({
   cancelExport: vi.fn(),
   getEffectiveFrame: vi.fn(() => ({ style: 'black', top: 0, bottom: 0, left: 0, right: 0, linkSides: true, linkVertical: false, blurStrength: 20 })),
   releaseCloseGuard: vi.fn(),
+  windowCloseGuard: vi.fn(),
 }))
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ i18n: { resolvedLanguage: 'en' } }) }))
-vi.mock('../src/store/session-persistence', () => ({ registerWindowCloseGuard: () => mocks.releaseCloseGuard }))
+vi.mock('../src/store/session-persistence', () => ({ registerWindowCloseGuard: (guard: () => boolean) => { mocks.windowCloseGuard(guard); return mocks.releaseCloseGuard } }))
 vi.mock('../src/store/session-store', () => ({ getEffectiveFrame: mocks.getEffectiveFrame }))
 vi.mock('../src/features/text/metadata-corrections-store', () => ({ useMetadataCorrections: (select: (state: { corrections: object }) => unknown) => select({ corrections: {} }) }))
 vi.mock('../src/features/text/text-model', () => ({ getEffectiveMetadata: () => ({}), resolveTextLayers: () => [] }))
@@ -61,6 +62,7 @@ describe('ExportScreen start guard', () => {
     mocks.cancelExport.mockReset()
     mocks.getEffectiveFrame.mockClear()
     mocks.releaseCloseGuard.mockReset()
+    mocks.windowCloseGuard.mockReset()
   })
   afterEach(() => {
     cleanup()
@@ -102,6 +104,14 @@ describe('ExportScreen start guard', () => {
     await advanceFrame(frames)
     await waitFor(() => expect(mocks.beginExport).toHaveBeenCalledTimes(1))
     expect(screen.getByRole('button', { name: 'Cancel export' })).toBeDisabled()
+
+    act(() => { mocks.windowCloseGuard.mock.calls[0][0]() })
+    expect(screen.getByRole('button', { name: 'Keep exported files' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Keep exported files' }))
+    expect(mocks.cancelExport).not.toHaveBeenCalled()
+    expect(mocks.releaseCloseGuard).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue exporting' }))
+    expect(screen.getByText('Preparing 30 photos for export.')).toBeInTheDocument()
 
     await act(async () => {
       events[0]({ type: 'photo', id: photos[0].id, outcome: { type: 'success', path: '/tmp/photo-0.jpg' }, processed: 1, total: 30 })

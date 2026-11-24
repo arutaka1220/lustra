@@ -51,6 +51,7 @@ function waitForNextFrame() {
 type ActiveRun = {
   report: ExportReport
   runId: string | null
+  stage: 'preparing' | 'starting' | 'running'
   cancelling: boolean
   releaseCloseGuard: (() => void) | null
   returnPhase: 'settings' | 'result'
@@ -114,6 +115,7 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
     const current: ActiveRun = {
       report: { outcomes: new Map(previous?.outcomes), cancelled: false, cleanupErrors: [...(previous?.cleanupErrors ?? [])] },
       runId: null,
+      stage: 'preparing',
       cancelling: false,
       releaseCloseGuard: null,
       returnPhase: previous ? 'result' : 'settings',
@@ -185,6 +187,7 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
       // The backend may start the worker before its IPC response returns; keep
       // cancellation disabled until the run ID is available for a safe cancel.
       setCanCancel(false)
+      current.stage = 'starting'
       const runId = await beginExport(preferences.destination, jobs, getExportSettings(preferences, capabilities), (event) => {
         if (activeRun.current !== current) return
         if (event.type === 'photo') {
@@ -215,6 +218,7 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
       })
       if (activeRun.current === current) {
         current.runId = runId
+        current.stage = 'running'
         setPreparing(false)
         setCanCancel(true)
       }
@@ -234,7 +238,7 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
 
   const requestCancel = async (policy: CancelPolicy) => {
     const current = activeRun.current
-    if (!current || current.cancelling) return
+    if (!current || current.cancelling || current.stage === 'starting') return
 
     current.cancelling = true
     setConfirmation(null)
