@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { PHOTO_METADATA_READER_VERSION } from '../types/photo'
 import type { AspectPadding, FrameSettings, ImportCandidate, PhotoMetadata, PhotoSource, SessionPhoto } from '../types/photo'
 import { classifyPhotoAspect } from '../features/editor/photo-aspect-ratio'
-import { fitCropRatio, ratioValue } from '../features/editor/crop-model'
+import { fitCropRatio, INITIAL_CROP_TRANSFORM, ratioValue } from '../features/editor/crop-model'
 import {
   appendChange, applyValues, changedValues, clearRemovedHistory, emptyHistory, getSeries, limitHistory,
   mergeChanges, moveHistoryEntry, pruneHistory, selectRedoSeries, selectUndoSeries, sessionLayout,
@@ -50,8 +50,10 @@ export type SessionState = {
   updateFrame: <K extends keyof FrameSettings>(key: K, value: FrameSettings[K]) => void
   patchFrame: (changes: Partial<FrameSettings>) => void
   resetPhotoOverride: (id: string, key: keyof FrameSettings) => void
+  resetPhotoOverrideGroup: (id: string, keys: (keyof FrameSettings)[]) => void
   resetPhotoOverrides: (id: string) => void
   setPhotoCrop: (id: string, cropTransform: SessionPhoto['cropTransform']) => void
+  setPhotoCrops: (cropTransforms: Record<string, SessionPhoto['cropTransform']>) => void
   setPhotoMetadataOverrides: (id: string, patch: Partial<PhotoMetadata>) => void
   setCompleted: (id: string, completed: boolean) => void
   doneNext: () => void
@@ -99,6 +101,21 @@ export const initialFrame: FrameSettings = {
   backgroundOpacity: 100,
   showInset: false,
   showShadow: false,
+}
+
+export const initialPortraitCardSettings = {
+  canvasLayout: 'portraitCard', portraitRatio: 4 / 5, portraitPhotoSize: 80, portraitVerticalPosition: 0,
+  portraitBackgroundStyle: 'blurred', portraitBackgroundCustomColor: '#000000', portraitBackgroundBlur: 32, portraitBackgroundBrightness: 90,
+} satisfies Partial<FrameSettings>
+
+function normalizeCropTransform(crop: SessionPhoto['cropTransform']): SessionPhoto['cropTransform'] {
+  if (!crop) return undefined
+  const isInitial = crop.x === INITIAL_CROP_TRANSFORM.x && crop.y === INITIAL_CROP_TRANSFORM.y
+    && crop.width === INITIAL_CROP_TRANSFORM.width && crop.height === INITIAL_CROP_TRANSFORM.height
+    && (crop.rotation ?? INITIAL_CROP_TRANSFORM.rotation) === INITIAL_CROP_TRANSFORM.rotation
+    && (crop.ratio ?? INITIAL_CROP_TRANSFORM.ratio) === INITIAL_CROP_TRANSFORM.ratio
+    && (crop.locked ?? INITIAL_CROP_TRANSFORM.locked) === INITIAL_CROP_TRANSFORM.locked && crop.customRatio === undefined
+  return isInitial ? undefined : crop
 }
 
 function freshWorkspace() {
@@ -435,10 +452,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
     const paddingKeys = ['top', 'bottom', 'left', 'right', 'linkSides', 'linkVertical', 'linkedPaddingRestore'] as const
     const hasPaddingChange = paddingKeys.some((key) => Object.hasOwn(adjusted, key))
+    const resetAspectPadding = Object.hasOwn(adjusted, 'aspectPadding') && adjusted.aspectPadding === undefined
     const nonPadding = { ...adjusted }
     for (const key of paddingKeys) delete nonPadding[key]
     let commonFrame: FrameSettings = { ...state.commonFrame, ...nonPadding }
-    if (hasPaddingChange && photo) {
+    if (hasPaddingChange && photo && !resetAspectPadding) {
       const group = classifyPhotoAspect(photo.imageWidth ?? 0, photo.imageHeight ?? 0)
       const defaults: AspectPadding = state.commonFrame.aspectPadding?.[group] ?? {
         top: state.commonFrame.top, bottom: state.commonFrame.bottom, left: state.commonFrame.left, right: state.commonFrame.right,
@@ -458,8 +476,16 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     delete overrides[key]
     return { ...photo, overrides }
   })),
+  resetPhotoOverrideGroup: (id, keys) => set((state) => changePhoto(state, id, (photo) => {
+    if (!keys.some((key) => Object.hasOwn(photo.overrides, key))) return photo
+    const overrides = { ...photo.overrides }
+    keys.forEach((key) => { delete overrides[key] })
+    return { ...photo, overrides }
+  })),
   resetPhotoOverrides: (id) => set((state) => changePhoto(state, id, (photo) => ({ ...photo, overrides: {} }))),
-  setPhotoCrop: (id, cropTransform) => set((state) => {
+  setPhotoCrop: (id, requestedCrop) => {
+    const cropTransform = normalizeCropTransform(requestedCrop)
+    return set((state) => {
     if (state.editMode === 'this') return changePhoto(state, id, (photo) => ({ ...photo, cropTransform }))
     const activePhoto = state.photos.find((photo) => photo.id === id)
     const activeWidth = activePhoto?.imageWidth ?? 0, activeHeight = activePhoto?.imageHeight ?? 0
@@ -485,7 +511,26 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       photos[index] = after
     }
     return Object.keys(values).length ? { photos, ...recordChange(state, { kind: 'photoBatch', values }) } : state
-  }),
+    })
+  },
+  setPhotoCrops: (requestedCrops) => {
+    const cropTransforms = Object.fromEntries(Object.entries(requestedCrops).map(([id, crop]) => [id, normalizeCropTransform(crop)]))
+    return set((state) => {
+    const photos = [...state.photos]
+    const values: Record<string, ValueChange<PhotoEdit>> = {}
+    for (let index = 0; index < photos.length; index += 1) {
+      const before = photos[index]
+      if (!Object.hasOwn(cropTransforms, before.id)) continue
+      const after = { ...before, cropTransform: cropTransforms[before.id] }
+      const edit = ({ overrides, completed, metadataOverrides, source, cropTransform }: SessionPhoto): PhotoEdit => ({ overrides, completed, metadataOverrides, source, cropTransform })
+      const change = changedValues(edit(before), edit(after))
+      if (!change.keys.length) continue
+      values[before.id] = change
+      photos[index] = after
+    }
+    return Object.keys(values).length ? { photos, ...recordChange(state, { kind: 'photoBatch', values }) } : state
+    })
+  },
   setPhotoMetadataOverrides: (id, patch) => set((state) => changePhoto(state, id, (photo) => {
     const metadataOverrides = { ...photo.metadataOverrides, ...patch }
     for (const key of Object.keys(metadataOverrides) as (keyof PhotoMetadata)[]) {

@@ -72,6 +72,60 @@ describe('session history and recovery', () => {
     expect(session().photos.map((item) => item.cropTransform?.rotation)).toEqual([9.25, 9.25])
   })
 
+  test('restoring a crop session snapshot in one batch cancels edits without adding history', () => {
+    session().addToSession([
+      { ...photo('restore-a'), imageWidth: 1200, imageHeight: 800 },
+      { ...photo('restore-b'), imageWidth: 800, imageHeight: 1200 },
+    ])
+    const original = { 'restore-a': { x: 0.1, y: 0.2, width: 0.7, height: 0.6, rotation: 12, ratio: '4:3' as const, locked: true }, 'restore-b': undefined }
+    session().setPhotoCrops(original)
+    const priorHistoryCount = session().history.common.undo.length
+    session().beginFrameEdit()
+    session().setPhotoCrop('restore-a', { x: 0.2, y: 0.2, width: 0.6, height: 0.6, rotation: 35, ratio: '1:1', locked: true })
+    session().setPhotoCrops(original)
+    session().endFrameEdit()
+    expect(session().photos[0].cropTransform).toEqual(original['restore-a'])
+    expect(session().photos[1].cropTransform).toBeUndefined()
+    expect(session().history.common.undo).toHaveLength(priorHistoryCount)
+  })
+
+  test('canonical initial crop reset does not create an undo entry', () => {
+    session().addToSession([photo('initial-crop')])
+    const before = session().history.common.undo.length
+    session().setPhotoCrop('initial-crop', { x: 0, y: 0, width: 1, height: 1, rotation: 0, ratio: 'original', locked: true })
+    expect(session().photos[0].cropTransform).toBeUndefined()
+    expect(session().history.common.undo).toHaveLength(before)
+  })
+
+  test('resetting a photo override group is one undoable change and preserves unrelated overrides', () => {
+    session().addToSession([photo('override-reset')])
+    session().setEditMode('this')
+    session().patchFrame({ top: 15, bottom: 22, style: 'white', showInset: true })
+    const historyBefore = session().history.photos['override-reset'].undo.length
+
+    session().resetPhotoOverrideGroup('override-reset', ['top', 'bottom'])
+    expect(session().photos[0].overrides).toMatchObject({ style: 'white', showInset: true })
+    expect(activeFrame()).toMatchObject({ top: 8, bottom: 15, style: 'white', showInset: true })
+    expect(session().history.photos['override-reset'].undo).toHaveLength(historyBefore + 1)
+
+    session().undo()
+    expect(session().photos[0].overrides).toMatchObject({ top: 15, bottom: 22, style: 'white', showInset: true })
+    session().redo()
+    expect(session().photos[0].overrides).toMatchObject({ style: 'white', showInset: true })
+  })
+
+  test('reset actions with no state change do not create undo history', () => {
+    session().addToSession([photo('no-op-reset')])
+    const before = session()
+    session().patchFrame({ blurStrength: before.commonFrame.blurStrength })
+    expect(session()).toBe(before)
+
+    session().setEditMode('this')
+    const beforePhotoReset = session()
+    session().resetPhotoOverrideGroup('no-op-reset', ['top', 'bottom'])
+    expect(session()).toBe(beforePhotoReset)
+  })
+
   test('Edge Stretch settings survive per-photo edits, undo/redo, and session restoration', () => {
     session().addToSession([photo('edge')])
     session().setEditMode('this')

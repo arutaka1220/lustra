@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import * as Slider from '@radix-ui/react-slider'
+import { ResetButton } from './ResetButton'
 
 type SliderInputProps = {
   label: string
@@ -11,9 +12,10 @@ type SliderInputProps = {
   onChange: (value: number) => void
   onChangeStart?: () => void
   onChangeEnd?: () => void
+  onReset?: () => void
 }
 
-export function SliderInput({ label, value, min = 0, max = 40, step = 1, unit = '%', onChange, onChangeStart, onChangeEnd }: SliderInputProps) {
+export function SliderInput({ label, value, min = 0, max = 40, step = 1, unit = '%', onChange, onChangeStart, onChangeEnd, onReset }: SliderInputProps) {
   const [draft, setDraft] = useState<string | null>(null)
   const activePointer = useRef<number | null>(null)
   const endChangeRef = useRef(onChangeEnd)
@@ -42,7 +44,7 @@ export function SliderInput({ label, value, min = 0, max = 40, step = 1, unit = 
 
   return (
     <div className="slider-field">
-      <span className="slider-field__label">{label}</span>
+      <div className="slider-field__label-row"><span className="slider-field__label">{label}</span>{onReset && <ResetButton label={label} onReset={onReset} />}</div>
       <div className="slider-field__control">
         <Slider.Root className="slider-root" min={min} max={max} step={step} value={[value]} onValueChange={([next]) => next != null && onChange(next)}
           onPointerDownCapture={(event) => {

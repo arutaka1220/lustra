@@ -1,8 +1,22 @@
 export type CropRatio = 'original' | 'free' | '1:1' | '3:2' | '4:3' | '16:9' | '9:16' | 'custom'
 export type CropRect = { x: number; y: number; width: number; height: number; rotation?: number; ratio?: CropRatio; locked?: boolean; customRatio?: number }
+export type CropTransform = CropRect & { rotation: number }
 export type CroppableRaster = { image: HTMLCanvasElement | HTMLImageElement; width: number; height: number }
 
 export const FULL_CROP: CropRect = { x: 0, y: 0, width: 1, height: 1 }
+export const INITIAL_CROP_TRANSFORM = { ...FULL_CROP, rotation: 0, ratio: 'original', locked: true } satisfies CropRect
+export type CropResetAction = 'crop' | 'ratio' | 'lock' | 'rotation'
+
+export function resetCropTransform(crop: CropRect | undefined, action: CropResetAction, sourceWidth: number, sourceHeight: number): CropTransform | undefined {
+  if (action === 'crop') return undefined
+  const current = { ...INITIAL_CROP_TRANSFORM, ...crop, rotation: crop?.rotation ?? INITIAL_CROP_TRANSFORM.rotation }
+  if (action === 'rotation') return { ...current, rotation: INITIAL_CROP_TRANSFORM.rotation }
+  if (action === 'lock') return { ...current, locked: INITIAL_CROP_TRANSFORM.locked }
+
+  const ratioReset = { ...current, ratio: INITIAL_CROP_TRANSFORM.ratio, customRatio: undefined }
+  const ratio = ratioValue('original', sourceWidth, sourceHeight)
+  return ratio ? { ...fitCropRatio(ratioReset, sourceWidth, sourceHeight, ratio), rotation: ratioReset.rotation } : ratioReset
+}
 const RATIO: Record<Exclude<CropRatio, 'free' | 'custom'>, number> = {
   original: 1, '1:1': 1, '3:2': 3 / 2, '4:3': 4 / 3, '16:9': 16 / 9, '9:16': 9 / 16,
 }

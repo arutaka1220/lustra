@@ -1,13 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PointerEvent } from 'react'
-import { FULL_CROP, moveCrop, ratioValue, resizeCrop, validCrop } from './crop-model'
+import { INITIAL_CROP_TRANSFORM, moveCrop, ratioValue, resizeCrop, validCrop } from './crop-model'
 import type { CropRect } from './crop-model'
 
 type Props = { bounds: { x: number; y: number; width: number; height: number }; crop?: CropRect; sourceWidth: number; sourceHeight: number; source: CanvasImageSource; onChange: (crop: CropRect) => void }
 type Drag = { handle: string; x: number; y: number; crop: CropRect; angle: number }
 
 export function CropOverlay({ bounds, crop: stored, sourceWidth, sourceHeight, source, onChange }: Props) {
-  const crop = { ...FULL_CROP, rotation: 0, ratio: 'original' as const, locked: true, ...stored, ...validCrop(stored) }
+  const crop = { ...INITIAL_CROP_TRANSFORM, ...stored, ...validCrop(stored) }
   const drag = useRef<Drag | undefined>(undefined)
   const result = useRef<HTMLCanvasElement>(null)
   const [active, setActive] = useState(false)

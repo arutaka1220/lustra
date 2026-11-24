@@ -589,3 +589,14 @@ RAW現像や明るさ調整・色調整などの編集機能は搭載しない�
 - 文字透明度は0〜100%で設定し、プレビューと書き出しに反映する。位置、アンカー、オフセットは既存の1080基準を使い、プレビューとネイティブ書き出しで同じ配置規則を使う。
 - テキスト、アンカー方式、オフセット、スタイル、表示状態、透明度はFrame設定とともにセッションスナップショットへ保存する。既存のAll Photos / This Photo、Undo / Redo、セッション自動保存・復元経路を使う。
 - JPEG / PNG / WebPのOriginal、720、1080、1440、2160px書き出しで最終写真へWatermarkを合成する。既存のICC、EXIF、GPS設定を維持し、元画像ファイルは変更しない。
+
+## Option / Alt + Reset
+
+- macOSのOption、WindowsのAltを押した状態でリセット対象へポインターを重ねるとReset操作を表示する。キー入力自体では編集せず、Resetボタンを押した場合のみ変更する。
+- 個別設定は製品デフォルトへ戻す。This Photoでは写真別オーバーライドだけを解除してAll Photosの値を継承する。変更がない場合はUndo履歴を増やさない。
+- 対応カテゴリはCanvas、Frame（Frame内Text Colorを含む）、Padding、Appearance、選択レイヤーのTypography、Crop & Rotate、Portrait Card。Text & Metadata全体のResetではレイヤーやメタデータを削除しない。
+- 個別ResetとカテゴリResetはUndo/Redoに統合し、カテゴリ一括変更は1回のUndoで復元する。セッション保存・復元でもReset状態を維持する。
+- Text ColorのAll Photos ResetはAutoをONにし、手動色とMy Paletteを保持する。This Photo Resetは写真別上書きを解除する。
+- Portrait CardはPhoto Size 80%、Vertical Position 0、専用背景効果の製品デフォルトへ戻し、Standardの設定を変更しない。
+- Crop & Rotateは回転0°、Original比率、初期構図、比率固定の製品デフォルトへ戻す。編集中はApplyで確定し、Cancelで編集開始前へ戻す。
+- Resetはテキストレイヤー、テンプレート文字列、EXIF変数、位置、Anchor、ユーザー保存パレットを削除しない。

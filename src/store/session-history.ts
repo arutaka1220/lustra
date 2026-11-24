@@ -145,10 +145,7 @@ export function appendChange(history: SessionHistory, change: SessionChange, lim
 export function selectUndoSeries(history: SessionHistory, activePhotoId: string | null): string | null | undefined {
   const common = history.common.undo.at(-1)
   const current = activePhotoId === null ? undefined : history.photos[activePhotoId]?.undo.at(-1)
-  if (common?.change.kind === 'layout') {
-    const isLatest = Object.values(history.photos).every((series) => (series.undo.at(-1)?.sequence ?? 0) < common.sequence)
-    if (isLatest) return null
-  }
+  if (common && (!current || common.sequence > current.sequence)) return null
   if (current) return activePhotoId
   if (common) return null
   return undefined
