@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ExportScreen } from '../src/features/export/ExportScreen'
+import type { ExportEvent } from '../src/features/export/export-model'
 
 const mocks = vi.hoisted(() => ({
   beginExport: vi.fn(),
@@ -48,7 +49,7 @@ describe('ExportScreen start guard', () => {
 
   it('shows preparation while start is delayed, ignores repeated submits, and permits a later run', async () => {
     const starts: Array<ReturnType<typeof deferred<string>>> = []
-    const events: Array<(event: { type: 'finished'; cancelled: boolean; cleanupErrors: string[]; deletedIds: string[] }) => void> = []
+    const events: Array<(event: ExportEvent) => void> = []
     mocks.beginExport.mockImplementation((_destination: string, _jobs: unknown[], _settings: unknown, onEvent: typeof events[number]) => {
       const start = deferred<string>()
       starts.push(start)
@@ -59,6 +60,7 @@ describe('ExportScreen start guard', () => {
     render(<ExportScreen photos={photos as never} commonFrame={{} as never} onBackToReview={() => {}} onBackToEditing={() => {}} onFinish={() => {}} onBusyChange={() => {}} />)
     const submit = screen.getByRole('button', { name: 'Export', exact: true })
     for (let index = 0; index < 10; index++) fireEvent.click(submit)
+    fireEvent.submit(submit.closest('form')!)
 
     expect(screen.getByRole('status')).toHaveTextContent('Preparing export...')
     expect(screen.getByText('Preparing 30 photos for export.')).toBeInTheDocument()
@@ -73,5 +75,7 @@ describe('ExportScreen start guard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Export again' }))
     fireEvent.click(screen.getByRole('button', { name: 'Export', exact: true }))
     await waitFor(() => expect(mocks.beginExport).toHaveBeenCalledTimes(2))
+    events[0]({ type: 'finished', cancelled: false, cleanupErrors: [], deletedIds: [] })
+    expect(screen.getByText('Preparing 30 photos for export.')).toBeInTheDocument()
   })
 })
