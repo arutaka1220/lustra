@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
 import { ArrowLeft, ArrowRight, Check, FileSearch } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useSessionStore, getEffectiveFrame } from '../../store/session-store'
+import { useSessionStore, getEffectiveFrame, initialFrame, initialPortraitCardSettings } from '../../store/session-store'
 import type { FrameSettings, SessionPhoto } from '../../types/photo'
 import { pickImageFiles, pickImageFolder } from '../import/photo-picker'
 import { TextInspector } from '../text/TextInspector'
@@ -13,6 +13,7 @@ import { CropControls } from './CropControls'
 import { prefetchEditPreview, previewNeighborIndices } from './preview-cache'
 import { useFilmstripLayout } from '../../hooks/useFilmstripLayout'
 import { effectiveFrameSettings } from './frame-layout'
+import { resetCropTransform } from './crop-model'
 
 type EditorScreenProps = {
   inspectorOpen: boolean
@@ -38,6 +39,7 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
   const endFrameEdit = useSessionStore((state) => state.endFrameEdit)
   const setCompleted = useSessionStore((state) => state.setCompleted)
   const setPhotoCrop = useSessionStore((state) => state.setPhotoCrop)
+  const setPhotoCrops = useSessionStore((state) => state.setPhotoCrops)
   const doneNext = useSessionStore((state) => state.doneNext)
   const nextPhoto = useSessionStore((state) => state.nextPhoto)
   const previousPhoto = useSessionStore((state) => state.previousPhoto)
@@ -45,13 +47,14 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
   const toggleFilmstrip = useSessionStore((state) => state.toggleFilmstrip)
   const filmstripLayout = useFilmstripLayout()
   const resetOverride = useSessionStore((state) => state.resetPhotoOverride)
+  const resetOverrideGroup = useSessionStore((state) => state.resetPhotoOverrideGroup)
   const resetAllOverrides = useSessionStore((state) => state.resetPhotoOverrides)
   const markMissing = useSessionStore((state) => state.markPhotoSourceMissing)
   const relink = useSessionStore((state) => state.relinkPhoto)
   const [relinkError, setRelinkError] = useState<{ id: string; key: string } | null>(null)
   const [locating, setLocating] = useState(false)
   const [cropMode, setCropMode] = useState(false)
-  const initialCrop = useRef<SessionPhoto['cropTransform']>(undefined)
+  const initialCrops = useRef<Record<string, SessionPhoto['cropTransform']>>({})
   const frame = useMemo(() => getEffectiveFrame(activePhoto, commonFrame), [activePhoto, commonFrame])
   const rawControlsFrame = editMode === 'all' ? getEffectiveFrame(activePhoto, commonFrame) : frame
   const controlsFrame = effectiveFrameSettings(rawControlsFrame)
@@ -73,6 +76,62 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
       if ('backgroundBrightness' in mapped) { mapped.portraitBackgroundBrightness = mapped.backgroundBrightness; delete mapped.backgroundBrightness }
     }
     patchFrame(mapped)
+  }
+  const resetCategory = (category: 'canvas' | 'frame' | 'padding' | 'effects') => {
+    const standardStyleKeys: (keyof FrameSettings)[] = ['blurStrength', 'backgroundBrightness', 'backgroundOpacity', 'ambientIntensity', 'ambientSoftness', 'ambientBrightness', 'ambientColorSource', 'edgeStretchMode', 'edgeStretchBlur', 'edgeStretchFade', 'showInset', 'showShadow']
+    const portraitKeys: (keyof FrameSettings)[] = ['portraitPhotoSize', 'portraitVerticalPosition', 'portraitBackgroundStyle', 'portraitBackgroundCustomColor', 'portraitBackgroundBlur', 'portraitBackgroundBrightness']
+    const styleAppearanceKeys: (keyof FrameSettings)[] = rawControlsFrame.style === 'blurred' ? standardStyleKeys.slice(0, 3)
+      : rawControlsFrame.style === 'ambientGradient' ? standardStyleKeys.slice(3, 7)
+        : rawControlsFrame.style === 'edgeStretch' ? standardStyleKeys.slice(7, 10) : []
+    const keys: (keyof FrameSettings)[] = category === 'canvas' ? ['canvasLayout', 'portraitRatio']
+      : category === 'frame' ? rawControlsFrame.canvasLayout === 'portraitCard' ? ['portraitBackgroundStyle', 'portraitBackgroundCustomColor', 'autoTextColor', 'manualTextColor'] : ['style', 'customColor', 'autoTextColor', 'manualTextColor']
+        : category === 'padding' ? ['top', 'bottom', 'left', 'right', 'linkSides', 'linkVertical', 'linkedPaddingRestore']
+          : rawControlsFrame.canvasLayout === 'portraitCard' ? portraitKeys
+            : [...styleAppearanceKeys, 'showInset', 'showShadow']
+    if (editMode === 'this') {
+      resetOverrideGroup(photo.id, keys)
+      return
+    }
+    const defaults: Partial<FrameSettings> = category === 'canvas' ? { canvasLayout: 'standard', portraitRatio: undefined }
+      : category === 'frame' ? rawControlsFrame.canvasLayout === 'portraitCard' ? { portraitBackgroundStyle: initialPortraitCardSettings.portraitBackgroundStyle, portraitBackgroundCustomColor: initialPortraitCardSettings.portraitBackgroundCustomColor, autoTextColor: true } : { style: initialFrame.style, customColor: undefined, autoTextColor: true }
+        : category === 'padding' ? { top: initialFrame.top, bottom: initialFrame.bottom, left: initialFrame.left, right: initialFrame.right, linkSides: initialFrame.linkSides, linkVertical: initialFrame.linkVertical, linkedPaddingRestore: undefined, aspectPadding: undefined }
+          : rawControlsFrame.canvasLayout === 'portraitCard' ? {
+            portraitPhotoSize: initialPortraitCardSettings.portraitPhotoSize,
+            portraitVerticalPosition: initialPortraitCardSettings.portraitVerticalPosition,
+            portraitBackgroundStyle: initialPortraitCardSettings.portraitBackgroundStyle,
+            portraitBackgroundCustomColor: initialPortraitCardSettings.portraitBackgroundCustomColor,
+            portraitBackgroundBlur: initialPortraitCardSettings.portraitBackgroundBlur,
+            portraitBackgroundBrightness: initialPortraitCardSettings.portraitBackgroundBrightness,
+          }
+            : { blurStrength: initialFrame.blurStrength, backgroundBrightness: initialFrame.backgroundBrightness, backgroundOpacity: initialFrame.backgroundOpacity, ambientIntensity: initialFrame.ambientIntensity, ambientSoftness: initialFrame.ambientSoftness, ambientBrightness: initialFrame.ambientBrightness, ambientColorSource: initialFrame.ambientColorSource, edgeStretchMode: initialFrame.edgeStretchMode, edgeStretchBlur: initialFrame.edgeStretchBlur, edgeStretchFade: initialFrame.edgeStretchFade, showInset: initialFrame.showInset, showShadow: initialFrame.showShadow }
+    const targetedDefaults = category === 'effects'
+      ? Object.fromEntries(keys.filter((key) => Object.hasOwn(defaults, key)).map((key) => [key, defaults[key]])) as Partial<FrameSettings>
+      : defaults
+    patchCanvasFrame(targetedDefaults)
+  }
+  const resetSetting = (key: keyof FrameSettings, value: FrameSettings[keyof FrameSettings]) => {
+    if (editMode === 'this') resetOverride(photo.id, key)
+    else patchCanvasFrame({ [key]: value } as Partial<FrameSettings>)
+  }
+  const resetTextColor = () => {
+    if (editMode === 'this') resetOverrideGroup(photo.id, ['autoTextColor', 'manualTextColor'])
+    else patchCanvasFrame({ autoTextColor: true })
+  }
+  const captureCropStart = () => {
+    initialCrops.current = editMode === 'all'
+      ? Object.fromEntries(photos.map(({ id, cropTransform }) => [id, cropTransform]))
+      : { [photo.id]: photo.cropTransform }
+  }
+  const cancelCrop = () => {
+    setPhotoCrops(initialCrops.current)
+    endFrameEdit()
+    setCropMode(false)
+  }
+  const resetCrops = (action: 'crop' | 'ratio' | 'lock' | 'rotation') => {
+    const targets = editMode === 'all' ? photos : activePhoto ? [activePhoto] : []
+    setPhotoCrops(Object.fromEntries(targets.map((target) => [target.id,
+      resetCropTransform(target.cropTransform, action, target.imageWidth ?? 0, target.imageHeight ?? 0),
+    ])))
   }
   const index = Math.max(0, photos.findIndex((photo) => photo.id === activePhoto?.id))
   const prefetchKey = previewNeighborIndices(photos.length, index).map(i => `${photos[i].id}\t${photos[i].source.url}`).join('\n')
@@ -139,12 +198,18 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
             </details>}
           </div>
           <FrameControls frame={controlsFrame} onChange={updateCanvasFrame}
-            onPatch={patchCanvasFrame} onFrameEditStart={beginFrameEdit} onFrameEditEnd={endFrameEdit}
+            onPatch={patchCanvasFrame} onFrameEditStart={beginFrameEdit} onFrameEditEnd={endFrameEdit} onResetCategory={resetCategory} onResetSetting={resetSetting} onResetTextColor={resetTextColor}
           >
             <TextInspector photo={photo} frame={controlsFrame} />
           </FrameControls>
           </div>
-          {cropMode && <CropControls crop={photo.cropTransform} sourceWidth={photo.imageWidth ?? 1} sourceHeight={photo.imageHeight ?? 1} onChange={crop => setPhotoCrop(photo.id, { ...crop, rotation: crop.rotation ?? photo.cropTransform?.rotation ?? 0 })} onApply={() => { endFrameEdit(); setCropMode(false) }} onCancel={() => { setPhotoCrop(photo.id, initialCrop.current); endFrameEdit(); setCropMode(false) }} />}
+          {cropMode && <CropControls crop={photo.cropTransform} sourceWidth={photo.imageWidth ?? 1} sourceHeight={photo.imageHeight ?? 1}
+            onChange={crop => setPhotoCrop(photo.id, { ...crop, rotation: crop.rotation ?? photo.cropTransform?.rotation ?? 0 })}
+            onResetCrop={() => resetCrops('crop')}
+            onResetRatio={() => resetCrops('ratio')}
+            onResetLock={() => resetCrops('lock')}
+            onResetRotation={() => resetCrops('rotation')}
+            onApply={() => { endFrameEdit(); setCropMode(false) }} onCancel={cancelCrop} />}
         </aside>
         <div
           className="inspector-resizer"
@@ -184,7 +249,7 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
         <div className="preview-stage-wrap">
           <div className="preview-stage-content">
             {photo.source.url
-              ? <FramePreview photo={photo} frame={frame} crop={photo.cropTransform} cropMode={cropMode} onCropModeChange={active => { if (active) initialCrop.current = photo.cropTransform; setCropMode(active) }} onCropChange={crop => setPhotoCrop(photo.id, crop)} onCropEditStart={beginFrameEdit} onCropEditEnd={endFrameEdit} onPortraitPositionChange={position => updateFrame('portraitVerticalPosition', position)} onPortraitPositionEditStart={beginFrameEdit} onPortraitPositionEditEnd={endFrameEdit} onImageError={() => markMissing(photo.id, photo.source)} onRevealInspector={onRevealInspector} />
+              ? <FramePreview photo={photo} frame={frame} crop={photo.cropTransform} cropMode={cropMode} onCropModeChange={active => { if (active) captureCropStart(); setCropMode(active) }} onCropChange={crop => setPhotoCrop(photo.id, crop)} onCropCancel={cancelCrop} onCropEditStart={beginFrameEdit} onCropEditEnd={endFrameEdit} onPortraitPositionChange={position => updateFrame('portraitVerticalPosition', position)} onPortraitPositionEditStart={beginFrameEdit} onPortraitPositionEditEnd={endFrameEdit} onImageError={() => markMissing(photo.id, photo.source)} onRevealInspector={onRevealInspector} />
               : <div className="relink-card">
                 <FileSearch size={26} />
                 <strong>{t('session.sourceMissing')}</strong>

@@ -287,7 +287,11 @@ export function TextInspector({ photo, frame }: TextInspectorProps) {
           </div>
         </details>
       </InspectorSection>
-      <InspectorSection title={t('text.typography')} open={isOpen('typography')} onToggle={() => toggle('typography')}>
+      <InspectorSection title={t('text.typography')} open={isOpen('typography')} onToggle={() => toggle('typography')} onReset={active ? () => {
+        const defaults = createTextElement(active.template, active.id)
+        const style = { fontFamily: defaults.fontFamily, weight: defaults.weight, size: defaults.size, opacity: defaults.opacity }
+        if (Object.entries(style).some(([key, value]) => active[key as keyof TextElement] !== value)) updateElement(active.id, style)
+      } : undefined}>
         {active ? <>
           <div className="text-fields">
             <FontInput value={active.fontFamily} onChange={(fontFamily) => updateElement(active.id, { fontFamily })} />

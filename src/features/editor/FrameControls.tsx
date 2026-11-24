@@ -9,6 +9,8 @@ import './frame-i18n'
 import { CustomColorPicker } from './CustomColorPicker'
 import { SelectField } from '../../components/ui/SelectField'
 import { autoFrameTextColor } from '../text/text-model'
+import { initialFrame, initialPortraitCardSettings } from '../../store/session-store'
+import { ResetButton } from './ResetButton'
 
 type FrameControlsProps = {
   frame: FrameSettings
@@ -16,6 +18,9 @@ type FrameControlsProps = {
   onPatch?: (changes: Partial<FrameSettings>) => void
   onFrameEditStart?: () => void
   onFrameEditEnd?: () => void
+  onResetCategory?: (category: 'canvas' | 'frame' | 'padding' | 'effects') => void
+  onResetSetting?: (key: keyof FrameSettings, value: FrameSettings[keyof FrameSettings]) => void
+  onResetTextColor?: () => void
   children?: ReactNode
 }
 
@@ -23,7 +28,7 @@ export const FRAME_STYLE_ORDER = ['none', 'black', 'white', 'blurred', 'softBlac
 const sides = ['top', 'bottom', 'left', 'right'] as const
 const oppositeSide = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' } as const
 
-export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFrameEditEnd, children }: FrameControlsProps) {
+export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFrameEditEnd, onResetCategory, onResetSetting, onResetTextColor, children }: FrameControlsProps) {
   const { t } = useTranslation()
   const { isOpen, toggle } = useInspectorSections()
   const isPortraitCard = frame.canvasLayout === 'portraitCard'
@@ -52,9 +57,9 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
   const changeManualTextColor = (color: string) => patch({ autoTextColor: false, manualTextColor: color })
   return (
     <div className="controls-scroll">
-      <InspectorSection title={t('framePreview.canvas')} open={isOpen('canvas')} onToggle={() => toggle('canvas')}>
-        <label className="portrait-canvas-field">
-          <span>{t('framePreview.canvasLayout')}</span>
+      <InspectorSection title={t('framePreview.canvas')} open={isOpen('canvas')} onToggle={() => toggle('canvas')} onReset={onResetCategory ? () => onResetCategory('canvas') : undefined}>
+        <div className="portrait-canvas-field">
+          <span className="resettable-label"><span>{t('framePreview.canvasLayout')}</span><ResetButton label={t('framePreview.canvasLayout')} onReset={() => onResetSetting?.('canvasLayout', initialFrame.canvasLayout)} /></span>
           <SelectField aria-label={t('framePreview.canvasLayout')} value={frame.canvasLayout ?? 'standard'} options={[
             { value: 'standard', label: t('framePreview.standardLayout') },
             { value: 'portraitCard', label: t('framePreview.portraitCardLayout') },
@@ -63,30 +68,30 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
             if (layout === 'portraitCard') {
               patch({
                 canvasLayout: layout,
-                portraitRatio: frame.portraitRatio ?? 4 / 5,
-                portraitPhotoSize: frame.portraitPhotoSize ?? 80,
-                portraitVerticalPosition: frame.portraitVerticalPosition ?? 0,
-                portraitBackgroundStyle: frame.portraitBackgroundStyle ?? 'blurred',
-                portraitBackgroundCustomColor: frame.portraitBackgroundCustomColor ?? '#000000',
-                portraitBackgroundBlur: frame.portraitBackgroundBlur ?? 32,
-                portraitBackgroundBrightness: frame.portraitBackgroundBrightness ?? 90,
+                portraitRatio: frame.portraitRatio ?? initialPortraitCardSettings.portraitRatio,
+                portraitPhotoSize: frame.portraitPhotoSize ?? initialPortraitCardSettings.portraitPhotoSize,
+                portraitVerticalPosition: frame.portraitVerticalPosition ?? initialPortraitCardSettings.portraitVerticalPosition,
+                portraitBackgroundStyle: frame.portraitBackgroundStyle ?? initialPortraitCardSettings.portraitBackgroundStyle,
+                portraitBackgroundCustomColor: frame.portraitBackgroundCustomColor ?? initialPortraitCardSettings.portraitBackgroundCustomColor,
+                portraitBackgroundBlur: frame.portraitBackgroundBlur ?? initialPortraitCardSettings.portraitBackgroundBlur,
+                portraitBackgroundBrightness: frame.portraitBackgroundBrightness ?? initialPortraitCardSettings.portraitBackgroundBrightness,
               })
             } else {
               patch({ canvasLayout: layout })
             }
           }} />
-        </label>
-        {isPortraitCard && <label className="portrait-canvas-field">
-          <span>{t('framePreview.canvasRatio')}</span>
-          <SelectField aria-label={t('framePreview.canvasRatio')} value={String(frame.portraitRatio ?? 4 / 5)} options={[
+        </div>
+        {isPortraitCard && <div className="portrait-canvas-field">
+          <span className="resettable-label"><span>{t('framePreview.canvasRatio')}</span><ResetButton label={t('framePreview.canvasRatio')} onReset={() => onResetSetting?.('portraitRatio', initialPortraitCardSettings.portraitRatio!)} /></span>
+          <SelectField aria-label={t('framePreview.canvasRatio')} value={String(frame.portraitRatio ?? initialPortraitCardSettings.portraitRatio)} options={[
             { value: String(4 / 5), label: '4:5' },
             { value: String(3 / 4), label: '3:4' },
             { value: String(9 / 16), label: '9:16' },
             { value: '1', label: '1:1' },
           ]} onValueChange={value => onChange('portraitRatio', Number(value))} />
-        </label>}
+        </div>}
       </InspectorSection>
-      <InspectorSection title={t('edit.frame')} open={isOpen('frame')} onToggle={() => toggle('frame')}>
+      <InspectorSection title={t('edit.frame')} open={isOpen('frame')} onToggle={() => toggle('frame')} onReset={onResetCategory ? () => onResetCategory('frame') : undefined}>
         <div className="style-picker">
           {FRAME_STYLE_ORDER.map((style) => style === 'custom'
             ? <CustomColorPicker key={style} tile selected={frame.style === 'custom'} label={t('framePreview.custom')} color={frame.customColor ?? '#000000'} onOpen={() => onChange('style', 'custom')} onChange={color => onChange('customColor', color)} onEditStart={onFrameEditStart} onEditEnd={onFrameEditEnd} />
@@ -99,6 +104,7 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
         <section className="frame-text-color" aria-label={t('framePreview.textColor')}>
           <header className="frame-text-color__header">
             <strong>{t('framePreview.textColor')}</strong>
+            {onResetTextColor && <ResetButton label={t('framePreview.textColor')} onReset={onResetTextColor} />}
             <label className="frame-text-color__auto">
               <span>Auto</span>
               <button type="button" role="switch" aria-label={t('framePreview.autoTextColor')} aria-checked={autoTextColor}
@@ -123,47 +129,50 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
         </section>
       </InspectorSection>
 
-      {frame.canvasLayout !== 'portraitCard' && <InspectorSection title={t('edit.padding')} open={isOpen('padding')} onToggle={() => toggle('padding')}>
+      {frame.canvasLayout !== 'portraitCard' && <InspectorSection title={t('edit.padding')} open={isOpen('padding')} onToggle={() => toggle('padding')} onReset={onResetCategory ? () => onResetCategory('padding') : undefined}>
         <p className="padding-help">{t('framePreview.paddingHelp')}</p>
         <p className="padding-help">{t('framePreview.paddingSameAspect')}</p>
         {(['linkVertical', 'linkSides'] as const).map((key) => <section className="padding-group" key={key}>
-          <header><strong>{t(key === 'linkVertical' ? 'framePreview.vertical' : 'framePreview.horizontal')}</strong><button className={`link-toggle ${frame[key] ? 'is-on' : ''}`} onClick={() => toggleLink(key)} aria-pressed={frame[key]}>
+          <header><strong>{t(key === 'linkVertical' ? 'framePreview.vertical' : 'framePreview.horizontal')}</strong><ResetButton label={t(key === 'linkVertical' ? 'framePreview.vertical' : 'framePreview.horizontal')} onReset={() => onResetSetting?.(key, initialFrame[key])} /><button className={`link-toggle ${frame[key] ? 'is-on' : ''}`} onClick={() => toggleLink(key)} aria-pressed={frame[key]}>
             {frame[key] ? <Link2 size={16} aria-hidden="true" /> : <Link2Off size={16} aria-hidden="true" />}
             <span>{t(`framePreview.${key}`)}</span><span className="toggle-state">{t(frame[key] ? 'framePreview.on' : 'framePreview.off')}</span>
-          </button></header><div className="margin-control-grid">{(key === 'linkVertical' ? sides.slice(0, 2) : sides.slice(2)).map((side) => <SliderInput key={side} label={t(`framePreview.${side}`)} value={frame[side]} max={32} onChange={(value) => setPadding(side, value)} {...sliderGestures} />)}</div>
+          </button></header><div className="margin-control-grid">{(key === 'linkVertical' ? sides.slice(0, 2) : sides.slice(2)).map((side) => <SliderInput key={side} label={t(`framePreview.${side}`)} value={frame[side]} max={32} onChange={(value) => setPadding(side, value)} onReset={() => onResetSetting?.(side, initialFrame[side])} {...sliderGestures} />)}</div>
         </section>)}
       </InspectorSection>}
 
-      <InspectorSection title={t('edit.appearance')} open={isOpen('effects')} onToggle={() => toggle('effects')}>
+      <InspectorSection title={t('edit.appearance')} open={isOpen('effects')} onToggle={() => toggle('effects')} onReset={onResetCategory ? () => onResetCategory('effects') : undefined}>
         {isPortraitCard && <>
-          <SliderInput label={t('framePreview.photoSize')} value={frame.portraitPhotoSize ?? 80} min={40} max={90} unit="%" onChange={value => onChange('portraitPhotoSize', value)} {...sliderGestures} />
-          <SliderInput label={t('framePreview.verticalPosition')} value={frame.portraitVerticalPosition ?? 0} min={-0.5} max={0.5} step={0.01} unit="" onChange={value => onChange('portraitVerticalPosition', value)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.photoSize')} value={frame.portraitPhotoSize ?? initialPortraitCardSettings.portraitPhotoSize!} min={40} max={90} unit="%" onChange={value => onChange('portraitPhotoSize', value)} onReset={() => onResetSetting?.('portraitPhotoSize', initialPortraitCardSettings.portraitPhotoSize!)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.verticalPosition')} value={frame.portraitVerticalPosition ?? initialPortraitCardSettings.portraitVerticalPosition!} min={-0.5} max={0.5} step={0.01} unit="" onChange={value => onChange('portraitVerticalPosition', value)} onReset={() => onResetSetting?.('portraitVerticalPosition', initialPortraitCardSettings.portraitVerticalPosition!)} {...sliderGestures} />
           <button className="button button--quiet portrait-reset-position" type="button" onClick={() => onChange('portraitVerticalPosition', 0)}>{t('framePreview.resetPosition')}</button>
         </>}
         {isPortraitCard && frame.style === 'blurred' && <>
-          <SliderInput label={t('framePreview.backgroundBlur')} value={frame.portraitBackgroundBlur ?? 32} max={40} unit="px" onChange={value => onChange('portraitBackgroundBlur', value)} {...sliderGestures} />
-          <SliderInput label={t('framePreview.backgroundBrightness')} value={frame.portraitBackgroundBrightness ?? 90} min={60} max={140} onChange={value => onChange('portraitBackgroundBrightness', value)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.backgroundBlur')} value={frame.portraitBackgroundBlur ?? initialPortraitCardSettings.portraitBackgroundBlur!} max={40} unit="px" onChange={value => onChange('portraitBackgroundBlur', value)} onReset={() => onResetSetting?.('portraitBackgroundBlur', initialPortraitCardSettings.portraitBackgroundBlur!)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.backgroundBrightness')} value={frame.portraitBackgroundBrightness ?? initialPortraitCardSettings.portraitBackgroundBrightness!} min={60} max={140} onChange={value => onChange('portraitBackgroundBrightness', value)} onReset={() => onResetSetting?.('portraitBackgroundBrightness', initialPortraitCardSettings.portraitBackgroundBrightness!)} {...sliderGestures} />
         </>}
         {frame.style === 'blurred' && !isPortraitCard && <>
-          <SliderInput label={t('framePreview.blur')} value={frame.blurStrength} max={40} unit="px" onChange={(value) => onChange('blurStrength', value)} {...sliderGestures} />
-          <SliderInput label={t('framePreview.brightness')} value={frame.backgroundBrightness} min={60} max={140} onChange={(value) => onChange('backgroundBrightness', value)} {...sliderGestures} />
-          <SliderInput label={t('framePreview.opacity')} value={frame.backgroundOpacity ?? 100} max={100} onChange={(value) => onChange('backgroundOpacity', value)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.blur')} value={frame.blurStrength} max={40} unit="px" onChange={(value) => onChange('blurStrength', value)} onReset={() => onResetSetting?.('blurStrength', initialFrame.blurStrength)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.brightness')} value={frame.backgroundBrightness} min={60} max={140} onChange={(value) => onChange('backgroundBrightness', value)} onReset={() => onResetSetting?.('backgroundBrightness', initialFrame.backgroundBrightness)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.opacity')} value={frame.backgroundOpacity ?? 100} max={100} onChange={(value) => onChange('backgroundOpacity', value)} onReset={() => onResetSetting?.('backgroundOpacity', initialFrame.backgroundOpacity)} {...sliderGestures} />
         </>}
         {frame.style === 'ambientGradient' && <>
-          <SliderInput label={t('framePreview.intensity')} value={frame.ambientIntensity ?? 85} max={100} unit="%" onChange={value => onChange('ambientIntensity', value)} {...sliderGestures} />
-          <SliderInput label={t('framePreview.softness')} value={frame.ambientSoftness ?? 65} max={100} unit="%" onChange={value => onChange('ambientSoftness', value)} {...sliderGestures} />
-          <SliderInput label={t('framePreview.ambientBrightness')} value={frame.ambientBrightness ?? 0} min={-100} max={100} onChange={value => onChange('ambientBrightness', value)} {...sliderGestures} />
-          <label className="field-label">{t('framePreview.colorSource')}<select value={frame.ambientColorSource ?? 'fullImage'} onChange={event => onChange('ambientColorSource', event.target.value as 'fullImage' | 'edges')}><option value="fullImage">{t('framePreview.fullImage')}</option><option value="edges">{t('framePreview.edges')}</option></select></label>
+          <SliderInput label={t('framePreview.intensity')} value={frame.ambientIntensity ?? initialFrame.ambientIntensity!} max={100} unit="%" onChange={value => onChange('ambientIntensity', value)} onReset={() => onResetSetting?.('ambientIntensity', initialFrame.ambientIntensity!)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.softness')} value={frame.ambientSoftness ?? initialFrame.ambientSoftness!} max={100} unit="%" onChange={value => onChange('ambientSoftness', value)} onReset={() => onResetSetting?.('ambientSoftness', initialFrame.ambientSoftness!)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.ambientBrightness')} value={frame.ambientBrightness ?? initialFrame.ambientBrightness!} min={-100} max={100} onChange={value => onChange('ambientBrightness', value)} onReset={() => onResetSetting?.('ambientBrightness', initialFrame.ambientBrightness!)} {...sliderGestures} />
+          <div className="field-label"><span className="resettable-label"><span>{t('framePreview.colorSource')}</span><ResetButton label={t('framePreview.colorSource')} onReset={() => onResetSetting?.('ambientColorSource', initialFrame.ambientColorSource!)} /></span><select aria-label={t('framePreview.colorSource')} value={frame.ambientColorSource ?? initialFrame.ambientColorSource!} onChange={event => onChange('ambientColorSource', event.target.value as 'fullImage' | 'edges')}><option value="fullImage">{t('framePreview.fullImage')}</option><option value="edges">{t('framePreview.edges')}</option></select></div>
         </>}
         {frame.style === 'edgeStretch' && <>
-          <label className="field-label">{t('framePreview.stretchMode')}<select value={frame.edgeStretchMode ?? 'extend'} onChange={event => onChange('edgeStretchMode', event.target.value as 'extend' | 'mirror')}><option value="extend">{t('framePreview.extend')}</option><option value="mirror">{t('framePreview.mirror')}</option></select></label>
-          <SliderInput label={t('framePreview.edgeBlur')} value={frame.edgeStretchBlur ?? 8} max={40} unit="px" onChange={value => onChange('edgeStretchBlur', value)} {...sliderGestures} />
-          <SliderInput label={t('framePreview.fade')} value={frame.edgeStretchFade ?? 12} max={40} unit="px" onChange={value => onChange('edgeStretchFade', value)} {...sliderGestures} />
+          <div className="field-label"><span className="resettable-label"><span>{t('framePreview.stretchMode')}</span><ResetButton label={t('framePreview.stretchMode')} onReset={() => onResetSetting?.('edgeStretchMode', initialFrame.edgeStretchMode!)} /></span><select aria-label={t('framePreview.stretchMode')} value={frame.edgeStretchMode ?? initialFrame.edgeStretchMode!} onChange={event => onChange('edgeStretchMode', event.target.value as 'extend' | 'mirror')}><option value="extend">{t('framePreview.extend')}</option><option value="mirror">{t('framePreview.mirror')}</option></select></div>
+          <SliderInput label={t('framePreview.edgeBlur')} value={frame.edgeStretchBlur ?? initialFrame.edgeStretchBlur!} max={40} unit="px" onChange={value => onChange('edgeStretchBlur', value)} onReset={() => onResetSetting?.('edgeStretchBlur', initialFrame.edgeStretchBlur!)} {...sliderGestures} />
+          <SliderInput label={t('framePreview.fade')} value={frame.edgeStretchFade ?? initialFrame.edgeStretchFade!} max={40} unit="px" onChange={value => onChange('edgeStretchFade', value)} onReset={() => onResetSetting?.('edgeStretchFade', initialFrame.edgeStretchFade!)} {...sliderGestures} />
         </>}
-        {frame.canvasLayout !== 'portraitCard' && (['showInset', 'showShadow'] as const).map((key) => <button className={`check-row ${frame[key] ? 'is-checked' : ''}`} key={key} onClick={() => onChange(key, !frame[key])} aria-pressed={frame[key]}>
-          <span className="check-box">{frame[key] && <Check size={13} aria-hidden="true" />}</span>
-          <span><strong>{t(key === 'showInset' ? 'framePreview.inset' : 'framePreview.shadow')}</strong></span>
-        </button>)}
+        {frame.canvasLayout !== 'portraitCard' && (['showInset', 'showShadow'] as const).map((key) => <div className="check-row-wrap" key={key}>
+          <button className={`check-row ${frame[key] ? 'is-checked' : ''}`} onClick={() => onChange(key, !frame[key])} aria-pressed={frame[key]}>
+            <span className="check-box">{frame[key] && <Check size={13} aria-hidden="true" />}</span>
+            <span><strong>{t(key === 'showInset' ? 'framePreview.inset' : 'framePreview.shadow')}</strong></span>
+          </button>
+          <ResetButton label={t(key === 'showInset' ? 'framePreview.inset' : 'framePreview.shadow')} onReset={() => onResetSetting?.(key, initialFrame[key])} />
+        </div>)}
       </InspectorSection>
       {children}
     </div>

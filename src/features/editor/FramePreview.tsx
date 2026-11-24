@@ -30,6 +30,7 @@ type FramePreviewProps = {
   onCropChange?: (crop: SessionPhoto['cropTransform']) => void
   onCropEditStart?: () => void
   onCropEditEnd?: () => void
+  onCropCancel?: () => void
   onPortraitPositionChange?: (position: number) => void
   onPortraitPositionEditStart?: () => void
   onPortraitPositionEditEnd?: () => void
@@ -53,7 +54,7 @@ function rasterizeImage(image: HTMLImageElement, maxEdge: number): PhotoRaster {
   return { image: canvas, width: canvas.width, height: canvas.height }
 }
 
-export function FramePreview({ photo, frame, compact = false, readOnly = false, onImageError, onRevealInspector, fallbackPreview, crop, cropMode: controlledCropMode, onCropModeChange, onCropChange, onCropEditStart, onCropEditEnd, onPortraitPositionChange, onPortraitPositionEditStart, onPortraitPositionEditEnd }: FramePreviewProps) {
+export function FramePreview({ photo, frame, compact = false, readOnly = false, onImageError, onRevealInspector, fallbackPreview, crop, cropMode: controlledCropMode, onCropModeChange, onCropChange, onCropEditStart, onCropEditEnd, onCropCancel, onPortraitPositionChange, onPortraitPositionEditStart, onPortraitPositionEditEnd }: FramePreviewProps) {
   const { t } = useTranslation()
   const viewport = useRef<HTMLDivElement>(null)
   const surface = useRef<HTMLDivElement>(null)
@@ -80,11 +81,11 @@ export function FramePreview({ photo, frame, compact = false, readOnly = false, 
       if (target?.closest('input,textarea,select,[contenteditable="true"]') && !(cropMode && (event.key === 'Enter' || event.key === 'Escape'))) return
       if (event.key.toLowerCase() === 'c' && !event.metaKey && !event.ctrlKey && !event.altKey) { event.preventDefault(); if (!cropMode) { initialCrop.current = crop; onCropEditStart?.() } else onCropEditEnd?.(); changeCropMode(!cropMode) }
       if (event.key === 'Enter' && cropMode) { event.preventDefault(); onCropEditEnd?.(); changeCropMode(false) }
-      if (event.key === 'Escape' && cropMode) { event.preventDefault(); onCropChange?.(initialCrop.current); onCropEditEnd?.(); changeCropMode(false) }
+      if (event.key === 'Escape' && cropMode) { event.preventDefault(); if (onCropCancel) onCropCancel(); else { onCropChange?.(initialCrop.current); onCropEditEnd?.(); changeCropMode(false) } }
     }
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
-  }, [interactive, cropMode, crop, onCropChange, onCropEditStart, onCropEditEnd, onCropModeChange, controlledCropMode])
+  }, [interactive, cropMode, crop, onCropChange, onCropEditStart, onCropEditEnd, onCropCancel, onCropModeChange, controlledCropMode])
   const sourceUrl = photo.source.url
   const status = loaded?.url === sourceUrl ? loaded : undefined
   const sourceMissing = photo.source.kind === 'path' && photo.source.missing === true
