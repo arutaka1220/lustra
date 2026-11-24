@@ -187,6 +187,37 @@
   font-variant-numeric: tabular-nums;
 }
 
+.export-progress__preparing {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 52px;
+}
+
+.export-progress__preparing > div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.export-progress__preparing span:not(.export-progress__spinner) {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.export-progress__spinner {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  border: 2px solid var(--surface-hover);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: export-spin .8s linear infinite;
+}
+
+@keyframes export-spin {
+  to { transform: rotate(360deg); }
+}
+
 .export-progress__label {
   justify-content: space-between;
   color: var(--text-secondary);

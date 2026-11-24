@@ -596,20 +596,13 @@ pub fn begin_export(
         return Err("Quality must be between 1 and 100.".to_owned());
     }
 
-    let mut active = ACTIVE.lock().map_err(|error| error.to_string())?;
-    if active.is_some() {
-        return Err("An export is already running.".to_owned());
-    }
     let id = format!(
         "{}-{}",
         std::process::id(),
         RUN_SEQUENCE.fetch_add(1, Ordering::Relaxed)
     );
     let status = Arc::new(AtomicU8::new(RUNNING));
-    *active = Some(ActiveRun {
-        id: id.clone(),
-        status: status.clone(),
-    });
+    register_active_run(&id, status.clone())?;
     let worker_id = id.clone();
     tauri::async_runtime::spawn_blocking(move || {
         run_export(
@@ -623,6 +616,40 @@ pub fn begin_export(
         )
     });
     Ok(id)
+}
+
+fn register_active_run(id: &str, status: Arc<AtomicU8>) -> Result<(), String> {
+    let mut active = ACTIVE.lock().map_err(|error| error.to_string())?;
+    if active.is_some() {
+        return Err("An export is already running.".to_owned());
+    }
+    *active = Some(ActiveRun {
+        id: id.to_owned(),
+        status,
+    });
+    Ok(())
+}
+
+#[cfg(test)]
+mod active_run_tests {
+    use super::*;
+
+    #[test]
+    fn duplicate_registration_keeps_the_original_run_and_status() {
+        let first_status = Arc::new(AtomicU8::new(RUNNING));
+        let second_status = Arc::new(AtomicU8::new(RUNNING));
+
+        register_active_run("first", first_status.clone()).unwrap();
+        let duplicate = register_active_run("second", second_status.clone());
+
+        assert!(duplicate.unwrap_err().contains("already running"));
+        let active = ACTIVE.lock().unwrap();
+        let current = active.as_ref().expect("first run remains active");
+        assert_eq!(current.id, "first");
+        assert!(Arc::ptr_eq(&current.status, &first_status));
+        drop(active);
+        *ACTIVE.lock().unwrap() = None;
+    }
 }
 
 #[tauri::command]
