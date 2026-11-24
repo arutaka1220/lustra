@@ -25,6 +25,8 @@ test('review opens a framed preview and can switch between images', async ({ pag
   const second = page.getByRole('button', { name: /preview test_exif_02\.png/i })
   for (const card of [first, second]) {
     await expect(card.locator('.review-thumbnail__canvas')).toBeVisible({ timeout: 10_000 })
+    const imageBox = await card.locator('.review-thumbnail__board').boundingBox()
+    expect(imageBox?.height).toBeGreaterThan(300)
   }
   const dialog = page.getByRole('dialog').filter({ has: page.locator('.review-preview-stage') })
   for (const card of [first, second, first]) {

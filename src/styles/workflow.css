@@ -133,7 +133,7 @@
 .recently-removed--start { width: min(480px, 100%); margin-top: 16px; text-align: left; }
 .recently-removed--start ul { position: static; width: 100%; margin-top: 6px; box-shadow: none; }
 
-.review-card__image { height: 220px; align-items: center; }
+.review-card__image { align-items: center; }
 .review-card__image:focus-visible { outline-offset: -3px; }
 .review-edit-button { width: 30px; height: 30px; }
 .review-missing { display: grid; justify-items: center; gap: 6px; color: var(--text-secondary); font-size: 12px; }
