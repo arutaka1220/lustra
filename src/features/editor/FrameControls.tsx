@@ -9,8 +9,6 @@ import './frame-i18n'
 import { CustomColorPicker } from './CustomColorPicker'
 import { SelectField } from '../../components/ui/SelectField'
 import { autoFrameTextColor } from '../text/text-model'
-import { writeAppPreference } from '../../store/session-persistence'
-import { setGlobalPaddingDefaults } from '../../store/session-store'
 
 type FrameControlsProps = {
   frame: FrameSettings
@@ -128,11 +126,6 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
       {frame.canvasLayout !== 'portraitCard' && <InspectorSection title={t('edit.padding')} open={isOpen('padding')} onToggle={() => toggle('padding')}>
         <p className="padding-help">{t('framePreview.paddingHelp')}</p>
         <p className="padding-help">{t('framePreview.paddingSameAspect')}</p>
-        <button className="button button--quiet" type="button" onClick={() => {
-          const defaults = frame.aspectPadding ?? {}
-          setGlobalPaddingDefaults(defaults)
-          void writeAppPreference('padding.aspect-defaults', defaults).catch(error => console.warn('Could not save global padding defaults', error))
-        }}>{t('framePreview.savePaddingDefaults')}</button>
         {(['linkVertical', 'linkSides'] as const).map((key) => <section className="padding-group" key={key}>
           <header><strong>{t(key === 'linkVertical' ? 'framePreview.vertical' : 'framePreview.horizontal')}</strong><button className={`link-toggle ${frame[key] ? 'is-on' : ''}`} onClick={() => toggleLink(key)} aria-pressed={frame[key]}>
             {frame[key] ? <Link2 size={16} aria-hidden="true" /> : <Link2Off size={16} aria-hidden="true" />}

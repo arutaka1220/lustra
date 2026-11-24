@@ -269,6 +269,10 @@ Lustraは、Lightroom等でセレクト・現像された写真にEXIFを用い�
 - 旧AutoをAuto ONへ移行する。旧Global色はGlobalモードを使用したレイヤーがあれば共通の手動色へ移行する。旧レイヤー別Custom色のみの場合は最頻色を採用し、同数ならレイヤー順で先の色を採用する。復元時に旧色フィールドを除去し、次の保存から新方式だけを出力する。
 - プレビューとRust書き出しは同一のFrame色解決規則を使い、JPEG / PNG / WebP / Original、Standard / Portrait Cardで文字Opacityを保つ。ICC / EXIF / GPSと元画像の仕様は変えない。
 
+**Padding**
+
+- 比率別Padding、Link、This Photo / All Photos、Undo/Redoは維持する。`Save as Global Defaults`ボタンと専用のグローバル保存・空Workspaceへの適用処理は提供しない。旧アプリ設定値は読み込まず、既存セッションデータを破壊しない。
+
 ### 4.4 Edit Frames: Previewと直接操作
 
 **写真の外側にある編集ワークスペース背景は常に白 (#FFFFFF) とする。** [確定]

@@ -101,24 +101,13 @@ export const initialFrame: FrameSettings = {
   showShadow: false,
 }
 
-let globalPaddingDefaults: FrameSettings['aspectPadding'] = {}
-export function setGlobalPaddingDefaults(value: FrameSettings['aspectPadding'] | null) {
-  globalPaddingDefaults = value && typeof value === 'object' ? value : {}
-}
-
-export function applyGlobalPaddingDefaultsToEmptyWorkspace() {
-  useSessionStore.setState((state) => state.photos.length || state.removedPhotos.length || state.history.sequence > 0
-    ? state
-    : { commonFrame: { ...state.commonFrame, aspectPadding: globalPaddingDefaults } })
-}
-
 function freshWorkspace() {
   return {
     sessionId: crypto.randomUUID(),
     photos: [],
     removedPhotos: [],
     activePhotoId: null,
-    commonFrame: { ...initialFrame, aspectPadding: globalPaddingDefaults },
+    commonFrame: { ...initialFrame },
     editMode: 'all' as const,
     filmstripOpen: true,
     screen: 'welcome' as const,

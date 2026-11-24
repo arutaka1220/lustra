@@ -198,6 +198,10 @@ RAW現像や明るさ調整・色調整などの編集機能は搭載しない�
 - 旧AutoはAuto ONへ移行する。旧Global指定を持つレイヤーがあればGlobal色を手動色へ移行する。旧個別Custom色しかない場合は、最頻色を採用し同数ならレイヤー順で最初の色を採用してAuto OFFへ移行する。既存の新方式フィールドは保持し、旧色フィールドは復元後の新規保存データから除く。
 - プレビュー、Review、JPEG / PNG / WebP / Original書き出しは同じFrame別色解決を使い、ICC / EXIF / GPSと元画像の扱いを維持する。
 
+### Paddingの初期値
+
+- Paddingはセッション内の比率別設定、Link、Undo/Redoを維持する。`Save as Global Defaults`操作と、それ専用の保存・適用処理は提供しない。
+
 
 ### 8.1 EXIFの表示と上書き
 
