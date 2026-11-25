@@ -9,12 +9,12 @@ edition = "2021"
 name = "lustra_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+documentation-media = ["dep:oxipng", "dep:png"]
+
 [build-dependencies]
 cc = "1"
 tauri-build = { version = "2", features = [] }
-
-[dev-dependencies]
-png = "0.18.1"
 
 [dependencies]
 crc32fast = "1"
@@ -28,3 +28,13 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-updater = "2"
 url = "2"
+oxipng = { version = "=10.2.1", optional = true }
+png = { version = "=0.18.1", optional = true }
+
+[[bin]]
+name = "documentation-media-optimize"
+path = "src/bin/documentation-media-optimize.rs"
+required-features = ["documentation-media"]
+
+[dev-dependencies]
+png = "0.18.1"
