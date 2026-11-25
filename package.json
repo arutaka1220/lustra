@@ -14,7 +14,8 @@
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
     "test:all": "bun run test && bun run test:e2e && bun run test:rust",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "icons:generate": "bun run tauri icon src-tauri/app-icon.svg --output src-tauri/icons"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.6",
