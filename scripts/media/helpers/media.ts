@@ -75,11 +75,11 @@ export async function inspectPng(path: string) {
   return { width, height, hasAlpha, sha256: digest, bytes: size }
 }
 
-export async function writeReport(root: string, files: Array<{ path: string; source?: string; before?: string; sizeBeforeOptimization?: number; sizeAfterOptimization?: number }>, outDir: string, options: { failureCount?: number; errors?: Array<{ path?: string; message: string }>; warnings?: string[] } = {}) {
+export async function writeReport(root: string, files: Array<{ path: string; source?: string; before?: string; status?: 'added' | 'changed' | 'unchanged'; sizeBeforeOptimization?: number; sizeAfterOptimization?: number }>, outDir: string, options: { failureCount?: number; errors?: Array<{ path?: string; message: string }>; warnings?: string[] } = {}) {
   const entries = await Promise.all(files.map(async (file) => {
     const path = resolve(root, file.source ?? file.path)
     const info = await inspectPng(path)
-    return { ...file, ...info, bytesSaved: (file.sizeBeforeOptimization ?? info.bytes) - (file.sizeAfterOptimization ?? info.bytes) }
+    return { ...file, ...info, status: file.status ?? (file.before ? 'changed' as const : 'added' as const), bytesSaved: (file.sizeBeforeOptimization ?? info.bytes) - (file.sizeAfterOptimization ?? info.bytes) }
   }))
   const manifest = { files: entries, successCount: entries.length, failureCount: options.failureCount ?? 0, errors: options.errors ?? [], warnings: options.warnings ?? [], totalBytes: entries.reduce((sum, entry) => sum + entry.bytes, 0), totalBytesBeforeOptimization: entries.reduce((sum, entry) => sum + (entry.sizeBeforeOptimization ?? entry.bytes), 0), totalBytesSaved: entries.reduce((sum, entry) => sum + entry.bytesSaved, 0) }
   const mediaDir = join(outDir, 'media'); await mkdir(mediaDir, { recursive: true })
@@ -93,7 +93,7 @@ export async function writeReport(root: string, files: Array<{ path: string; sou
     ['English screenshots', entries.map((entry, index) => ({ entry, index })).filter(({ entry }) => entry.path.includes('/en/'))],
     ['Export examples', entries.map((entry, index) => ({ entry, index })).filter(({ entry }) => entry.path.includes('/examples/'))],
   ] as const
-  const cards = grouped.filter(([, items]) => items.length).map(([title, items]) => `<section><h2>${title}</h2>${items.map(({ entry, index }) => `<article><h3>${escapeHtml(entry.path)}</h3><p>${entry.width} × ${entry.height} · ${(entry.bytes / 1024 / 1024).toFixed(2)} MiB · lossless optimization: ${(entry.sizeBeforeOptimization ?? entry.bytes) - entry.bytes} bytes saved · SHA-256 ${entry.sha256} · ${entry.before ? 'changed' : 'added'}</p>${entry.before ? `<details open><summary>Before / After</summary><img src="before/${index}.png" alt="Before"><img src="media/${index}.png" alt="After"></details>` : `<img src="media/${index}.png" alt="${escapeHtml(entry.path)}">`}</article>`).join('\n')}</section>`).join('\n')
+  const cards = grouped.filter(([, items]) => items.length).map(([title, items]) => `<section><h2>${title}</h2>${items.map(({ entry, index }) => `<article><h3>${escapeHtml(entry.path)}</h3><p>${entry.width} × ${entry.height} · ${(entry.bytes / 1024 / 1024).toFixed(2)} MiB · ${escapeHtml(entry.status)} · lossless optimization: ${(entry.sizeBeforeOptimization ?? entry.bytes) - entry.bytes} bytes saved · SHA-256 ${entry.sha256}</p>${entry.before ? `<details open><summary>Before / After</summary><img src="before/${index}.png" alt="Before"><img src="media/${index}.png" alt="After"></details>` : `<img src="media/${index}.png" alt="${escapeHtml(entry.path)}">`}</article>`).join('\n')}</section>`).join('\n')
   await writeFile(join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2))
   const failures = (options.errors ?? []).length ? `<section><h2>Errors</h2><ul>${options.errors!.map((error) => `<li>${error.path ? `<strong>${escapeHtml(error.path)}</strong>: ` : ''}${escapeHtml(error.message)}</li>`).join('')}</ul></section>` : ''
   const warnings = (options.warnings ?? []).length ? `<section><h2>Warnings</h2><ul>${options.warnings!.map((warning) => `<li>${escapeHtml(warning)}</li>`).join('')}</ul></section>` : ''

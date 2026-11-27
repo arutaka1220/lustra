@@ -5,6 +5,9 @@ dist/
 .bun-cache/
 test-results/
 .media-tmp/
+.media-input/
+.media-output/
+.media-package/
 *.media-tmp
 
 # Tauri build artifacts

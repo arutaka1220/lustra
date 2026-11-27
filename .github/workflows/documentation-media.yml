@@ -1,0 +1,439 @@
+name: Documentation Media Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      media_type:
+        description: Media to generate
+        required: true
+        type: choice
+        options: [all, screenshots, examples]
+        default: all
+      language:
+        description: Screenshot language (ignored for examples; leave as both)
+        required: true
+        type: choice
+        options: [both, ja, en]
+        default: both
+      scene:
+        description: Screenshot scene (ignored for examples; leave as all)
+        required: true
+        type: choice
+        options: [all, hero, frame-styles, ambient-gradient, edge-stretch, portrait-card, crop-and-rotate, custom-color, metadata, import, review, export, metadata-corrections]
+        default: all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documentation-media
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate dispatch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      media_type: ${{ steps.config.outputs.media_type }}
+      language: ${{ steps.config.outputs.language }}
+      scene: ${{ steps.config.outputs.scene }}
+      languages: ${{ steps.config.outputs.languages }}
+      expected_count: ${{ steps.config.outputs.expected_count }}
+      source_commit: ${{ steps.config.outputs.source_commit }}
+      app_version: ${{ steps.config.outputs.app_version }}
+    steps:
+      - name: Require workflow_dispatch from main
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+        run: |
+          if [[ "$DISPATCH_REF" != refs/heads/main ]]; then
+            echo "Documentation Media Pipeline must be dispatched from main (received $DISPATCH_REF)." >&2
+            exit 1
+          fi
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.1.6
+      - name: Install ExifTool
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends libimage-exiftool-perl
+      - name: Install project dependencies
+        run: bun install --frozen-lockfile
+      - id: config
+        name: Validate main ref, inputs, fixtures, and expected count
+        env:
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_SHA: ${{ github.sha }}
+          MEDIA_TYPE: ${{ inputs.media_type }}
+          MEDIA_LANGUAGE: ${{ inputs.language }}
+          MEDIA_SCENE: ${{ inputs.scene }}
+        run: bun scripts/media/workflow.ts validate-config
+      - name: Report dispatch validation failure
+        if: failure()
+        run: echo 'Dispatch validation failed before any media PR write. Check the branch, selected inputs, and approved demo fixture files.' >> "$GITHUB_STEP_SUMMARY"
+
+  screenshots:
+    name: Screenshots (${{ matrix.language }})
+    needs: validate
+    if: needs.validate.outputs.media_type != 'examples'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        language: ${{ fromJSON(needs.validate.outputs.languages) }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.validate.outputs.source_commit }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.1.6
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # pinned action revision
+        with:
+          toolchain: 1.93.1
+      - name: Install Tauri build and metadata dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential curl file libayatana-appindicator3-dev libgtk-3-dev \
+            libimage-exiftool-perl libssl-dev libwebkit2gtk-4.1-dev libxdo-dev \
+            librsvg2-dev pkg-config
+          sudo fc-cache -f
+      - name: Install project dependencies
+        run: bun install --frozen-lockfile
+      - name: Install Chromium and its runtime dependencies
+        run: bunx playwright install --with-deps chromium
+      - name: Generate screenshot set (one retry)
+        env:
+          MEDIA_LANGUAGE: ${{ matrix.language }}
+          MEDIA_SCENE: ${{ needs.validate.outputs.scene }}
+        run: |
+          bun scripts/media/cli.ts screenshots --language "$MEDIA_LANGUAGE" --scene "$MEDIA_SCENE" || \
+            bun scripts/media/cli.ts screenshots --language "$MEDIA_LANGUAGE" --scene "$MEDIA_SCENE"
+      - name: Prepare generated files for the artifact
+        env:
+          MEDIA_TYPE: screenshots
+          MEDIA_LANGUAGE: ${{ matrix.language }}
+          MEDIA_SCENE: ${{ needs.validate.outputs.scene }}
+        run: bun scripts/media/workflow.ts export-generated
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: success()
+        with:
+          name: documentation-media-screenshots-${{ matrix.language }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .media-output/screenshots/
+            .media-output/generation-manifest-${{ matrix.language }}.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 2
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: documentation-media-diagnostics-${{ matrix.language }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .media-tmp/playwright/
+            .media-tmp/latest-report/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Summarize screenshot generation failure
+        if: failure()
+        env:
+          LANGUAGE: ${{ matrix.language }}
+          SCENE: ${{ needs.validate.outputs.scene }}
+        run: echo "Screenshot generation failed for $LANGUAGE / $SCENE. Inspect the step log and diagnostics artifact; no PR will be created." >> "$GITHUB_STEP_SUMMARY"
+
+  examples:
+    name: Native export examples
+    needs: validate
+    if: needs.validate.outputs.media_type != 'screenshots'
+    runs-on: macos-15
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.validate.outputs.source_commit }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.1.6
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # pinned action revision
+        with:
+          toolchain: 1.93.1
+      - name: Install ExifTool and project dependencies
+        run: |
+          brew install exiftool
+          bun install --frozen-lockfile
+      - name: Generate production-rendered examples
+        run: bun run media:examples
+      - name: Prepare generated files for the artifact
+        env:
+          MEDIA_TYPE: examples
+          MEDIA_LANGUAGE: both
+          MEDIA_SCENE: all
+        run: bun scripts/media/workflow.ts export-generated
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: success()
+        with:
+          name: documentation-media-examples-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .media-output/examples/
+            .media-output/generation-manifest-examples.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 2
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: documentation-media-diagnostics-examples-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .media-tmp/latest-report/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Summarize native example failure
+        if: failure()
+        run: echo 'Native example generation failed on macOS. Inspect the renderer log and diagnostics artifact; no PR will be created.' >> "$GITHUB_STEP_SUMMARY"
+
+  process:
+    name: Assemble, compare, and validate media
+    needs: [validate, screenshots, examples]
+    if: >-
+      always() && needs.validate.result == 'success' &&
+      (needs.validate.outputs.media_type == 'examples' || needs.screenshots.result == 'success') &&
+      (needs.validate.outputs.media_type == 'screenshots' || needs.examples.result == 'success')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.package.outputs.changed }}
+      changed_count: ${{ steps.package.outputs.changed_count }}
+      success_count: ${{ steps.package.outputs.success_count }}
+      failure_count: ${{ steps.package.outputs.failure_count }}
+      total_bytes: ${{ steps.package.outputs.total_bytes }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.validate.outputs.source_commit }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.1.6
+      - name: Install metadata audit dependency
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends libimage-exiftool-perl
+      - name: Install project dependencies
+        run: bun install --frozen-lockfile
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        if: needs.validate.outputs.media_type != 'examples'
+        with:
+          pattern: documentation-media-screenshots-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .media-input/
+          merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        if: needs.validate.outputs.media_type != 'screenshots'
+        with:
+          name: documentation-media-examples-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .media-input/
+      - id: package
+        name: Verify expected paths, PNGs, privacy metadata, and changes
+        env:
+          MEDIA_TYPE: ${{ needs.validate.outputs.media_type }}
+          MEDIA_LANGUAGE: ${{ needs.validate.outputs.language }}
+          MEDIA_SCENE: ${{ needs.validate.outputs.scene }}
+          MEDIA_SOURCE_COMMIT: ${{ needs.validate.outputs.source_commit }}
+        run: bun scripts/media/workflow.ts package
+      - name: Write review summary
+        if: always()
+        env:
+          EXPECTED: ${{ needs.validate.outputs.expected_count }}
+          SUCCEEDED: ${{ steps.package.outputs.success_count }}
+          FAILED: ${{ steps.package.outputs.failure_count }}
+          CHANGED: ${{ steps.package.outputs.changed_count }}
+          TOTAL_BYTES: ${{ steps.package.outputs.total_bytes }}
+          SOURCE_SHA: ${{ needs.validate.outputs.source_commit }}
+          APP_VERSION: ${{ needs.validate.outputs.app_version }}
+          TARGET: ${{ needs.validate.outputs.media_type }} / ${{ needs.validate.outputs.language }} / ${{ needs.validate.outputs.scene }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo '## Documentation Media Pipeline'
+            echo
+            echo "- Source commit: `$SOURCE_SHA`"
+            echo "- App version: `$APP_VERSION`"
+            echo "- Requested target: `$TARGET`"
+            echo "- Planned files: `${EXPECTED:-not validated}`"
+            echo "- Successful files: `${SUCCEEDED:-0}`"
+            echo "- Failed files: `${FAILED:-unknown}`"
+            echo "- Changed files: `${CHANGED:-0}`"
+            echo "- Generated bytes: `${TOTAL_BYTES:-not available}`"
+            echo '- Validation: package job must pass PNG, metadata, path, and SHA-256 checks.'
+            echo '- Review the workflow artifact and offline HTML report before approving the `documentation-media` Environment.'
+            echo "- [Workflow run and artifact download]($RUN_URL)"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Report processing failure location
+        if: failure()
+        run: |
+          {
+            echo
+            echo 'Generation or package validation failed. Inspect the failed job step and diagnostics artifact, then rerun after resolving the cause.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always() && steps.package.outcome == 'success'
+        with:
+          name: documentation-media-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .media-package/screenshots/
+            .media-package/examples/
+            .media-package/comparison/
+            .media-package/manifest.json
+            .media-package/report.html
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
+
+  create-pr:
+    name: Create approved media PR
+    needs: [validate, process]
+    if: needs.process.result == 'success' && needs.process.outputs.changed == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: documentation-media
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.validate.outputs.source_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.1.6
+      - name: Install metadata audit dependency
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends libimage-exiftool-perl
+      - name: Install project dependencies
+        run: bun install --frozen-lockfile
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: documentation-media-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .media-package/
+      - name: Revalidate approved artifact hashes and exact paths
+        env:
+          MEDIA_TYPE: ${{ needs.validate.outputs.media_type }}
+          MEDIA_LANGUAGE: ${{ needs.validate.outputs.language }}
+          MEDIA_SCENE: ${{ needs.validate.outputs.scene }}
+          MEDIA_SOURCE_COMMIT: ${{ needs.validate.outputs.source_commit }}
+        run: bun scripts/media/workflow.ts verify-approved
+      - name: Ensure main has not moved during approval
+        env:
+          EXPECTED_SHA: ${{ needs.validate.outputs.source_commit }}
+        run: |
+          set -euo pipefail
+          actual=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [[ "$actual" != "$EXPECTED_SHA" ]]; then
+            echo "main moved from $EXPECTED_SHA to $actual during artifact review. Rerun the media pipeline." >&2
+            exit 1
+          fi
+      - id: app-token
+        name: Create Lustra Bot installation token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.LUSTRA_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.LUSTRA_BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: lustra
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Configure an ephemeral Git credential helper
+        env:
+          LUSTRA_BOT_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: git config --local credential.helper '!f() { echo username=x-access-token; echo "password=$LUSTRA_BOT_TOKEN"; }; f'
+      - name: Stage and verify only approved generated PNGs
+        env:
+          MEDIA_TYPE: ${{ needs.validate.outputs.media_type }}
+          MEDIA_LANGUAGE: ${{ needs.validate.outputs.language }}
+          MEDIA_SCENE: ${{ needs.validate.outputs.scene }}
+          MEDIA_SOURCE_COMMIT: ${{ needs.validate.outputs.source_commit }}
+        run: bun scripts/media/workflow.ts publish-approved
+      - name: Create one commit and one PR without overwriting existing work
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          LUSTRA_BOT_TOKEN: ${{ steps.app-token.outputs.token }}
+          BASE_SHA: ${{ needs.validate.outputs.source_commit }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          branch="docs/update-media-$RUN_ID"
+          current_main=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [[ "$current_main" != "$BASE_SHA" ]]; then
+            echo "main moved from $BASE_SHA to $current_main before the PR write. Rerun media generation." >&2
+            exit 1
+          fi
+          existing_pr=$(gh pr list --state all --head "$branch" --json url --jq '.[0].url // empty')
+          if [[ -n "$existing_pr" ]]; then
+            echo "A PR already exists for this workflow run: $existing_pr" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if git ls-remote --exit-code origin "refs/heads/$branch" >/dev/null 2>&1; then
+            git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch"
+            git merge-base --is-ancestor "$BASE_SHA" "refs/remotes/origin/$branch" || {
+              echo "Existing branch $branch is not based on this source commit; refusing to alter it." >&2
+              exit 1
+            }
+            git diff --quiet "refs/remotes/origin/$branch" -- docs/assets || {
+              echo "Existing branch $branch differs from this approved artifact; refusing to alter it." >&2
+              exit 1
+            }
+            git diff --quiet "$BASE_SHA" "refs/remotes/origin/$branch" -- . ':!docs/assets' || {
+              echo "Existing branch $branch contains changes outside generated assets." >&2
+              exit 1
+            }
+            result_sha=$(git rev-parse "refs/remotes/origin/$branch")
+          else
+            git switch -c "$branch" "$BASE_SHA"
+            bun scripts/media/workflow.ts publish-approved
+            git diff --cached --check
+            git diff --cached --quiet && { echo 'No staged media changes remain.'; exit 1; }
+            git diff --cached --name-only -z | node -e 'let d="";process.stdin.on("data",x=>d+=x).on("end",()=>{const p=d.split("\0").filter(Boolean);const ok=/^docs\/assets\/(screenshots\/(ja|en)\/[a-z0-9-]+\.png|examples\/[a-z0-9-]+\.png)$/;if(!p.length||p.some(x=>!ok.test(x))){console.error("Staged changes contain a disallowed path");process.exit(1)}})'
+            git config user.name 'Lustra Bot'
+            git config user.email 'lustra-bot[bot]@users.noreply.github.com'
+            git commit -m 'docs: update documentation media'
+            git push origin "$branch"
+            result_sha=$(git rev-parse HEAD)
+          fi
+          current_main=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [[ "$current_main" != "$BASE_SHA" ]]; then
+            echo "main moved to $current_main during branch publication; refusing to create a PR from stale media." >&2
+            exit 1
+          fi
+          MEDIA_SOURCE_COMMIT="$BASE_SHA" MEDIA_RESULT_COMMIT="$result_sha" MEDIA_RUN_URL="$RUN_URL" \
+            bun scripts/media/workflow.ts pr-body
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title 'docs: update documentation media' \
+            --body-file .media-package/pr-body.md
+          if gh label list --limit 100 --json name --jq '.[].name' | grep -Fxq documentation; then
+            gh pr edit "$branch" --add-label documentation
+          fi
+          pr_url=$(gh pr view "$branch" --json url --jq .url)
+          echo "Created $pr_url; merge remains manual." >> "$GITHUB_STEP_SUMMARY"
+      - name: Summarize PR publication failure
+        if: failure()
+        run: echo 'Approved media remains in the workflow artifact. Inspect the failed PR job step before retrying; the workflow does not delete or rewrite an existing branch.' >> "$GITHUB_STEP_SUMMARY"
