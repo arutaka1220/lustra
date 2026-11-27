@@ -17,10 +17,9 @@ import {
   resolveTemplate, TEXT_ANCHORS,
 } from './text-model'
 import type { MetadataField, TextAnchor, TextElement } from './text-model'
-import './text-i18n'
 import './text.css'
 
-const weights = [400, 500, 600, 700]
+const weights = [400, 500, 600, 700] as const
 
 type TextInspectorProps = { photo: SessionPhoto; frame: FrameSettings }
 
@@ -297,7 +296,7 @@ export function TextInspector({ photo, frame }: TextInspectorProps) {
             <FontInput value={active.fontFamily} onChange={(fontFamily) => updateElement(active.id, { fontFamily })} />
             <label>{t('text.weight')}
               <SelectField className="text-field" value={String(active.weight)} onValueChange={(value) => updateElement(active.id, { weight: Number(value) })}
-                options={weights.map((weight) => ({ value: String(weight), label: t(`text.weight.${weight}`) }))} />
+                options={weights.map((weight) => ({ value: String(weight), label: t(`text.weight.${weight}` as const) }))} />
             </label>
           </div>
           <SliderInput label={t('text.size')} value={active.size} min={8} max={160} unit="px" onChange={(size) => updateElement(active.id, { size })} onChangeStart={beginEdit} onChangeEnd={endEdit} />

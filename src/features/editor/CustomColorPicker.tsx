@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, Clipboard, Plus, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { hexToRgb, hsvToHex, parseHex, rgbToHex, rgbToHsv } from './color-utils'
 import { useMyPalette } from './MyPalette'
 import './custom-color-picker.css'
@@ -22,6 +23,7 @@ type Props = {
 type Point = { top: number; left: number; placement: 'right' | 'left' }
 
 export function CustomColorPicker({ color: rawColor, onChange, onOpen, tile = false, selected = false, label = 'Custom', title = 'Frame Color', onEditStart, onEditEnd, disabled = false, compact = false }: Props) {
+  const { t } = useTranslation()
   const color = parseHex(rawColor) ?? '#000000'
   const trigger = useRef<HTMLButtonElement>(null)
   const popover = useRef<HTMLDivElement>(null)
@@ -103,7 +105,7 @@ export function CustomColorPicker({ color: rawColor, onChange, onOpen, tile = fa
     updatePalette([...palette, color])
   }
   const editSaved = (saved: string) => {
-    const next = window.prompt('Enter a new HEX color', saved)
+    const next = window.prompt(t('color.picker.enterHex'), saved)
     if (next === null) return
     const parsed = parseHex(next)
     if (!parsed || (parsed !== saved && palette.includes(parsed))) return
@@ -115,13 +117,13 @@ export function CustomColorPicker({ color: rawColor, onChange, onOpen, tile = fa
   }
 
   return <>
-    <button ref={trigger} type="button" disabled={disabled} className={tile ? `style-option custom-color__tile ${selected ? 'is-active' : ''}` : compact ? `custom-color__compact ${selected ? 'is-selected' : ''}` : 'custom-color__trigger'} aria-label={tile ? `${label} frame color` : `Choose custom ${title.toLowerCase()}`} aria-expanded={open} aria-pressed={tile || compact ? selected : undefined} onClick={() => { onOpen?.(); setHexDraft(color); position(); setOpen(true) }}>
+    <button ref={trigger} type="button" disabled={disabled} className={tile ? `style-option custom-color__tile ${selected ? 'is-active' : ''}` : compact ? `custom-color__compact ${selected ? 'is-selected' : ''}` : 'custom-color__trigger'} aria-label={tile ? t('color.picker.frameColor', { name: label }) : t('color.picker.chooseCustom', { name: title })} aria-expanded={open} aria-pressed={tile || compact ? selected : undefined} onClick={() => { onOpen?.(); setHexDraft(color); position(); setOpen(true) }}>
       {tile ? <><span className="style-preview style-preview--custom" style={{ '--custom-frame-color': color } as React.CSSProperties}><span /></span><span>{label}</span></> : compact ? <><span className="custom-color__compact-swatch" style={{ backgroundColor: color }} /><Plus size={13} aria-hidden="true" /></> : <><span className="custom-color__trigger-swatch" style={{ backgroundColor: color }} /><span className="custom-color__trigger-value">{color}</span><span className="custom-color__trigger-chevron" aria-hidden="true">⌄</span></>}
       {tile && selected && <Check className="custom-color__tile-check" size={14} aria-hidden="true" />}
     </button>
     {open && createPortal(<div ref={popover} className="custom-color__popover" role="dialog" aria-label={title} data-placement={point.placement} style={{ top: point.top, left: point.left }}>
-      <header className="custom-color__header"><h2>{title}</h2><button type="button" className="custom-color__close" aria-label="Close color picker" onClick={() => { end(); setOpen(false); trigger.current?.focus() }}><X size={17}/></button></header>
-      <div ref={field} className="custom-color__field" role="slider" tabIndex={0} aria-label="Saturation and brightness" aria-valuetext={`Saturation ${Math.round(hsv.s)}%, brightness ${Math.round(hsv.v)}%`} onKeyDown={event => {
+      <header className="custom-color__header"><h2>{title}</h2><button type="button" className="custom-color__close" aria-label={t('color.picker.close')} onClick={() => { end(); setOpen(false); trigger.current?.focus() }}><X size={17}/></button></header>
+      <div ref={field} className="custom-color__field" role="slider" tabIndex={0} aria-label={t('color.picker.saturationBrightness')} aria-valuetext={t('color.picker.saturationBrightnessValue', { saturation: String(Math.round(hsv.s)), brightness: String(Math.round(hsv.v)) })} onKeyDown={event => {
         if (!event.key.startsWith('Arrow')) return
         event.preventDefault(); begin()
         const step = event.shiftKey ? 10 : 2
@@ -131,22 +133,22 @@ export function CustomColorPicker({ color: rawColor, onChange, onOpen, tile = fa
       }} onBlur={end} onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); pickField(event) }} onPointerMove={event => { if (event.buttons) pickField(event) }} onPointerUp={end} style={{ background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${hsv.h} 100% 50%))` }}>
         <span className="custom-color__field-marker" style={{ left: `${hsv.s}%`, top: `${100 - hsv.v}%` }} />
       </div>
-      <div className="custom-color__hue-wrap"><input aria-label="Hue" type="range" min="0" max="359" value={Math.round(hsv.h)} onPointerDown={begin} onPointerUp={end} onBlur={end} onChange={event => setHue(Number(event.target.value))} style={{ '--hue-position': `${(hsv.h / 359) * 100}%` } as React.CSSProperties} /></div>
-      <div className="custom-color__value-heading"><span>Color values</span><div className="custom-color__segmented" role="group" aria-label="Color value format">{(['HEX', 'RGB'] as const).map(value => <button key={value} type="button" aria-pressed={mode === value} className={mode === value ? 'is-active' : ''} onClick={() => { setMode(value); setHexDraft(color); setRgbDraft(null) }}>{value}</button>)}</div></div>
-      {mode === 'HEX' ? <div className="custom-color__hex-row"><span className="custom-color__sample" style={{ backgroundColor: color }} /><input aria-label="HEX" value={hexDraft} maxLength={7} onFocus={begin} onChange={event => { const value = event.target.value; setHexDraft(value); const valid = parseHex(value); if (valid) apply(valid, 'hex') }} onBlur={() => { if (!parseHex(hexDraft)) setHexDraft(color); end() }} onKeyDown={event => { if (event.key === 'Enter') { const valid = parseHex(hexDraft); if (valid) { apply(valid, 'hex'); setHexDraft(valid) }; event.currentTarget.blur() } }} /><button type="button" aria-label="Copy color" onClick={copy}><Clipboard size={15}/><span>{copied ? 'Copied' : 'Copy'}</span></button></div> : <div className="custom-color__rgb-row">{(['r','g','b'] as const).map((channel, index) => <label key={channel}>{channel.toUpperCase()}<input aria-label={channel.toUpperCase()} type="text" inputMode="numeric" aria-invalid={!!rgbDraft?.[channel] && Number(rgbDraft[channel]) > 255} value={rgbDraft?.[channel] ?? String(rgb[channel])} onFocus={begin} onChange={event => {
+      <div className="custom-color__hue-wrap"><input aria-label={t('color.picker.hue')} type="range" min="0" max="359" value={Math.round(hsv.h)} onPointerDown={begin} onPointerUp={end} onBlur={end} onChange={event => setHue(Number(event.target.value))} style={{ '--hue-position': `${(hsv.h / 359) * 100}%` } as React.CSSProperties} /></div>
+      <div className="custom-color__value-heading"><span>{t('color.picker.values')}</span><div className="custom-color__segmented" role="group" aria-label={t('color.picker.valueFormat')}>{(['HEX', 'RGB'] as const).map(value => <button key={value} type="button" aria-pressed={mode === value} className={mode === value ? 'is-active' : ''} onClick={() => { setMode(value); setHexDraft(color); setRgbDraft(null) }}>{t(value === 'HEX' ? 'color.hex' : 'color.rgb', { ns: 'common' })}</button>)}</div></div>
+      {mode === 'HEX' ? <div className="custom-color__hex-row"><span className="custom-color__sample" style={{ backgroundColor: color }} /><input aria-label={t('color.hex', { ns: 'common' })} value={hexDraft} maxLength={7} onFocus={begin} onChange={event => { const value = event.target.value; setHexDraft(value); const valid = parseHex(value); if (valid) apply(valid, 'hex') }} onBlur={() => { if (!parseHex(hexDraft)) setHexDraft(color); end() }} onKeyDown={event => { if (event.key === 'Enter') { const valid = parseHex(hexDraft); if (valid) { apply(valid, 'hex'); setHexDraft(valid) }; event.currentTarget.blur() } }} /><button type="button" aria-label={t('color.picker.copyColor')} onClick={copy}><Clipboard size={15}/><span>{copied ? t('color.picker.copied') : t('color.picker.copyColor')}</span></button></div> : <div className="custom-color__rgb-row">{(['r','g','b'] as const).map((channel, index) => <label key={channel}>{channel.toUpperCase()}<input aria-label={channel.toUpperCase()} type="text" inputMode="numeric" aria-invalid={!!rgbDraft?.[channel] && Number(rgbDraft[channel]) > 255} value={rgbDraft?.[channel] ?? String(rgb[channel])} onFocus={begin} onChange={event => {
         const value = event.target.value
         if (!/^\d{0,3}$/.test(value)) return
         const draft = { ...(rgbDraft ?? { r: String(rgb.r), g: String(rgb.g), b: String(rgb.b) }), [channel]: value }
         setRgbDraft(draft)
         if (value !== '' && Number(value) <= 255) apply(rgbToHex({ r: Number(draft.r || rgb.r), g: Number(draft.g || rgb.g), b: Number(draft.b || rgb.b) }), 'rgb')
       }} onBlur={event => { const value = event.currentTarget.value; if (value === '' || Number(value) > 255) setRgbDraft(null); end() }} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur() }} />{index < 2 && <span className="sr-only">,</span>}</label>)}</div>}
-      <section className="custom-color__palette" aria-label={`My Palette ${palette.length} / 16`}>
-        <header><h3>My Palette</h3><span>{palette.length} / 16</span></header>
-        {palette.length === 0 ? <div className="custom-color__empty"><p>No saved colors yet.</p><span>Save your favorite frame colors here.</span><button type="button" className="custom-color__save" disabled={palette.length >= 16} onClick={saveCurrent}><Plus size={15}/>Save current color</button></div> : <>
-          <div className="custom-color__swatches">{palette.map(saved => <button key={saved} type="button" className={`custom-color__palette-swatch ${saved === color ? 'is-selected' : ''}`} aria-label={`Apply ${saved}`} aria-pressed={saved === color} title={`${saved} · right-click to edit or remove`} style={{ backgroundColor: saved }} onClick={() => { begin(); apply(saved); end() }} onContextMenu={event => { event.preventDefault(); editSaved(saved) }} onKeyDown={event => { if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); removeSaved(saved) } if (event.key === 'F2') { event.preventDefault(); editSaved(saved) } }} />)}{palette.length < 16 && <button type="button" className="custom-color__add" aria-label="Add color to My Palette" title="Save current color" disabled={palette.includes(color)} onClick={saveCurrent}><Plus size={17}/></button>}</div>
-          <div className="custom-color__palette-actions"><button type="button" disabled={!palette.includes(color)} onClick={() => editSaved(color)}>Edit selected color</button><button type="button" disabled={!palette.includes(color)} onClick={() => removeSaved(color)}>Remove</button></div>
+        <section className="custom-color__palette" aria-label={t('color.picker.paletteLabel', { count: palette.length })}>
+        <header><h3>{t('color.picker.palette')}</h3><span>{palette.length} / 16</span></header>
+        {palette.length === 0 ? <div className="custom-color__empty"><p>{t('color.picker.empty')}</p><span>{t('color.picker.saveFavorite')}</span><button type="button" className="custom-color__save" disabled={palette.length >= 16} onClick={saveCurrent}><Plus size={15}/>{t('color.picker.saveCurrent')}</button></div> : <>
+          <div className="custom-color__swatches">{palette.map(saved => <button key={saved} type="button" className={`custom-color__palette-swatch ${saved === color ? 'is-selected' : ''}`} aria-label={t('color.picker.apply', { color: saved })} aria-pressed={saved === color} title={t('color.picker.colorOptions', { color: saved })} style={{ backgroundColor: saved }} onClick={() => { begin(); apply(saved); end() }} onContextMenu={event => { event.preventDefault(); editSaved(saved) }} onKeyDown={event => { if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); removeSaved(saved) } if (event.key === 'F2') { event.preventDefault(); editSaved(saved) } }} />)}{palette.length < 16 && <button type="button" className="custom-color__add" aria-label={t('color.picker.addToPalette')} title={t('color.picker.saveCurrentTitle')} disabled={palette.includes(color)} onClick={saveCurrent}><Plus size={17}/></button>}</div>
+          <div className="custom-color__palette-actions"><button type="button" disabled={!palette.includes(color)} onClick={() => editSaved(color)}>{t('color.picker.editSelected')}</button><button type="button" disabled={!palette.includes(color)} onClick={() => removeSaved(color)}>{t('color.picker.remove')}</button></div>
         </>}
-        {palette.length >= 16 && <p className="custom-color__limit">Palette full. Edit or remove a saved color to add another.</p>}
+        {palette.length >= 16 && <p className="custom-color__limit">{t('color.picker.paletteFull')}</p>}
       </section>
     </div>, document.body)}
   </>

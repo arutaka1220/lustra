@@ -5,7 +5,6 @@ import { canvasAspectRatio, fitCanvasToBounds } from '../editor/frame-layout'
 import { createCanvasRenderer, createFrameScene } from '../editor/frame-paint'
 import { TextOverlay } from '../text/TextOverlay'
 import { usePhotoThumbnail } from '../import/photo-thumbnail-cache'
-import '../editor/frame-i18n'
 import './review-thumbnail.css'
 
 const OUTPUT_EDGE = 768

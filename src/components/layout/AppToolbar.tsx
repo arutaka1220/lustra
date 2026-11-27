@@ -41,7 +41,7 @@ export function AppToolbar({
           title={t(inspectorOpen ? 'edit.hideInspector' : 'edit.showInspector')}
           onClick={onToggleInspector}
         >{inspectorOpen ? <PanelLeftClose size={18} /> : <PanelLeft size={18} />}</button>}
-        <button className="brand" onClick={onHome} disabled={navigationLocked} aria-label={t('common.home')}>Lustra</button>
+        <button className="brand" onClick={onHome} disabled={navigationLocked} aria-label={t('common.home')}>{t('app.name', { ns: 'common' })}</button>
       </div>
 
       {screen === 'edit' && <div className="app-toolbar__progress" aria-live="polite">

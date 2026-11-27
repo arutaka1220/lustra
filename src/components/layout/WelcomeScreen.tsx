@@ -49,7 +49,7 @@ export function WelcomeScreen({ onImportPhotos, onImportFolder }: WelcomeScreenP
             <button className="button button--secondary" onClick={onImportFolder}><FolderOpen size={16} /> {t('welcome.addFolder')}</button>
           </div>
         </section>
-        <div className="start-screen__footnote">JPEG · PNG · WebP</div>
+        <div className="start-screen__footnote">{t('formats.jpeg', { ns: 'common' })} · {t('formats.png', { ns: 'common' })} · {t('formats.webp', { ns: 'common' })}</div>
         {suspendedSessions.length > 0 && <section className="recent-sessions" aria-labelledby="suspended-title">
           <h2 id="suspended-title"><History size={16} /> {t('session.suspended')}</h2>
           <ul>{suspendedSessions.map((session) => <li key={session.id}>

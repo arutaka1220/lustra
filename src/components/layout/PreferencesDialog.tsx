@@ -7,11 +7,12 @@ import { isTauri } from '@tauri-apps/api/core'
 import { ExportPreferencesPanel } from '../../features/export/ExportPreferencesPanel'
 import { MetadataCorrections } from '../../features/text/MetadataCorrections'
 import { SelectField } from '../ui/SelectField'
-import { clearThumbnailCache, getThumbnailCacheSize, writeAppPreference } from '../../store/session-persistence'
+import { clearThumbnailCache, getThumbnailCacheSize, readAppPreference, writeAppPreference } from '../../store/session-persistence'
 import { useSessionStore } from '../../store/session-store'
 import { useUpdateStore } from '../../features/updates/update-store'
 import type { UpdateChannel } from '../../features/updates/update-store'
 import { canInstallUpdate } from '../../features/updates/update-policy'
+import { applyJapaneseUiFont, isJapaneseUiFont, isJapaneseUiFontAvailable, JAPANESE_UI_FONTS, type JapaneseUiFont } from '../../i18n/ui-font'
 
 type PreferencesDialogProps = {
   open: boolean
@@ -38,7 +39,9 @@ export function PreferencesDialog({ open, onOpenChange, exportBusy, persistenceR
   const [cacheSize, setCacheSize] = useState<number | null>(null)
   const [cacheBusy, setCacheBusy] = useState(false)
   const [version, setVersion] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [japaneseFont, setJapaneseFont] = useState<JapaneseUiFont>('noto')
+  const [availableJapaneseFonts, setAvailableJapaneseFonts] = useState<ReadonlySet<JapaneseUiFont>>(new Set(['noto']))
+  const [error, setError] = useState<'settings.storageError' | 'settings.preferenceError' | null>(null)
   const recentLimit = useSessionStore((state) => state.recentLimit)
   const undoLimit = useSessionStore((state) => state.undoLimit)
   const setRecentLimit = useSessionStore((state) => state.setRecentLimit)
@@ -69,12 +72,42 @@ export function PreferencesDialog({ open, onOpenChange, exportBusy, persistenceR
     if (focusUpdatesRevision > 0) setSection('updates')
   }, [focusUpdatesRevision])
 
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    let disposed = false
+    void Promise.all([
+      readAppPreference<unknown>('ui.japaneseFont'),
+      Promise.all(JAPANESE_UI_FONTS.map(async (font): Promise<readonly [JapaneseUiFont, boolean]> => [font, await isJapaneseUiFontAvailable(font)])),
+    ]).then(async ([saved, availability]) => {
+      if (disposed) return
+      const available = new Set<JapaneseUiFont>(availability.filter(([, supported]) => supported).map(([font]) => font))
+      setAvailableJapaneseFonts(available)
+      const requested = isJapaneseUiFont(saved) && available.has(saved) ? saved : 'noto'
+      setJapaneseFont(await applyJapaneseUiFont(requested))
+    }).catch(() => {
+      if (!disposed) setAvailableJapaneseFonts(new Set(['noto']))
+    })
+    return () => { disposed = true }
+  }, [])
+
   async function updateLanguage(next: string) {
     setError(null)
     try {
       await writeAppPreference('ui.language', next)
       localStorage.setItem('lustra.language', next)
       await i18n.changeLanguage(next)
+    } catch {
+      setError('settings.preferenceError')
+    }
+  }
+
+  async function updateJapaneseFont(next: string) {
+    if (!isJapaneseUiFont(next) || !availableJapaneseFonts.has(next)) return
+    setError(null)
+    try {
+      await writeAppPreference('ui.japaneseFont', next)
+      const applied = await applyJapaneseUiFont(next)
+      setJapaneseFont(applied)
     } catch {
       setError('settings.preferenceError')
     }
@@ -116,7 +149,16 @@ export function PreferencesDialog({ open, onOpenChange, exportBusy, persistenceR
               {section === 'general' && <label className="preference-row">
                 <div><strong>{t('settings.language')}</strong><span>{t('settings.languageBody')}</span></div>
                 <SelectField value={language} onValueChange={(value) => void updateLanguage(value)} options={[
-                  { value: 'en', label: 'English' }, { value: 'ja', label: '日本語' },
+                  { value: 'en', label: t('languages.english', { ns: 'common' }) }, { value: 'ja', label: t('languages.japanese', { ns: 'common' }) },
+                ]} />
+              </label>}
+              {import.meta.env.DEV && section === 'general' && <label className="preference-row">
+                <div><strong>{t('settings.uiJapaneseFont')}</strong><span>{t('settings.uiJapaneseFontBody')}</span></div>
+                <SelectField aria-label={t('settings.uiJapaneseFont')} value={japaneseFont} onValueChange={(value) => void updateJapaneseFont(value)} options={[
+                  { value: 'noto', label: t('fonts.notoSansJP', { ns: 'common' }) },
+                  { value: 'line-seed', label: t('fonts.lineSeedJP', { ns: 'common' }), disabled: !availableJapaneseFonts.has('line-seed') },
+                  { value: 'm-plus', label: t('fonts.mPlus1', { ns: 'common' }), disabled: !availableJapaneseFonts.has('m-plus') },
+                  { value: 'hiragino', label: t('fonts.hiraginoSans', { ns: 'common' }), disabled: !availableJapaneseFonts.has('hiragino') },
                 ]} />
               </label>}
               {section === 'metadata' && <MetadataCorrections />}
@@ -168,7 +210,7 @@ export function PreferencesDialog({ open, onOpenChange, exportBusy, persistenceR
                 {updater.status === 'failed' && <div className="preference-row"><span>{updater.error ? t('updates.errorDetail', { error: updater.error }) : t('updates.error')}</span><button className="button button--secondary" onClick={() => void updater.check(true)}>{t('common.retry')}</button></div>}
                 {exportBusy && <p className="preferences-note">{t('updates.exportBusy')}</p>}
               </>}
-              {section === 'about' && <div className="preference-row"><strong>Lustra</strong>{version && <span>{version}</span>}</div>}
+              {section === 'about' && <div className="preference-row"><strong>{t('app.name', { ns: 'common' })}</strong>{version && <span>{version}</span>}</div>}
               {error && <p className="workflow-error" role="alert">{t(error)}</p>}
             </section>
           </div>
