@@ -61,6 +61,11 @@ fn allow_photo_directory(app: tauri::AppHandle, path: String) -> Result<(), Stri
 }
 
 #[tauri::command]
+fn set_native_menu_label(app: tauri::AppHandle, quit_label: String) -> Result<(), String> {
+    persistence::set_quit_menu_label(&app, &quit_label).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 async fn read_photo_metadata(
     app: tauri::AppHandle,
     path: String,
@@ -94,6 +99,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             allow_photo_paths,
             allow_photo_directory,
+            set_native_menu_label,
             read_photo_metadata,
             fonts::list_font_families,
             persistence::load_sessions,

@@ -54,6 +54,9 @@ describe('centralized translation dictionaries', () => {
     expect(i18n.t('import.confirmCount', { count: 12 })).toBe('12枚の写真を読み込む')
     expect(i18n.t('edit.completion', { count: 8, total: 12 })).toBe('12枚中8枚が完了')
     expect(i18n.t('session.photoCount', { count: 1 })).toBe('1枚')
+    expect(i18n.t('export.progressCount', { processed: '3', total: '30' })).toBe('30枚中3枚を書き出し中')
+    expect(i18n.t('export.incompleteBody', { count: 3 })).toBe('未完了の写真が3枚あります。書き出すと、すべての写真が含まれます。')
+    expect(i18n.t('export.exportFailed')).toBe('書き出しを開始できませんでした。')
   })
 
   it('shows the Japanese translation for user facing errors', async () => {
@@ -93,7 +96,9 @@ describe('centralized translation dictionaries', () => {
   })
 
   it('registers every Japanese key in the Japanese runtime bundle without English fallback', () => {
-    const japaneseKeys = Object.keys(flattenTranslationLeaves(japanese))
-    for (const key of japaneseKeys) expect(i18n.exists(key, { lng: 'ja' }), key).toBe(true)
+    for (const [key, text] of Object.entries(flattenTranslationLeaves(japanese))) {
+      expect(i18n.exists(key, { lng: 'ja' }), key).toBe(true)
+      expect(i18n.t(key, { lng: 'ja' }), key).toBe(text)
+    }
   })
 })

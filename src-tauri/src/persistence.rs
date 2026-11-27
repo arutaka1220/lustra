@@ -538,3 +538,30 @@ pub(crate) fn install_quit_menu(app: &tauri::App) -> tauri::Result<()> {
     });
     Ok(())
 }
+
+pub(crate) fn set_quit_menu_label(app: &tauri::AppHandle, label: &str) -> tauri::Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        use tauri::menu::MenuItemKind;
+
+        let Some(menu) = app.menu() else {
+            return Ok(());
+        };
+        let Some(MenuItemKind::Submenu(app_menu)) = menu.items()?.into_iter().next() else {
+            return Ok(());
+        };
+        for item in app_menu.items()? {
+            if item.id().as_ref() == "lustra-save-and-quit" {
+                if let MenuItemKind::MenuItem(item) = item {
+                    item.set_text(label)?;
+                }
+                break;
+            }
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (app, label);
+    }
+    Ok(())
+}

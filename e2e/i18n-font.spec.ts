@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test('language and development Japanese font selections apply and persist', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/')
   await page.getByRole('button', { name: 'Preferences' }).click()
   await page.getByRole('combobox').first().click()

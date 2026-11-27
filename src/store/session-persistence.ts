@@ -82,6 +82,7 @@ function explain(error: unknown): string {
 }
 
 function reportPersistenceError(error: unknown) {
+  console.error('Session persistence operation failed', error)
   reportStatus({ ...status, error: explain(error) })
 }
 

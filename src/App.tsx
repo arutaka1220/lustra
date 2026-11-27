@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { invoke, isTauri } from '@tauri-apps/api/core'
 import { Aperture, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { PhotoMetadataNoticeDialog } from './components/layout/PhotoMetadataNoticeDialog'
@@ -40,7 +41,7 @@ export function App() {
   const persistence = useSessionPersistence()
   const [exportBusy, setExportBusy] = useState(false)
   const [suspending, setSuspending] = useState(false)
-  const [suspendError, setSuspendError] = useState<string | null>(null)
+  const [suspendError, setSuspendError] = useState(false)
   const photoImport = usePhotoImport(persistence.ready, screen !== 'export')
   const loadMetadataCorrections = useMetadataCorrections((state) => state.load)
   const updateNoticeKey = `${updater.status}:${updater.channel}:${updater.update?.version ?? ''}`
@@ -63,7 +64,7 @@ export function App() {
       return
     }
     setSuspending(true)
-    setSuspendError(null)
+    setSuspendError(false)
     try {
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
       endFrameEdit()
@@ -76,7 +77,8 @@ export function App() {
     } catch (error) {
       const id = useSessionStore.getState().suspendedSessions[0]?.id
       if (id) resumeSuspendedSession(id)
-      setSuspendError(error instanceof Error ? error.message : String(error))
+      console.error('Could not save the current session before leaving the editor', error)
+      setSuspendError(true)
     } finally {
       setSuspending(false)
     }
@@ -87,7 +89,10 @@ export function App() {
   useEffect(() => {
     let disposed = false
     void readAppPreference<string>('ui.language').then((language) => {
-      if (!disposed && (language === 'en' || language === 'ja')) void i18n.changeLanguage(language)
+      if (disposed) return
+      if (language === 'en' || language === 'ja') void i18n.changeLanguage(language)
+      const resolvedLanguage = language === 'ja' || (language !== 'en' && i18n.resolvedLanguage?.startsWith('ja')) ? 'ja' : 'en'
+      if (isTauri()) void invoke('set_native_menu_label', { quitLabel: i18n.t('nativeMenu.quit', { lng: resolvedLanguage }) }).catch((error) => console.error('Could not update the native menu label', error))
     }).catch((error) => console.error('Could not restore the display language', error))
     return () => { disposed = true }
   }, [i18n])
@@ -142,12 +147,12 @@ export function App() {
       />
 
       {suspendError && <div className="persistence-notice" role="alert">
-        <div><strong>{t('session.saveError')}</strong><small>{suspendError}</small></div>
+        <div><strong>{t('session.saveError')}</strong></div>
         <button className="button button--secondary button--small" onClick={() => { void goHome() }}>{t('common.retry')}</button>
       </div>}
 
       {persistence.error && <div className="persistence-notice" role="alert">
-        <div><strong>{t(persistence.protectedArchive || !persistence.ready ? 'session.loadError' : 'session.saveError')}</strong><small>{persistence.error}</small>
+        <div><strong>{t(persistence.protectedArchive || !persistence.ready ? 'session.loadError' : 'session.saveError')}</strong>
           {persistence.protectedArchive && <small>{t('session.recoveryNoOverwrite')}</small>}
         </div>
         <button className="button button--secondary button--small" onClick={persistence.retry}>{t('common.retry')}</button>
@@ -191,7 +196,7 @@ export function App() {
       />
       {showUpdateNotice && <aside className="update-notice" role={updater.status === 'failed' ? 'alert' : 'status'}>
         <div><strong>{t('updates.noticeTitle')}</strong><span>{updater.status === 'failed'
-          ? t('updates.errorDetail', { error: updater.error ?? t('updates.error') })
+          ? t('updates.error')
           : updater.status === 'readyToRestart'
             ? t('updates.status.readyToRestart')
             : t('updates.noticeAvailable', { version: updater.update?.version ?? '' })}</span></div>
