@@ -66,4 +66,29 @@ PNG output is lossless and keeps alpha for decorated windows. Screenshots are ge
 
 ## GitHub Actions
 
-GitHub Actions orchestration and Lustra Bot approval/PR automation are Phase 2 and are intentionally not included in this Phase 1 implementation. Review local output and its HTML report before staging generated PNGs.
+The `Documentation Media Pipeline` workflow is a manual `workflow_dispatch` workflow restricted to `main`. Choose `all`, `screenshots`, or `examples`; screenshot requests can select `both`, `ja`, or `en` and one scene. When generating examples, leave language at `both` and scene at `all`. Contradictory values fail before generation. Ordinary pushes, pull requests, and releases do not trigger media generation.
+
+Screenshot generation and artifact processing run on `ubuntu-24.04`. The nine finished examples run on `macos-15` because the production Rust renderer links CoreGraphics, CoreText, and ImageIO. The engine is not reimplemented for Linux. All generation jobs use isolated checkouts and do not receive the Lustra Bot key. The Linux screenshot jobs and native renderer are independent; the workflow only proceeds to review when every job required by the selected media type succeeds.
+
+The assembled artifact is named `documentation-media-<run-id>-<attempt>`, is retained for 30 days, and contains the PNGs, SHA-256 manifest, offline HTML report, and before/after comparisons. Open the workflow run's Summary and download this artifact to inspect the report locally. Generation failures may also publish a short-lived diagnostics artifact without media credentials.
+
+When generated images differ from `main`, the `create-pr` job pauses at the `documentation-media` Environment. Review and approve the deployment only after inspecting the artifact and report. The environment must require the configured reviewer and contain `LUSTRA_BOT_CLIENT_ID` as a variable and `LUSTRA_BOT_PRIVATE_KEY` as a secret. Approval authorizes only the verified artifact from that run. The job rechecks artifact hashes, allowed paths, and the `main` SHA before it requests a short-lived repository-scoped Lustra Bot token. That token can write contents and pull requests, and exists only in the approval job.
+
+After approval, Lustra Bot creates one commit on `docs/update-media-<run-id>` and opens a PR against `main`. The PR embeds before/after comparisons and the workflow artifact link. Existing required CI runs on the image-only PR; the workflow never merges it. Use manual Squash and merge after reviewing the images, PR diff, and CI result. If `main` moves while approval is pending, the run stops and asks for a fresh generation. If no images changed, the workflow skips Environment approval and PR creation.
+
+The repository's current required `validate` workflow has no path filter, so image-only PRs trigger its existing checks. Environment approval, App token issuance, push, and PR creation can only be exercised by a `workflow_dispatch` on `main`; they are not executed from pull request branches.
+
+## Troubleshooting
+
+- If a dispatch is rejected, select the `main` branch and use only the listed media type, language, and scene values.
+- If example rendering fails on Ubuntu, check that the workflow still uses its dedicated `macos-15` job; the production export backend is Apple-framework based.
+- A missing or inaccessible GitHub Environment setting prevents the PR job from obtaining the App key. Restore the `documentation-media` reviewer and its configured variable/secret; do not replace the approval with a repository secret.
+- If review approval is followed by a `main` SHA mismatch, run the workflow again against the new `main` head.
+- If an App token or push fails, the 30-day reviewed artifact remains available for diagnosis; no PAT or `GITHUB_TOKEN` write fallback is used.
+- If a PR already exists for the same run, the workflow reports that PR and does not create a duplicate or rewrite its branch.
+
+## Known limits
+
+- GitHub's manual approval, App installation, and PR creation require a post-merge dispatch to verify end-to-end.
+- Export examples run on macOS to preserve the real native renderer; an all-Ubuntu runner cannot execute them with the current application architecture.
+- Generated media still needs human visual review; passing structural and privacy checks does not guarantee composition quality.

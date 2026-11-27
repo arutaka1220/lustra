@@ -110,7 +110,7 @@ async function writeFailureReport(config: ReturnType<typeof parseArgs>, outputs:
       const target = safeOutputPath(output.relative)
       const status = existsSync(target) ? (sha256(target) === info.sha256 ? 'unchanged' : 'changed') : 'added'
       files.push({ path: output.relative, result: 'success', status, width: info.width, height: info.height, bytes: info.bytes, sha256: info.sha256, hasAlpha: info.hasAlpha })
-      reportFiles.push({ path: output.relative, source: relative(root, output.staged) })
+      reportFiles.push({ path: output.relative, source: relative(root, output.staged), status })
     } catch (fileError) {
       const message = safeErrorMessage(fileError)
       files.push({ path: output.relative, result: 'failed', status: 'failed', error: message })
@@ -237,7 +237,11 @@ async function main() {
     stage = 'metadata audit, manifest, and HTML report generation'
     const manifest = createManifest({ generatedAt: new Date().toISOString(), sourceCommit: Bun.spawnSync(['git', 'rev-parse', 'HEAD'], { cwd: root }).stdout.toString().trim(), appVersion: JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).version, kind: config.kind, languages: config.languages, scene: config.scene, tools: { bun: Bun.version, playwright: JSON.parse(readFileSync(resolve(root, 'node_modules/@playwright/test/package.json'), 'utf8')).version, chromium: chromiumVersion, oxipng: '10.2.1', rustc: toolVersion('rustc', ['--version']), cargo: toolVersion('cargo', ['--version']), exiftool: toolVersion('exiftool', ['-ver']) }, files: stagedEntries.map(({ item, info, optimization }) => { const old = trackedBefore.get(item.relative); const status = !old ? 'added' : sha256(resolve(root, old)) === info.sha256 ? 'unchanged' : 'changed'; return { path: item.relative, result: 'success', ...info, hasAlpha: optimization.has_alpha, sizeBeforeOptimization: optimization.before_bytes, sizeAfterOptimization: optimization.after_bytes, optimizationBytesSaved: optimization.before_bytes - optimization.after_bytes, status } }) })
     const reportDir = resolve(temp, 'report'); mkdirSync(reportDir, { recursive: true })
-    await writeReport(root, stagedEntries.map(({ item, optimization }) => ({ path: item.relative, source: relative(root, item.staged), before: trackedBefore.get(item.relative), sizeBeforeOptimization: optimization.before_bytes, sizeAfterOptimization: optimization.after_bytes })), reportDir)
+    await writeReport(root, stagedEntries.map(({ item, info, optimization }) => {
+      const before = trackedBefore.get(item.relative)
+      const status = !before ? 'added' : sha256(resolve(root, before)) === info.sha256 ? 'unchanged' : 'changed'
+      return { path: item.relative, source: relative(root, item.staged), before, status, sizeBeforeOptimization: optimization.before_bytes, sizeAfterOptimization: optimization.after_bytes }
+    }), reportDir)
     await Bun.write(resolve(reportDir, 'manifest.json'), JSON.stringify(manifest, null, 2))
     const metadataPaths = publish.map(({ staged }) => staged)
     validatePublicMetadata(metadataPaths)

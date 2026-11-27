@@ -28,6 +28,7 @@ Conventional Commitsに近い種類の接頭辞を使い、作業内容が分か
 | テスト | `test/session-restore` |
 | ドキュメント | `docs/update-requirements` |
 | 保守作業 | `chore/update-dependencies` |
+| CI / 自動化 | `ci/update-workflow` |
 
 ## コミット
 
