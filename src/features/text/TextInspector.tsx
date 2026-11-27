@@ -250,18 +250,18 @@ export function TextInspector({ photo, frame }: TextInspectorProps) {
             }} title={t('text.remove')} aria-label={t('text.remove')}><Trash2 size={15} /></button>
           </div>
           <div className="text-fields">
-            <label>{t('text.template')}
+            <label>{t('text.template.label')}
               <textarea className="text-field" ref={editor} value={active.template} rows={2} onFocus={beginEdit} onBlur={endEdit} onChange={(event) => updateElement(active.id, { template: event.target.value })} />
             </label>
             <label className="visually-hidden" htmlFor={variablesId}>{t('text.variable')}</label>
             <SelectField className="text-field" id={variablesId} aria-label={t('text.variable')} placeholder={t('text.variable')} value=""
               onValueChange={(variable) => insertVariable(variable)}
               options={Object.keys(METADATA_VARIABLES).map((variable) => ({ value: variable, label: `{${variable}}` }))} />
-            <label>{t('text.anchor')}
+            <label>{t('text.anchor.label')}
               <SelectField className="text-field" value={active.anchor} onValueChange={(value) => updateElement(active.id, { anchor: value as TextAnchor })}
                 options={TEXT_ANCHORS.map((anchor) => ({ value: anchor, label: t(`text.anchor.${anchor}`) }))} />
             </label>
-            <label>{t('text.anchorMode')}
+            <label>{t('text.anchorMode.label')}
               <SelectField className="text-field" value={active.anchorMode ?? 'canvas'} onValueChange={(value) => changeAnchorMode(active, value as 'photo' | 'canvas')}
                 options={[{ value: 'photo', label: t('text.anchorMode.photo') }, { value: 'canvas', label: t('text.anchorMode.canvas') }]} />
             </label>
@@ -272,7 +272,7 @@ export function TextInspector({ photo, frame }: TextInspectorProps) {
           </div>
         </>}
         <details className="text-metadata" open={metadataOpen} onToggle={(event) => setMetadataOpen(event.currentTarget.open)}>
-          <summary>{t('text.metadata')}</summary>
+          <summary>{t('text.metadata.label')}</summary>
           <div className="text-fields">
             {Object.values(METADATA_VARIABLES).map((field) => <MetadataInput
               key={field}
@@ -294,7 +294,7 @@ export function TextInspector({ photo, frame }: TextInspectorProps) {
         {active ? <>
           <div className="text-fields">
             <FontInput value={active.fontFamily} onChange={(fontFamily) => updateElement(active.id, { fontFamily })} />
-            <label>{t('text.weight')}
+            <label>{t('text.weight.label')}
               <SelectField className="text-field" value={String(active.weight)} onValueChange={(value) => updateElement(active.id, { weight: Number(value) })}
                 options={weights.map((weight) => ({ value: String(weight), label: t(`text.weight.${weight}` as const) }))} />
             </label>

@@ -54,7 +54,7 @@ export function ImportScreen({ onAddFiles, onAddFolder, onDropFiles, dragging }:
       ) : (
         <section className="candidate-sheet">
           <div className="candidate-toolbar">
-            <div className="candidate-selection"><span className="selection-indicator"><Check size={12} /></span><strong>{t('import.selected', { count: selectedCount, total: candidates.length })}</strong></div>
+            <div className="candidate-selection"><span className="selection-indicator"><Check size={12} /></span><strong>{t('import.selected', { count: selectedCount, total: String(candidates.length) })}</strong></div>
             <div className="candidate-actions">
               <button className="text-button" onClick={() => selectAll(true)}>{t('import.selectAll')}</button>
               <span className="toolbar-divider" />

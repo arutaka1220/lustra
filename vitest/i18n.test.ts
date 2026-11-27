@@ -10,6 +10,13 @@ describe('centralized translation dictionaries', () => {
     expect(findTranslationIssues(english, japanese)).toEqual([])
   })
 
+  it('organizes locale strings into feature namespaces', () => {
+    expect(english.edit.doneNext).toBe('Done & Next')
+    expect(japanese.edit.doneNext).toBe('完了して次へ')
+    expect(english.text.template.label).toBe('Text')
+    expect(japanese.text.template.label).toBe('テキスト')
+  })
+
   it('reports missing, unexpected, empty, and mismatched interpolation entries', () => {
     const issues = findTranslationIssues(
       { actions: { save: 'Save', delete: 'Delete', empty: 'Not empty', interpolation: 'Delete {{name}}' } },
