@@ -36,6 +36,36 @@ mod platform {
     }
 }
 
+/// Render a documentation sample through the same native renderer used by batch export.
+/// This entry point is used by the developer-only CLI and is not registered as a Tauri command.
+pub fn render_documentation_example(source: PathBuf, job_json: &str) -> Result<Vec<u8>, String> {
+    if !platform::available(ExportFormat::Png) {
+        return Err("Native PNG export is unavailable on this platform.".to_owned());
+    }
+    let job: ExportJob = serde_json::from_str(job_json).map_err(|error| error.to_string())?;
+    let settings: ExportSettings = serde_json::from_value(serde_json::json!({
+        "format": "png",
+        "size": 1440,
+        "quality": 100,
+        "keepCamera": false,
+        "keepLens": false,
+        "keepExposure": false,
+        "keepDate": false,
+        "keepGps": false,
+        "keepSerial": false,
+        "applyMetadataCorrections": false,
+        "colorSpace": "srgb"
+    }))
+    .map_err(|error| error.to_string())?;
+    let mut job = job;
+    job.path = source.clone();
+    let bytes = platform::render(&source, &job, &settings)?;
+    match metadata::filtered_exif(&source, &settings, &job.metadata)? {
+        Some(metadata) => metadata::attach_exif(bytes, metadata, ExportFormat::Png),
+        None => Ok(bytes),
+    }
+}
+
 static DESTINATION: Mutex<Option<DestinationGrant>> = Mutex::new(None);
 static ACTIVE: Mutex<Option<ActiveRun>> = Mutex::new(None);
 static RUN_SEQUENCE: AtomicU64 = AtomicU64::new(1);
