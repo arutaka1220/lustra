@@ -1,22 +1,22 @@
 {
-  "version": "1.0.0-beta.4",
-  "notes": "## What's Changed\n* docs: add pull request development workflow by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/1\n* chore: remove preset feature by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/2\n* fix: skip update checks in development builds by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/3\n* fix: improve Ambient Gradient color fidelity by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/4\n* feat: add edge stretch frame style by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/5\n* feat: add photo watermark support by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/6\n* feat: add interactive crop and rotation controls by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/7\n* refactor: remove obsolete preset features by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/8\n* feat: add portrait card canvas layout by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/9\n* refactor: simplify text color controls and padding defaults by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/10\n* feat: add option alt reset controls by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/11\n* chore: release v1.0.0-beta.4 by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/12\n\n## New Contributors\n* @arutaka1220 made their first contribution in https://github.com/arutaka1220/lustra/pull/1\n\n**Full Changelog**: https://github.com/arutaka1220/lustra/compare/v1.0.0-beta.3...v1.0.0-beta.4",
-  "pub_date": "2026-11-24T09:22:50.916Z",
+  "version": "1.0.0-beta.5",
+  "notes": "## What's Changed\n* feat: introduce adaptive mosaic review gallery by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/13\n* fix: prevent duplicate export requests by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/14\n* Generate app icons from the SVG source by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/15\n* feat: add documentation media pipeline by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/16\n* ci: add documentation media workflow by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/17\n* docs: redesign project readme by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/18\n* refactor: unify type-safe i18n and improve Japanese UI by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/19\n* chore: release v1.0.0-beta.5 by @arutaka1220 in https://github.com/arutaka1220/lustra/pull/20\n\n\n**Full Changelog**: https://github.com/arutaka1220/lustra/compare/v1.0.0-beta.4...v1.0.0-beta.5",
+  "pub_date": "2026-11-28T19:11:20.391Z",
   "session_snapshot_versions": [
     3
   ],
   "platforms": {
     "darwin-aarch64": {
-      "url": "https://github.com/arutaka1220/lustra/releases/download/v1.0.0-beta.4/Lustra-darwin-aarch64.app.tar.gz",
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTK0QzZHh5blF4RGdBSmVQYXYxem5weWM1TEFteTRvcTJrTHl5SVNUekNxNzBLay9JVU5kMnJTWFJzRUhFeDdNanc3UEk0YzFSb1dNdEdwK3Q4V2lDYUx5TFdZazJvWHdJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1NTExODAyCWZpbGU6THVzdHJhLmFwcC50YXIuZ3oJdmVyc2lvbjoxLjAuMC1iZXRhLjQKbkNLc1NwZTZRYXZLUXBNSnJtNXhPUlpPY3Z0MnNCUURqZVVaMHhzM24zd0U4ZkZ3SGEwWE9sUStzbktZVFFWcFJnRlkyS3N1eC9Sa2sreDJCV1ZUQnc9PQo="
+      "url": "https://github.com/arutaka1220/lustra/releases/download/v1.0.0-beta.5/Lustra-darwin-aarch64.app.tar.gz",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTK0QzZHh5blF4RG1WNVArWFdJUlA5YXloZFB6dUdsVXBVQmlxWUIvc3l3aHJNdDRRYlNNWGRRL3dCY09DRmV2dzk1VHhCUm9FYmpHZ2VrN0g1N1dINFN6djEyTWg4Z0FjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1ODkyNzM4CWZpbGU6THVzdHJhLmFwcC50YXIuZ3oJdmVyc2lvbjoxLjAuMC1iZXRhLjUKaFMvNzJlY0VZVnM3cklqemVsY0FTQkZ1YjVXdXAzMytUMGFKbFg2a1J5Vnhod2pFSWk0ZjczTlJxbWpTZ3Y1WmQyS3B2Z2ZGTkdRVE9aM2F1VzNVQWc9PQo="
     },
     "darwin-x86_64": {
-      "url": "https://github.com/arutaka1220/lustra/releases/download/v1.0.0-beta.4/Lustra-darwin-x86_64.app.tar.gz",
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTK0QzZHh5blF4RGgzdCszRERhQ25vY3NxWU56cDRZbXZKUGExQUh1amg0a0lDQWFWMzFMQ3VqQUpTbGdKcXFDaG0wUzhxM0JwSy9GOTg5MlhKUXU3eTlIcUY5VC84eHdvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1NTEyMTQ4CWZpbGU6THVzdHJhLmFwcC50YXIuZ3oJdmVyc2lvbjoxLjAuMC1iZXRhLjQKQ2drWVBBdUVqbGQzeGx1VUN6MUZuTkY5UC8vTnNCdzcxWk1ZbmdHRmtvV0dmOCtrcHRrVEsxTGgyWFN0QmVCTDA0OTVJL0ozTVpqK1kyemtBcnVUQVE9PQo="
+      "url": "https://github.com/arutaka1220/lustra/releases/download/v1.0.0-beta.5/Lustra-darwin-x86_64.app.tar.gz",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTK0QzZHh5blF4RGxDb3M2dTZHOSt2SHZHM1Q3Q1d3MEV3Snk2bWpTYVJQMHg4QWR0OFpSeW00QWJ3L3NROGV4SU1YTWVuOStDYy84dlA5cjE1emxLVUs2Z1QyZXFhd3drPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1ODkzMDU3CWZpbGU6THVzdHJhLmFwcC50YXIuZ3oJdmVyc2lvbjoxLjAuMC1iZXRhLjUKaVFKTEZoV3pQSmViVm5hakk1QmhmRWhCWnAwSkRZNEg0U05aelN1M2NxQVoxTU51LzNmRUczclFmVXhVVmhUT3hPTk5BVGxYbmg2bVlsZnptZGJMRFE9PQo="
     },
     "windows-x86_64": {
-      "url": "https://github.com/arutaka1220/lustra/releases/download/v1.0.0-beta.4/Lustra-windows-x86_64-setup.exe",
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTK0QzZHh5blF4RHVJWlNoTEhkNUk2ZWgyZEhvQTBzdytiNUJaeWY3TUF1ekx2VEZHeDlZM1lZeHY0WXQ3OEdTK0FoQjhEM0dQZmpwZThyT2dULzduYmZZOFpKaWRQSVFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1NTExOTY2CWZpbGU6THVzdHJhXzEuMC4wLWJldGEuNF94NjQtc2V0dXAuZXhlCXZlcnNpb246MS4wLjAtYmV0YS40CmhRRmNZQ2JKRG9SWFR6d1hucWpxUzdIamRyZGQxWnJ6NGNROXp3cWZKQ01Eek9WbTJBZUl5Q0xNYTVTSDZqRG1oaVRCYXY5UVdadE5LRGcwSlJZTkJnPT0K"
+      "url": "https://github.com/arutaka1220/lustra/releases/download/v1.0.0-beta.5/Lustra-windows-x86_64-setup.exe",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTK0QzZHh5blF4RHBzVTM5R2E2Y0oyVmVjTkgzOWhmS2lXcFRMcnhlQk0wUTBpZTJBcmlabmlPMW1STXlqTjc4NEhzM01pNDN3aGVjZlRnS3pNWlVpcmdlZnR5dkhHcFF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1ODkzMDQxCWZpbGU6THVzdHJhXzEuMC4wLWJldGEuNV94NjQtc2V0dXAuZXhlCXZlcnNpb246MS4wLjAtYmV0YS41CkU3aSszbjdYUnlEYmhqNzI0RmRzUU5CcDZ5S1VJRVlCbEE5bHFBaG5ZbjgzdDROMzMwUDBmT0VxRy9sVWhKcDc1cjllYTI4dGhHL29MNmZHb2ZtMUNBPT0K"
     }
   }
 }
