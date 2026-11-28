@@ -160,6 +160,7 @@ export function PreferencesDialog({ open, onOpenChange, exportBusy, persistenceR
                   { value: 'line-seed', label: t('fonts.lineSeedJP', { ns: 'common' }), disabled: !availableJapaneseFonts.has('line-seed') },
                   { value: 'm-plus', label: t('fonts.mPlus1', { ns: 'common' }), disabled: !availableJapaneseFonts.has('m-plus') },
                   { value: 'hiragino', label: t('fonts.hiraginoSans', { ns: 'common' }), disabled: !availableJapaneseFonts.has('hiragino') },
+                  { value: 'gen-interface', label: t('fonts.genInterfaceJP', { ns: 'common' }), disabled: !availableJapaneseFonts.has('gen-interface') },
                 ]} />
               </label>}
               {section === 'metadata' && <MetadataCorrections />}

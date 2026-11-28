@@ -39,6 +39,7 @@
 :root[data-japanese-font="line-seed"] { --font-ui-japanese: "LINE Seed JP"; }
 :root[data-japanese-font="m-plus"] { --font-ui-japanese: "M PLUS 1 Variable"; }
 :root[data-japanese-font="hiragino"] { --font-ui-japanese: "Hiragino Sans"; }
+:root[data-japanese-font="gen-interface"] { --font-ui-japanese: "Gen Interface JP"; }
 
 * { box-sizing: border-box; }
 html, body, #root { width: 100%; min-width: 920px; min-height: 100%; margin: 0; }

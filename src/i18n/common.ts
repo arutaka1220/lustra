@@ -10,7 +10,7 @@ export const common = {
   color: { hex: 'HEX', rgb: 'RGB' },
   fonts: {
     inter: 'Inter', notoSansJP: 'Noto Sans JP', lineSeedJP: 'LINE Seed JP',
-    mPlus1: 'M PLUS 1', hiraginoSans: 'Hiragino Sans',
+    mPlus1: 'M PLUS 1', hiraginoSans: 'Hiragino Sans', genInterfaceJP: 'Gen Interface JP',
   },
   languages: { english: 'English', japanese: '日本語' },
 } as const

@@ -1,4 +1,4 @@
-export const JAPANESE_UI_FONTS = ['noto', 'line-seed', 'm-plus', 'hiragino'] as const
+export const JAPANESE_UI_FONTS = ['noto', 'line-seed', 'm-plus', 'hiragino', 'gen-interface'] as const
 export type JapaneseUiFont = (typeof JAPANESE_UI_FONTS)[number]
 
 const FONT_FAMILY: Record<JapaneseUiFont, string> = {
@@ -6,6 +6,7 @@ const FONT_FAMILY: Record<JapaneseUiFont, string> = {
   'line-seed': 'LINE Seed JP',
   'm-plus': 'M PLUS 1 Variable',
   hiragino: 'Hiragino Sans',
+  'gen-interface': 'Gen Interface JP',
 }
 
 let devFontsLoaded: Promise<void> | null = null

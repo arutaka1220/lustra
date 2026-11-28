@@ -8,6 +8,7 @@ afterEach(() => {
 describe('Japanese UI font selection', () => {
   it('validates saved font identifiers without accepting unknown values', () => {
     expect(isJapaneseUiFont('m-plus')).toBe(true)
+    expect(isJapaneseUiFont('gen-interface')).toBe(true)
     expect(isJapaneseUiFont('system-default')).toBe(false)
     expect(isJapaneseUiFont(null)).toBe(false)
   })
