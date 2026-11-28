@@ -9,8 +9,7 @@ export const common = {
   metadata: { exif: 'EXIF', xmp: 'XMP', iso: 'ISO', gps: 'GPS', icc: 'ICC' },
   color: { hex: 'HEX', rgb: 'RGB' },
   fonts: {
-    inter: 'Inter', notoSansJP: 'Noto Sans JP', lineSeedJP: 'LINE Seed JP',
-    mPlus1: 'M PLUS 1', hiraginoSans: 'Hiragino Sans', genInterfaceJP: 'Gen Interface JP',
+    inter: 'Inter', notoSansJP: 'Noto Sans JP', genInterfaceJP: 'Gen Interface JP',
   },
   languages: { english: 'English', japanese: '日本語' },
 } as const

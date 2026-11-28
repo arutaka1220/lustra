@@ -38,10 +38,10 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-i18next": "^15.7.3",
-    "zustand": "^5.0.8"
+    "zustand": "^5.0.8",
+    "gen-interface-jp": "0.8.0"
   },
   "devDependencies": {
-    "@fontsource-variable/m-plus-1": "^5.3.1",
     "@playwright/test": "^1.65.1",
     "@tailwindcss/vite": "^4.1.13",
     "@tauri-apps/cli": "^2.8.4",
@@ -51,7 +51,6 @@
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.4",
-    "gen-interface-jp": "0.8.0",
     "jsdom": "^31.0.1",
     "tailwindcss": "^4.1.13",
     "typescript": "~5.9.2",

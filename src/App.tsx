@@ -17,7 +17,6 @@ import { flushSessionPersistence, readAppPreference, useSessionPersistence } fro
 import { useMetadataCorrections } from './features/text/metadata-corrections-store'
 import { ExportScreen } from './features/export/ExportScreen'
 import { useUpdateStore } from './features/updates/update-store'
-import { applyJapaneseUiFont, isJapaneseUiFont } from './i18n/ui-font'
 import './styles/workflow.css'
 
 export function App() {
@@ -96,16 +95,6 @@ export function App() {
     }).catch((error) => console.error('Could not restore the display language', error))
     return () => { disposed = true }
   }, [i18n])
-  useEffect(() => {
-    if (!import.meta.env.DEV) return
-    let disposed = false
-    void readAppPreference<unknown>('ui.japaneseFont').then(async (saved) => {
-      const applied = await applyJapaneseUiFont(isJapaneseUiFont(saved) ? saved : 'noto')
-      if (!disposed && saved !== applied && saved !== null) console.warn('Saved Japanese UI font is unavailable; using Noto Sans JP')
-    }).catch((error) => console.error('Could not restore the Japanese UI font', error))
-    return () => { disposed = true }
-  }, [])
-
   return (
     <div className="app-shell" onDrop={photoImport.handleDrop} onDragOver={(event) => {
       if (event.dataTransfer.types.includes('Files')) event.preventDefault()

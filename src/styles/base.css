@@ -2,7 +2,7 @@
 
 :root {
   --font-ui-latin: "Inter Variable";
-  --font-ui-japanese: "Noto Sans JP Variable";
+  --font-ui-japanese: "Gen Interface JP";
   --font-ui: var(--font-ui-latin), var(--font-ui-japanese), sans-serif;
   font-family: var(--font-ui);
   font-synthesis: none;
@@ -34,12 +34,6 @@
   --filmstrip-collapsed-height: 28px;
   --workspace-background: #FFFFFF;
 }
-
-:root[data-japanese-font="noto"] { --font-ui-japanese: "Noto Sans JP Variable"; }
-:root[data-japanese-font="line-seed"] { --font-ui-japanese: "LINE Seed JP"; }
-:root[data-japanese-font="m-plus"] { --font-ui-japanese: "M PLUS 1 Variable"; }
-:root[data-japanese-font="hiragino"] { --font-ui-japanese: "Hiragino Sans"; }
-:root[data-japanese-font="gen-interface"] { --font-ui-japanese: "Gen Interface JP"; }
 
 * { box-sizing: border-box; }
 html, body, #root { width: 100%; min-width: 920px; min-height: 100%; margin: 0; }

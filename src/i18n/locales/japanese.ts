@@ -179,8 +179,6 @@ export const japanese = {
   },
   "settings": {
     "language": "言語",
-    "uiJapaneseFont": "日本語UIフォント（開発用）",
-    "uiJapaneseFontBody": "日本語表示に使うフォントを比較します",
     "title": "設定",
     "description": "Lustraの表示言語、書き出しの初期値、保存容量を管理します。",
     "languageBody": "Lustraで使用する言語",
