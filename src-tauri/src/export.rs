@@ -39,11 +39,7 @@ mod platform {
 /// Render a documentation sample through the same native renderer used by batch export.
 /// This entry point is used by the developer-only CLI and is not registered as a Tauri command.
 pub fn render_documentation_example(source: PathBuf, job_json: &str) -> Result<Vec<u8>, String> {
-    if !platform::available(ExportFormat::Png) {
-        return Err("Native PNG export is unavailable on this platform.".to_owned());
-    }
-    let job: ExportJob = serde_json::from_str(job_json).map_err(|error| error.to_string())?;
-    let settings: ExportSettings = serde_json::from_value(serde_json::json!({
+    let settings_json = serde_json::json!({
         "format": "png",
         "size": 1440,
         "quality": 100,
@@ -55,13 +51,32 @@ pub fn render_documentation_example(source: PathBuf, job_json: &str) -> Result<V
         "keepSerial": false,
         "applyMetadataCorrections": false,
         "colorSpace": "srgb"
-    }))
-    .map_err(|error| error.to_string())?;
+    })
+    .to_string();
+    render_export_example(source, job_json, &settings_json)
+}
+
+/// Render one explicit export job through the production renderer for baseline tooling.
+/// This entry point is developer-only and is not registered as a Tauri command.
+pub fn render_export_example(
+    source: PathBuf,
+    job_json: &str,
+    settings_json: &str,
+) -> Result<Vec<u8>, String> {
+    let settings: ExportSettings =
+        serde_json::from_str(settings_json).map_err(|error| error.to_string())?;
+    if !platform::available(settings.format) {
+        return Err(format!(
+            "Native {:?} export is unavailable on this platform.",
+            settings.format
+        ));
+    }
+    let job: ExportJob = serde_json::from_str(job_json).map_err(|error| error.to_string())?;
     let mut job = job;
     job.path = source.clone();
     let bytes = platform::render(&source, &job, &settings)?;
     match metadata::filtered_exif(&source, &settings, &job.metadata)? {
-        Some(metadata) => metadata::attach_exif(bytes, metadata, ExportFormat::Png),
+        Some(metadata) => metadata::attach_exif(bytes, metadata, settings.format),
         None => Ok(bytes),
     }
 }

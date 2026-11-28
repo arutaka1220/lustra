@@ -1,0 +1,13 @@
+{
+  "format": "jpeg",
+  "size": "original",
+  "quality": 90,
+  "keepCamera": false,
+  "keepLens": false,
+  "keepExposure": false,
+  "keepDate": false,
+  "keepGps": false,
+  "keepSerial": false,
+  "applyMetadataCorrections": false,
+  "colorSpace": "srgb"
+}
