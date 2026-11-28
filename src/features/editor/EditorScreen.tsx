@@ -14,6 +14,23 @@ import { prefetchEditPreview, previewNeighborIndices } from './preview-cache'
 import { useFilmstripLayout } from '../../hooks/useFilmstripLayout'
 import { effectiveFrameSettings } from './frame-layout'
 import { resetCropTransform } from './crop-model'
+import type { TranslationSchemaKey } from '../../i18n/types'
+
+const overrideFieldLabelKeys: Partial<Record<keyof FrameSettings, TranslationSchemaKey>> = {
+  style: 'edit.field.style',
+  top: 'edit.field.top',
+  right: 'edit.field.right',
+  bottom: 'edit.field.bottom',
+  left: 'edit.field.left',
+  linkSides: 'edit.field.linkSides',
+  linkVertical: 'edit.field.linkVertical',
+  blurStrength: 'edit.field.blurStrength',
+  backgroundBrightness: 'edit.field.backgroundBrightness',
+  backgroundOpacity: 'edit.field.backgroundOpacity',
+  showInset: 'edit.field.showInset',
+  showShadow: 'edit.field.showShadow',
+  textElements: 'edit.field.textElements',
+}
 
 type EditorScreenProps = {
   inspectorOpen: boolean
@@ -51,7 +68,7 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
   const resetAllOverrides = useSessionStore((state) => state.resetPhotoOverrides)
   const markMissing = useSessionStore((state) => state.markPhotoSourceMissing)
   const relink = useSessionStore((state) => state.relinkPhoto)
-  const [relinkError, setRelinkError] = useState<{ id: string; key: string } | null>(null)
+  const [relinkError, setRelinkError] = useState<{ id: string; key: 'session.relinkError' | 'session.relinkDuplicate' | 'session.relinkNoMatch' } | null>(null)
   const [locating, setLocating] = useState(false)
   const [cropMode, setCropMode] = useState(false)
   const initialCrops = useRef<Record<string, SessionPhoto['cropTransform']>>({})
@@ -193,7 +210,7 @@ export function EditorScreen({ inspectorOpen, inspectorWidth, onResizeInspector,
             </div>
             {overrides.length > 0 && <details className="override-settings">
               <summary>{t('edit.overrides', { count: overrides.length })}</summary>
-              <ul>{overrides.map((key) => <li key={key}><span>{t(`edit.field.${key}`, { defaultValue: key })}</span><button className="text-button" onClick={() => resetOverride(photo.id, key)}>{t('edit.useCommon')}</button></li>)}</ul>
+              <ul>{overrides.map((key) => <li key={key}><span>{overrideFieldLabelKeys[key] ? t(overrideFieldLabelKeys[key]) : key}</span><button className="text-button" onClick={() => resetOverride(photo.id, key)}>{t('edit.useCommon')}</button></li>)}</ul>
               <button className="text-button" onClick={() => resetAllOverrides(photo.id)}>{t('edit.resetOverrides')}</button>
             </details>}
           </div>

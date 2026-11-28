@@ -89,7 +89,7 @@ export function ReviewScreen() {
           <p>{t('review.body')}</p>
         </div>
         <div className="review-heading__actions">
-          <span className="review-completion"><Check size={14} /> {t('edit.completion', { count: completed, total: photos.length })}</span>
+          <span className="review-completion"><Check size={14} /> {t('edit.completion', { count: completed, total: String(photos.length) })}</span>
           <div className="review-size-control">
             <label htmlFor="review-minimum-size">{t('review.minimumSize')}</label>
             <div className="review-size-control__slider">

@@ -4,13 +4,17 @@ import { useTranslation } from 'react-i18next'
 import { SliderInput } from './SliderInput'
 import { InspectorSection } from './InspectorSection'
 import { useInspectorSections } from './useInspectorSections'
-import type { FrameSettings } from '../../types/photo'
-import './frame-i18n'
+import type { FrameSettings, FrameStyle } from '../../types/photo'
 import { CustomColorPicker } from './CustomColorPicker'
 import { SelectField } from '../../components/ui/SelectField'
 import { autoFrameTextColor } from '../text/text-model'
 import { initialFrame, initialPortraitCardSettings } from '../../store/session-store'
 import { ResetButton } from './ResetButton'
+
+const frameStyleName = {
+  none: 'none', black: 'black', white: 'white', blurred: 'blur', softBlack: 'softBlack',
+  softWhite: 'softWhite', custom: 'custom', ambientGradient: 'ambientGradient', edgeStretch: 'edgeStretch',
+} as const satisfies Record<FrameStyle, keyof typeof import('../../i18n/common').common.frames>
 
 type FrameControlsProps = {
   frame: FrameSettings
@@ -94,11 +98,11 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
       <InspectorSection title={t('edit.frame')} open={isOpen('frame')} onToggle={() => toggle('frame')} onReset={onResetCategory ? () => onResetCategory('frame') : undefined}>
         <div className="style-picker">
           {FRAME_STYLE_ORDER.map((style) => style === 'custom'
-            ? <CustomColorPicker key={style} tile selected={frame.style === 'custom'} label={t('framePreview.custom')} color={frame.customColor ?? '#000000'} onOpen={() => onChange('style', 'custom')} onChange={color => onChange('customColor', color)} onEditStart={onFrameEditStart} onEditEnd={onFrameEditEnd} />
+            ? <CustomColorPicker key={style} tile selected={frame.style === 'custom'} label={t('frames.custom', { ns: 'common' })} color={frame.customColor ?? '#000000'} onOpen={() => onChange('style', 'custom')} onChange={color => onChange('customColor', color)} onEditStart={onFrameEditStart} onEditEnd={onFrameEditEnd} />
             : <button className={`style-option ${frame.style === style ? 'is-active' : ''}`} key={style}
               onClick={() => onChange('style', style)} aria-pressed={frame.style === style}>
               <span className={`style-preview style-preview--${style === 'blurred' ? 'blur' : style}`}><span /></span>
-              <span>{t(`framePreview.${style}`)}</span>{frame.style === style && <Check size={14} aria-hidden="true" />}
+              <span>{t(`frames.${frameStyleName[style]}`, { ns: 'common' })}</span>{frame.style === style && <Check size={14} aria-hidden="true" />}
             </button>)}
         </div>
         <section className="frame-text-color" aria-label={t('framePreview.textColor')}>
@@ -106,7 +110,7 @@ export function FrameControls({ frame, onChange, onPatch, onFrameEditStart, onFr
             <strong>{t('framePreview.textColor')}</strong>
             {onResetTextColor && <ResetButton label={t('framePreview.textColor')} onReset={onResetTextColor} />}
             <label className="frame-text-color__auto">
-              <span>Auto</span>
+              <span>{t('framePreview.auto')}</span>
               <button type="button" role="switch" aria-label={t('framePreview.autoTextColor')} aria-checked={autoTextColor}
                 className={`switch ${autoTextColor ? 'is-on' : ''}`}
                 onClick={() => patch(autoTextColor

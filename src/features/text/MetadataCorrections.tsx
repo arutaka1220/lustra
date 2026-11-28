@@ -79,7 +79,7 @@ export function MetadataCorrections() {
 
   return (
     <div className="metadata-corrections">
-      <h2>{t('text.corrections')}</h2>
+      <h2>{t('text.corrections.label')}</h2>
       {status === 'loadError' && <p className="text-feedback" role="status">
         {t('text.corrections.loadError')} <button className="text-button" type="button" onClick={() => void load()}>{t('text.corrections.retry')}</button>
       </p>}

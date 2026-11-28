@@ -12,7 +12,29 @@ const mocks = vi.hoisted(() => ({
   windowCloseGuard: vi.fn(),
 }))
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ i18n: { resolvedLanguage: 'en' } }) }))
+vi.mock('react-i18next', () => ({ useTranslation: () => ({
+  i18n: { resolvedLanguage: 'en' },
+  t: (key: string, values?: Record<string, unknown>) => {
+    const messages: Record<string, string> = {
+      'export.settingsTitle': 'Export photos', 'export.backToReview': 'Back to review', 'export.backToEditing': 'Back to editing',
+      'export.export': 'Export', 'export.loadingMetadata': 'Reading metadata for {{count}} photos…',
+      'export.incompleteTitle': 'Export unfinished photos?', 'export.incompleteBody': '{{count}} photos are still marked incomplete.',
+      'export.exportAnyway': 'Export anyway', 'export.progressTitle': 'Exporting photos', 'export.preparingTitle': 'Preparing export...',
+      'export.preparingCount': 'Preparing {{count}} photos for export.', 'export.progressCount': '{{processed}} of {{total}} photos processed',
+      'export.cancel': 'Cancel export', 'export.cancelling': 'Cancelling export…', 'export.cancelTitle': 'Cancel this export?',
+      'export.cancelBody': 'Choose whether to keep the files created by this export.', 'export.continue': 'Continue exporting',
+      'export.keep': 'Keep exported files', 'export.delete': 'Delete exported files', 'export.resultTitle': 'Export results',
+      'export.cancelledTitle': 'Export cancelled', 'export.savedCount': '{{count}} photos saved', 'export.failedCount': '{{count}} photos failed',
+      'export.skippedCount': '{{count}} photos cancelled', 'export.failedTitle': 'Photos that could not be exported',
+      'export.retryFailed': 'Retry failed', 'export.exportAgain': 'Export again', 'export.finish': 'Finish',
+      'export.cleanupFailed': 'Some exported files could not be deleted.', 'export.photoFailed': 'This photo could not be exported.',
+      'export.unsupportedSource': 'Choose the original file in the desktop app.', 'export.missingSource': 'Locate the original file in the editor and try again.',
+      'export.unprocessedSource': 'The export ended before processing this photo.', 'export.exportFailed': 'Could not start exporting.',
+      'export.cancelFailed': 'Could not cancel the export.', 'export.finishFailed': 'Could not finish the session.',
+    }
+    return (messages[key] ?? key).replace(/{{(\w+)}}/g, (_match, name: string) => String(values?.[name] ?? ''))
+  },
+}) }))
 vi.mock('../src/store/session-persistence', () => ({ registerWindowCloseGuard: (guard: () => boolean) => { mocks.windowCloseGuard(guard); return mocks.releaseCloseGuard } }))
 vi.mock('../src/store/session-store', () => ({ getEffectiveFrame: mocks.getEffectiveFrame }))
 vi.mock('../src/features/text/metadata-corrections-store', () => ({ useMetadataCorrections: (select: (state: { corrections: object }) => unknown) => select({ corrections: {} }) }))

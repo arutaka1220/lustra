@@ -12,7 +12,7 @@ test('Alt reveals targeted reset buttons and blur reset is undoable', async ({ p
   await expect(page.locator('.preview-board')).toBeVisible()
   const frameSection = page.getByRole('button', { name: 'Frame', exact: true })
   if (await frameSection.getAttribute('aria-expanded') !== 'true') await frameSection.click()
-  await page.getByRole('button', { name: 'Blurred', exact: true }).click()
+  await page.getByRole('button', { name: 'Blur', exact: true }).click()
   const appearance = page.getByRole('button', { name: 'Appearance', exact: true })
   if (await appearance.getAttribute('aria-expanded') !== 'true') await appearance.click()
   const blur = page.getByRole('spinbutton', { name: 'Blur strength' })

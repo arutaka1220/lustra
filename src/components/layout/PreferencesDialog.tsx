@@ -3,7 +3,7 @@ import { HardDrive, Info, Languages, RefreshCw, ScanLine, Upload, X } from 'luci
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getVersion } from '@tauri-apps/api/app'
-import { isTauri } from '@tauri-apps/api/core'
+import { invoke, isTauri } from '@tauri-apps/api/core'
 import { ExportPreferencesPanel } from '../../features/export/ExportPreferencesPanel'
 import { MetadataCorrections } from '../../features/text/MetadataCorrections'
 import { SelectField } from '../ui/SelectField'
@@ -38,7 +38,7 @@ export function PreferencesDialog({ open, onOpenChange, exportBusy, persistenceR
   const [cacheSize, setCacheSize] = useState<number | null>(null)
   const [cacheBusy, setCacheBusy] = useState(false)
   const [version, setVersion] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<'settings.storageError' | 'settings.preferenceError' | null>(null)
   const recentLimit = useSessionStore((state) => state.recentLimit)
   const undoLimit = useSessionStore((state) => state.undoLimit)
   const setRecentLimit = useSessionStore((state) => state.setRecentLimit)
@@ -75,6 +75,7 @@ export function PreferencesDialog({ open, onOpenChange, exportBusy, persistenceR
       await writeAppPreference('ui.language', next)
       localStorage.setItem('lustra.language', next)
       await i18n.changeLanguage(next)
+      if (isTauri()) void invoke('set_native_menu_label', { quitLabel: t('nativeMenu.quit', { lng: next }) }).catch((error) => console.error('Could not update the native menu label', error))
     } catch {
       setError('settings.preferenceError')
     }
@@ -116,7 +117,7 @@ export function PreferencesDialog({ open, onOpenChange, exportBusy, persistenceR
               {section === 'general' && <label className="preference-row">
                 <div><strong>{t('settings.language')}</strong><span>{t('settings.languageBody')}</span></div>
                 <SelectField value={language} onValueChange={(value) => void updateLanguage(value)} options={[
-                  { value: 'en', label: 'English' }, { value: 'ja', label: '日本語' },
+                  { value: 'en', label: t('languages.english', { ns: 'common' }) }, { value: 'ja', label: t('languages.japanese', { ns: 'common' }) },
                 ]} />
               </label>}
               {section === 'metadata' && <MetadataCorrections />}
@@ -165,10 +166,10 @@ export function PreferencesDialog({ open, onOpenChange, exportBusy, persistenceR
                   <div><strong>{t('updates.downloadProgress')}</strong><span>{updater.contentLength ? `${Math.min(100, Math.round(updater.downloaded / updater.contentLength * 100))}%` : t('updates.downloading')}</span></div>
                   {updater.contentLength && <progress max={updater.contentLength} value={Math.min(updater.downloaded, updater.contentLength)} />}
                 </div>}
-                {updater.status === 'failed' && <div className="preference-row"><span>{updater.error ? t('updates.errorDetail', { error: updater.error }) : t('updates.error')}</span><button className="button button--secondary" onClick={() => void updater.check(true)}>{t('common.retry')}</button></div>}
+                {updater.status === 'failed' && <div className="preference-row"><span>{t('updates.error')}</span><button className="button button--secondary" onClick={() => void updater.check(true)}>{t('common.retry')}</button></div>}
                 {exportBusy && <p className="preferences-note">{t('updates.exportBusy')}</p>}
               </>}
-              {section === 'about' && <div className="preference-row"><strong>Lustra</strong>{version && <span>{version}</span>}</div>}
+              {section === 'about' && <div className="preference-row"><strong>{t('app.name', { ns: 'common' })}</strong>{version && <span>{version}</span>}</div>}
               {error && <p className="workflow-error" role="alert">{t(error)}</p>}
             </section>
           </div>

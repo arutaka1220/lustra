@@ -10,11 +10,9 @@ import { effectiveFrameSettings } from '../editor/frame-layout'
 import { useMetadataCorrections } from '../text/metadata-corrections-store'
 import { getEffectiveMetadata, resolveTextLayers } from '../text/text-model'
 import { ExportPreferencesContent } from './ExportPreferencesPanel'
-import { exportCopy } from './export-copy'
 import {
   beginExport,
   cancelExport,
-  exportError,
   getExportSettings,
 } from './export-model'
 import type { CancelPolicy, ExportJob, ExportOutcome } from './export-model'
@@ -85,13 +83,28 @@ function ExportConfirmation({ open, onClose, restoreFocus, title, description, c
 }
 
 export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEditing, onFinish, onBusyChange }: ExportScreenProps) {
-  const { i18n } = useTranslation()
+  const { i18n, t } = useTranslation()
   const language = i18n.resolvedLanguage?.startsWith('ja') ? 'ja' : 'en'
-  const copy = exportCopy[language]
+  const copy = {
+    settingsTitle: t('export.settingsTitle'), backToReview: t('export.backToReview'), backToEditing: t('export.backToEditing'),
+    export: t('export.export'), loadingMetadata: (count: number) => t('export.loadingMetadata', { count }),
+    incompleteTitle: t('export.incompleteTitle'), incompleteBody: (count: number) => t('export.incompleteBody', { count }),
+    exportAnyway: t('export.exportAnyway'), progressTitle: t('export.progressTitle'), preparingTitle: t('export.preparingTitle'),
+    preparingCount: (count: number) => t('export.preparingCount', { count }),
+    progressCount: (processed: number, total: number) => t('export.progressCount', { processed: String(processed), total: String(total) }),
+    cancel: t('export.cancel'), cancelling: t('export.cancelling'), cancelTitle: t('export.cancelTitle'), cancelBody: t('export.cancelBody'),
+    continue: t('export.continue'), keep: t('export.keep'), delete: t('export.delete'), resultTitle: t('export.resultTitle'),
+    cancelledTitle: t('export.cancelledTitle'), savedCount: (count: number) => t('export.savedCount', { count }),
+    failedCount: (count: number) => t('export.failedCount', { count }), skippedCount: (count: number) => t('export.skippedCount', { count }),
+    failedTitle: t('export.failedTitle'), retryFailed: t('export.retryFailed'), exportAgain: t('export.exportAgain'), finish: t('export.finish'),
+    cleanupFailed: t('export.cleanupFailed'), unsupportedSource: t('export.unsupportedSource'), missingSource: t('export.missingSource'),
+    unprocessedSource: t('export.unprocessedSource'), photoFailed: t('export.photoFailed'), exportFailed: t('export.exportFailed'),
+    cancelFailed: t('export.cancelFailed'), finishFailed: t('export.finishFailed'), destinationFailed: t('export.destinationFailed'),
+  }
   const corrections = useMetadataCorrections((state) => state.corrections)
   const values = useExportPreferences()
   const { preferences, capabilities, destinationApproved, pickingDestination } = values
-  const [actionError, setActionError] = useState<{ description: string; detail: string } | null>(null)
+  const [actionError, setActionError] = useState<{ description: string } | null>(null)
   const [confirmation, setConfirmation] = useState<'incomplete' | 'cancel' | null>(null)
   const [phase, setPhase] = useState<'settings' | 'progress' | 'result'>('settings')
   const [preparing, setPreparing] = useState(false)
@@ -231,7 +244,8 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
       setCanCancel(false)
       setPreparing(false)
       setPhase(previous ? 'result' : 'settings')
-      setActionError({ description: copy.exportFailed, detail: exportError(error) })
+      if (import.meta.env.DEV) console.error('Export could not start', error)
+      setActionError({ description: copy.exportFailed })
       onBusyChange(false)
     }
   }
@@ -261,7 +275,8 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
       if (activeRun.current !== current) return
       current.cancelling = false
       setCancelling(false)
-      setActionError({ description: copy.cancelFailed, detail: exportError(error) })
+      if (import.meta.env.DEV) console.error('Export could not be cancelled', error)
+      setActionError({ description: copy.cancelFailed })
     }
   }
 
@@ -272,7 +287,8 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
     try {
       await onFinish()
     } catch (error) {
-      setActionError({ description: copy.finishFailed, detail: exportError(error) })
+      if (import.meta.env.DEV) console.error('Session could not be finished', error)
+      setActionError({ description: copy.finishFailed })
     } finally {
       setFinishing(false)
       onBusyChange(false)
@@ -360,15 +376,14 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
                 <ul>
                   {failed.map((photo) => {
                     const outcome = report.outcomes.get(photo.id)
-                    return <li key={photo.id}><strong>{photo.name}</strong><span>{outcome?.type === 'failed' && outcome.message}</span></li>
+                    return <li key={photo.id}><strong>{photo.name}</strong><span>{outcome?.type === 'failed' && copy.photoFailed}</span></li>
                   })}
                 </ul>
               </div>
             )}
             {!!report.cleanupErrors.length && (
               <div className="export-error" role="alert">
-                <strong>{copy.cleanupFailed}</strong>
-                <ul>{report.cleanupErrors.map((error, index) => <li key={index}>{error}</li>)}</ul>
+                <strong>{report.cleanupErrors.length === 1 ? copy.cleanupFailed : t('export.cleanupFailedCount', { count: report.cleanupErrors.length })}</strong>
               </div>
             )}
             <div className="export-actions export-result__actions">
@@ -386,7 +401,7 @@ export function ExportScreen({ photos, commonFrame, onBackToReview, onBackToEdit
           </div>
         )}
 
-        {actionError && <div className="export-error" role="alert"><strong>{actionError.description}</strong><span>{actionError.detail}</span></div>}
+        {actionError && <div className="export-error" role="alert"><strong>{actionError.description}</strong></div>}
       </section>
 
       <ExportConfirmation open={confirmation === 'incomplete'} onClose={() => setConfirmation(null)} restoreFocus={restoreDialogFocus} title={copy.incompleteTitle} description={copy.incompleteBody(incomplete)}>

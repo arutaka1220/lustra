@@ -1,7 +1,10 @@
 @import "tailwindcss";
 
 :root {
-  font-family: "Inter Variable", "Noto Sans JP Variable", sans-serif;
+  --font-ui-latin: "Inter Variable";
+  --font-ui-japanese: "Gen Interface JP";
+  --font-ui: var(--font-ui-latin), var(--font-ui-japanese), sans-serif;
+  font-family: var(--font-ui);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

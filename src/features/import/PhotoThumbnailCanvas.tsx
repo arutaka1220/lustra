@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { ImageOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { usePhotoThumbnail } from './photo-thumbnail-cache'
-import '../editor/frame-i18n'
 import './photo-thumbnail.css'
 
 type Props = { url?: string; fit?: 'cover' | 'contain' }

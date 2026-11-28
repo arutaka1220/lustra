@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { PointerEvent } from 'react'
 import { INITIAL_CROP_TRANSFORM, moveCrop, ratioValue, resizeCrop, validCrop } from './crop-model'
 import type { CropRect } from './crop-model'
@@ -7,6 +8,7 @@ type Props = { bounds: { x: number; y: number; width: number; height: number }; 
 type Drag = { handle: string; x: number; y: number; crop: CropRect; angle: number }
 
 export function CropOverlay({ bounds, crop: stored, sourceWidth, sourceHeight, source, onChange }: Props) {
+  const { t } = useTranslation()
   const crop = { ...INITIAL_CROP_TRANSFORM, ...stored, ...validCrop(stored) }
   const drag = useRef<Drag | undefined>(undefined)
   const result = useRef<HTMLCanvasElement>(null)
@@ -84,7 +86,7 @@ export function CropOverlay({ bounds, crop: stored, sourceWidth, sourceHeight, s
     if (p.x >= crop.x && p.x <= crop.x+crop.width && p.y >= crop.y && p.y <= crop.y+crop.height) start(event, 'move')
     else if (nearCorner) start(event, 'rotate')
   }
-  return <div className="crop-overlay-wrap"><canvas ref={result} className="crop-result-preview" style={{ left: x, top: y, width: w, height: h }} aria-hidden="true"/><svg className={`crop-overlay${active ? ` is-dragging is-dragging-${drag.current?.handle}` : ''}${hover ? ` is-hover-${hover}` : ''}`} aria-label="Crop controls" onPointerDown={startFromSurface} onPointerMove={update} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end} onPointerLeave={() => { if (!drag.current) setHover('') }}>
+  return <div className="crop-overlay-wrap"><canvas ref={result} className="crop-result-preview" style={{ left: x, top: y, width: w, height: h }} aria-hidden="true"/><svg className={`crop-overlay${active ? ` is-dragging is-dragging-${drag.current?.handle}` : ''}${hover ? ` is-hover-${hover}` : ''}`} aria-label={t('crop.controls')} onPointerDown={startFromSurface} onPointerMove={update} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end} onPointerLeave={() => { if (!drag.current) setHover('') }}>
     <defs><mask id="crop-mask"><rect width="100%" height="100%" fill="white"/><rect x={x} y={y} width={w} height={h} fill="black"/></mask></defs>
     <rect width="100%" height="100%" fill="rgba(0,0,0,.52)" mask="url(#crop-mask)" pointerEvents="none" />
     <rect x={x} y={y} width={w} height={h} className="crop-outline" onPointerDown={e => start(e, 'move')} />

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { fitCropRatio, INITIAL_CROP_TRANSFORM, ratioValue, resetCropTransform } from './crop-model'
 import type { CropRect } from './crop-model'
-import './frame-i18n'
 import { ResetButton } from './ResetButton'
 
 type Props = {

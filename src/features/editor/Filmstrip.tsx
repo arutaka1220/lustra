@@ -74,7 +74,7 @@ export function Filmstrip({ photos, activePhotoId, completed, expanded, height, 
           <div className="filmstrip-heading__summary">
             <strong>{t('edit.photos')}</strong>
             <span>{t('session.photoCount', { count: photos.length })}</span>
-            <span className="filmstrip-completion">{t('edit.completion', { count: completed, total: photos.length })}</span>
+            <span className="filmstrip-completion">{t('edit.completion', { count: completed, total: String(photos.length) })}</span>
           </div>
         </div>
         <div className="filmstrip-actions">
@@ -130,7 +130,7 @@ export function Filmstrip({ photos, activePhotoId, completed, expanded, height, 
         <Dialog.Content className="settings-dialog">
           <Dialog.Title className="dialog-title">{confirmRemove ? t('session.remove') : optionsPhoto?.name}</Dialog.Title>
           <Dialog.Description className="dialog-description">
-            {confirmRemove ? t('session.removeBody', { name: optionsPhoto?.name }) : t('session.photoOptions', { name: optionsPhoto?.name })}
+            {confirmRemove ? t('session.removeBody', { name: optionsPhoto?.name ?? '' }) : t('session.photoOptions', { name: optionsPhoto?.name ?? '' })}
           </Dialog.Description>
           {!confirmRemove && optionsPhoto && <div className="photo-option-actions">
             <button className="button button--secondary" onClick={() => moveBy(optionsPhoto.id, -1)} disabled={photos[0]?.id === optionsPhoto.id}>{t('session.moveEarlier')}</button>
