@@ -1,7 +1,7 @@
 [package]
 name = "lustra"
 default-run = "lustra"
-version = "1.0.0-beta.4"
+version = "1.0.0-beta.5"
 description = "A focused photo framing desktop app"
 authors = ["Lustra"]
 edition = "2021"
