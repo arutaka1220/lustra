@@ -12,6 +12,15 @@ pub fn render_documentation_example(
     export::render_documentation_example(source, job_json)
 }
 
+/// Developer tooling entry point for explicit production-renderer baseline cases.
+pub fn render_export_example(
+    source: std::path::PathBuf,
+    job_json: &str,
+    settings_json: &str,
+) -> Result<Vec<u8>, String> {
+    export::render_export_example(source, job_json, settings_json)
+}
+
 use std::path::Path;
 use tauri::Manager;
 use tauri_plugin_fs::FsExt;

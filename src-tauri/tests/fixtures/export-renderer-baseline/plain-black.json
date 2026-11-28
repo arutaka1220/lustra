@@ -1,0 +1,26 @@
+{
+  "id": "plain-black-baseline",
+  "path": "replaced-by-baseline-cli",
+  "frame": {
+    "style": "black",
+    "canvasLayout": "standard",
+    "top": 12,
+    "bottom": 12,
+    "left": 12,
+    "right": 12,
+    "blurStrength": 25,
+    "backgroundBrightness": 0,
+    "backgroundOpacity": 100,
+    "showInset": false,
+    "showShadow": false
+  },
+  "crop": {
+    "x": 0,
+    "y": 0,
+    "width": 1,
+    "height": 1,
+    "rotation": 0
+  },
+  "text": [],
+  "metadata": {}
+}

@@ -1,0 +1,51 @@
+{
+  "id": "text-crop-baseline",
+  "path": "replaced-by-baseline-cli",
+  "frame": {
+    "style": "blurred",
+    "canvasLayout": "standard",
+    "top": 12,
+    "bottom": 12,
+    "left": 12,
+    "right": 12,
+    "blurStrength": 28,
+    "backgroundBrightness": 45,
+    "backgroundOpacity": 100,
+    "showInset": true,
+    "showShadow": true
+  },
+  "crop": {
+    "x": 0.08,
+    "y": 0.12,
+    "width": 0.84,
+    "height": 0.76,
+    "rotation": 1.5
+  },
+  "text": [
+    {
+      "text": "Lustra — 風景の記録",
+      "anchor": "bottom-left",
+      "x": 36,
+      "y": 38,
+      "size": 32,
+      "fontFamily": "Arial",
+      "weight": 400,
+      "color": "#ffffff",
+      "opacity": 92,
+      "anchorMode": "photo"
+    },
+    {
+      "text": "A quiet morning",
+      "anchor": "top-center",
+      "x": 0,
+      "y": 28,
+      "size": 24,
+      "fontFamily": "Arial",
+      "weight": 600,
+      "color": "#ffffff",
+      "opacity": 84,
+      "anchorMode": "canvas"
+    }
+  ],
+  "metadata": {}
+}
